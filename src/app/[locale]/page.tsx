@@ -424,7 +424,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </div>
           </Reveal>
           <Card className="p-6">
-            <ContactForm content={copy} />
+            <ContactForm content={copy} locale={locale} />
           </Card>
         </div>
       </section>
