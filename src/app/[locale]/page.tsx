@@ -420,7 +420,19 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               <a href={whatsappHref} className="flex items-center gap-3 hover:text-lead-blue">
                 <MessageCircle className="h-5 w-5" /> {whatsappDisplay}
               </a>
-              <p>{sharedContent.socials.join(" · ")}</p>
+              <div className="flex flex-wrap gap-2">
+                {sharedContent.socials.map((social) => (
+                  <a
+                    key={social.name}
+                    href={social.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-gray transition hover:border-lead-blue hover:text-lead-blue"
+                  >
+                    {social.name}
+                  </a>
+                ))}
+              </div>
             </div>
           </Reveal>
           <Card className="p-6">
@@ -451,6 +463,19 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <div>
             <h2 className="font-heading text-2xl font-bold text-lead-navy">LEAD</h2>
             <p className="mt-3 text-sm leading-7 text-lead-gray">Speak English with Confidence.</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {sharedContent.socials.map((social) => (
+                <a
+                  key={social.name}
+                  href={social.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-lead-gray transition hover:bg-lead-blue hover:text-white"
+                >
+                  {social.name}
+                </a>
+              ))}
+            </div>
           </div>
           {["Quick Links", "Courses", "Resources"].map((heading) => (
             <div key={heading}>

@@ -56,7 +56,20 @@ export const iconMap = {
 };
 
 export const sharedContent = {
-  socials: ["Instagram", "Facebook", "TikTok", "YouTube"],
+  socials: [
+    {
+      name: "Instagram",
+      url: "https://www.instagram.com/learnenglishdaily_2026?igsh=cjN2aXd3ODN5dXUw"
+    },
+    {
+      name: "Facebook",
+      url: "https://www.facebook.com/profile.php?id=61589425052642"
+    },
+    {
+      name: "TikTok",
+      url: "https://www.tiktok.com/@learn.english.daily.1?_r=1&_t=ZS-96ZIuehHDJU"
+    }
+  ],
   stats: [
     { value: 1000, suffix: "+", icon: "Users" },
     { value: 50, suffix: "+", icon: "BookOpen" },
