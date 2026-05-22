@@ -14,11 +14,12 @@ export function ContactForm({ content, locale }: { content: SiteContent; locale:
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setSent(false);
     setError("");
     setSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const payload = {
       name: String(formData.get("name") || ""),
       email: String(formData.get("email") || ""),
@@ -39,7 +40,7 @@ export function ContactForm({ content, locale }: { content: SiteContent; locale:
         throw new Error(result?.error || "Unable to submit right now. Please try again.");
       }
 
-      event.currentTarget.reset();
+      form.reset();
       setSent(true);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit right now. Please try again.");
