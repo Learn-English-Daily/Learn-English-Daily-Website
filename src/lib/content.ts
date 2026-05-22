@@ -81,7 +81,7 @@ export const sharedContent = {
       name: "Ms. Eva Yulia",
       qualification: "BS, Islamic Education",
       experience: "6 years",
-      specialization: "Life is an endless journey. Embrace each chapter with hope and gratitude.",
+      specialization: "Studying is ordinary but making it fun is extra-ordinary.",
       initials: "EY",
       accent: "blue"
     },
