@@ -202,9 +202,9 @@ export const content = {
       ["Blog Articles", "Helpful guidance for study, careers, and IELTS.", "BookOpen"]
     ],
     pricing: [
-      ["Basic", "For steady group learning", "$29/mo", ["Group Classes", "Weekly Assignments", "Community Support"]],
-      ["Standard", "Most Popular", "$49/mo", ["Group Classes", "Practice Sessions", "Teacher Feedback", "Progress Reports"]],
-      ["Premium", "For personal coaching", "$99/mo", ["One-to-One Coaching", "Personalized Plan", "Priority Support", "Certificate Guidance"]]
+      ["Basic", "For steady group learning", "Under consideration", ["Group Classes", "Weekly Assignments", "Community Support"]],
+      ["Standard", "Most Popular", "Under consideration", ["Group Classes", "Practice Sessions", "Teacher Feedback", "Progress Reports"]],
+      ["Premium", "For personal coaching", "Under consideration", ["One-to-One Coaching", "Personalized Plan", "Priority Support", "Certificate Guidance"]]
     ],
     faq: [
       ["Who can join LEAD?", "School students, university students, job seekers, professionals, homemakers, IELTS learners, and anyone who wants better English can join."],
@@ -312,9 +312,9 @@ export const content = {
       ["Artikel Blog", "Panduan belajar, karier, dan IELTS yang bermanfaat.", "BookOpen"]
     ],
     pricing: [
-      ["Basic", "Untuk belajar grup rutin", "$29/bln", ["Kelas Grup", "Tugas Mingguan", "Dukungan Komunitas"]],
-      ["Standard", "Paling Populer", "$49/bln", ["Kelas Grup", "Sesi Praktik", "Feedback Guru", "Laporan Progres"]],
-      ["Premium", "Untuk coaching personal", "$99/bln", ["Coaching 1:1", "Rencana Personal", "Prioritas Support", "Panduan Sertifikat"]]
+      ["Basic", "Untuk belajar grup rutin", "Sedang dipertimbangkan", ["Kelas Grup", "Tugas Mingguan", "Dukungan Komunitas"]],
+      ["Standard", "Paling Populer", "Sedang dipertimbangkan", ["Kelas Grup", "Sesi Praktik", "Feedback Guru", "Laporan Progres"]],
+      ["Premium", "Untuk coaching personal", "Sedang dipertimbangkan", ["Coaching 1:1", "Rencana Personal", "Prioritas Support", "Panduan Sertifikat"]]
     ],
     faq: [
       ["Siapa yang bisa bergabung dengan LEAD?", "Siswa sekolah, mahasiswa, pencari kerja, profesional, ibu rumah tangga, peserta IELTS, dan siapa pun yang ingin meningkatkan bahasa Inggris."],
