@@ -414,8 +414,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <h2 className="font-heading text-3xl font-bold text-lead-navy sm:text-4xl">{copy.contact.title}</h2>
             <p className="mt-4 leading-8 text-lead-gray">{copy.contact.subtitle}</p>
             <div className="mt-8 grid gap-4 text-sm font-semibold text-lead-gray">
-              <a href="mailto:hello@learnenglishdaily.com" className="flex items-center gap-3 hover:text-lead-blue">
-                <Mail className="h-5 w-5" /> hello@learnenglishdaily.com
+              <a href="mailto:Lead@learn-english-daily.com" className="flex items-center gap-3 hover:text-lead-blue">
+                <Mail className="h-5 w-5" /> Lead@learn-english-daily.com
               </a>
               <a href={whatsappHref} className="flex items-center gap-3 hover:text-lead-blue">
                 <MessageCircle className="h-5 w-5" /> {whatsappDisplay}
