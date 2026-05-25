@@ -1,0 +1,181 @@
+import { cookies } from "next/headers";
+import { unstable_noStore as noStore } from "next/cache";
+import { Mail, MessageCircle, RefreshCcw } from "lucide-react";
+import type { WithId } from "mongodb";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { logoutAdmin } from "@/app/admin/actions";
+import { AdminLoginForm } from "@/app/admin/login-form";
+import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { getMongoDb } from "@/lib/mongodb";
+
+export const dynamic = "force-dynamic";
+
+type LeadDocument = {
+  name?: string;
+  email?: string;
+  whatsapp?: string;
+  goal?: string;
+  locale?: string;
+  source?: string;
+  createdAt?: Date;
+};
+
+type Lead = {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp: string;
+  goal: string;
+  locale: string;
+  source: string;
+  createdAt: string;
+};
+
+async function getLeads(): Promise<Lead[]> {
+  const db = await getMongoDb();
+  const collectionName = process.env.MONGODB_COLLECTION || "leads";
+  const docs = (await db.collection<LeadDocument>(collectionName).find({}).sort({ createdAt: -1 }).limit(100).toArray()) as WithId<LeadDocument>[];
+
+  return docs.map((doc) => ({
+    id: doc._id.toString(),
+    name: doc.name || "Unknown",
+    email: doc.email || "",
+    whatsapp: doc.whatsapp || "",
+    goal: doc.goal || "",
+    locale: doc.locale || "en",
+    source: doc.source || "website",
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
+  }));
+}
+
+function formatDate(value: string) {
+  if (!value) return "Unknown";
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date(value));
+}
+
+export default async function AdminPage() {
+  noStore();
+  const cookieStore = await cookies();
+  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+
+  if (!isAdminConfigured()) {
+    return (
+      <main className="min-h-screen bg-lead-soft px-4 py-10">
+        <Card className="mx-auto max-w-xl p-8">
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
+          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Admin password missing</h1>
+          <p className="mt-4 leading-7 text-lead-gray">
+            Add <code className="rounded bg-slate-100 px-2 py-1">ADMIN_PASSWORD</code> in Vercel Environment Variables and in
+            your local <code className="rounded bg-slate-100 px-2 py-1">.env.local</code> file.
+          </p>
+        </Card>
+      </main>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#fff7d6_100%)] px-4 py-10">
+        <Card className="w-full max-w-md p-8 shadow-soft">
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
+          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">View student inquiries</h1>
+          <p className="mt-3 leading-7 text-lead-gray">Sign in to see contact form submissions from MongoDB.</p>
+          <AdminLoginForm />
+        </Card>
+      </main>
+    );
+  }
+
+  const leads = await getLeads();
+
+  return (
+    <main className="min-h-screen bg-lead-soft">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="container-shell flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
+            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Student inquiries</h1>
+            <p className="mt-2 text-sm text-lead-gray">Showing latest {leads.length} form submissions.</p>
+          </div>
+          <div className="flex gap-3">
+            <Button asChild variant="secondary">
+              <a href="/admin">
+                <RefreshCcw className="h-4 w-4" />
+                Refresh
+              </a>
+            </Button>
+            <form action={logoutAdmin}>
+              <Button type="submit" variant="primary">Logout</Button>
+            </form>
+          </div>
+        </div>
+      </header>
+
+      <section className="container-shell py-8">
+        {leads.length ? (
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-[0.08em] text-lead-gray">
+                  <tr>
+                    <th className="px-5 py-4">Student</th>
+                    <th className="px-5 py-4">Contact</th>
+                    <th className="px-5 py-4">Goal / message</th>
+                    <th className="px-5 py-4">Locale</th>
+                    <th className="px-5 py-4">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {leads.map((lead) => (
+                    <tr key={lead.id} className="align-top">
+                      <td className="px-5 py-5">
+                        <p className="font-heading text-base font-bold text-lead-navy">{lead.name}</p>
+                        <p className="mt-1 text-xs text-lead-gray">{lead.source}</p>
+                      </td>
+                      <td className="px-5 py-5">
+                        <div className="grid gap-2">
+                          {lead.email ? (
+                            <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-2 font-semibold text-lead-blue hover:text-blue-700">
+                              <Mail className="h-4 w-4" />
+                              {lead.email}
+                            </a>
+                          ) : null}
+                          {lead.whatsapp ? (
+                            <a
+                              href={`https://wa.me/${lead.whatsapp.replace(/\D/g, "")}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 font-semibold text-emerald-600 hover:text-emerald-700"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                              {lead.whatsapp}
+                            </a>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="max-w-md px-5 py-5 leading-7 text-lead-gray">{lead.goal}</td>
+                      <td className="px-5 py-5">
+                        <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">{lead.locale}</span>
+                      </td>
+                      <td className="px-5 py-5 text-lead-gray">{formatDate(lead.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <Card className="p-8 text-center">
+            <h2 className="font-heading text-2xl font-bold text-lead-navy">No inquiries yet</h2>
+            <p className="mt-3 text-lead-gray">New contact form submissions will appear here.</p>
+          </Card>
+        )}
+      </section>
+    </main>
+  );
+}
