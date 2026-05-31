@@ -402,10 +402,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             {copy.pricing.map(([course, accent, levels]) => {
               const headerStyle =
                 accent === "green"
-                  ? "bg-emerald-500 text-white"
+                  ? "border-b border-emerald-100 bg-emerald-50 text-emerald-900"
                   : accent === "red"
-                    ? "bg-rose-500 text-white"
-                    : "bg-lead-yellow text-lead-navy";
+                    ? "border-b border-blue-100 bg-blue-50 text-blue-950"
+                    : "border-b border-yellow-100 bg-yellow-50 text-yellow-950";
               return (
                   <Card key={course} className="flex h-full flex-col overflow-hidden">
                     <div className={`min-h-28 p-6 ${headerStyle}`}>
