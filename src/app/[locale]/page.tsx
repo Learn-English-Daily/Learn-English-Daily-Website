@@ -72,7 +72,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           pricingIntro: "Harga transparan untuk setiap tingkat belajar dan jumlah pertemuan.",
           perMeeting: "Per pertemuan",
           perMonth: "Per bulan",
-          meetings: "Pertemuan"
+          meetings: "Pertemuan",
+          startingFrom: "Mulai dari",
+          moreInformation: "Informasi lebih lanjut"
         }
       : {
           pills: ["Daily speaking quests", "Vocabulary streaks", "Friendly feedback"],
@@ -86,7 +88,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           pricingIntro: "Clear pricing for each learning level and number of meetings.",
           perMeeting: "Per meeting",
           perMonth: "Per month",
-          meetings: "Meetings"
+          meetings: "Meetings",
+          startingFrom: "Starting from",
+          moreInformation: "More information"
         };
 
   const jsonLd = {
@@ -393,39 +397,49 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                     ? "bg-rose-500 text-white"
                     : "bg-lead-yellow text-lead-navy";
               return (
-                <Card key={course} className="overflow-hidden">
-                  <div className={`min-h-24 p-6 ${headerStyle}`}>
-                    <h3 className="font-heading text-xl font-extrabold leading-7">{course}</h3>
-                  </div>
-                  <div className="divide-y divide-slate-100">
-                    {levels.map(([level, plan, perMeeting, perMonth, meetings]) => (
-                      <div key={level} className="p-5">
-                        <div className="flex items-center justify-between gap-3">
-                          <h4 className="font-heading text-lg font-bold text-lead-navy">{level}</h4>
-                          <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold text-lead-blue">{plan}</span>
+                  <Card key={course} className="flex h-full flex-col overflow-hidden">
+                    <div className={`min-h-28 p-6 ${headerStyle}`}>
+                      <h3 className="font-heading text-xl font-extrabold leading-7">{course}</h3>
+                    </div>
+                    <div className="flex flex-1 flex-col p-6">
+                      <p className="text-sm font-semibold text-lead-gray">{funCopy.startingFrom}</p>
+                      <p className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">
+                        {levels[0][3]}
+                        <span className="ml-1 text-sm font-semibold text-lead-gray">/ {funCopy.perMonth.toLowerCase()}</span>
+                      </p>
+                      <details className="mt-6 rounded-lg border border-slate-200 bg-slate-50">
+                        <summary className="focus-ring cursor-pointer rounded-lg px-4 py-3 text-sm font-bold text-lead-blue">
+                          {funCopy.moreInformation}
+                        </summary>
+                        <div className="divide-y divide-slate-200 border-t border-slate-200">
+                          {levels.map(([level, plan, perMeeting, perMonth, meetings]) => (
+                            <div key={level} className="p-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <h4 className="font-heading font-bold text-lead-navy">{level}</h4>
+                                <span className="rounded-lg bg-white px-2 py-1 text-xs font-bold text-lead-blue">{plan}</span>
+                              </div>
+                              <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                                <div>
+                                  <dt className="font-semibold text-lead-gray">{funCopy.perMeeting}</dt>
+                                  <dd className="mt-1 font-bold text-lead-navy">{perMeeting}</dd>
+                                </div>
+                                <div>
+                                  <dt className="font-semibold text-lead-gray">{funCopy.perMonth}</dt>
+                                  <dd className="mt-1 font-bold text-lead-navy">{perMonth}</dd>
+                                </div>
+                                <div>
+                                  <dt className="font-semibold text-lead-gray">{funCopy.meetings}</dt>
+                                  <dd className="mt-1 font-bold text-lead-navy">{meetings}</dd>
+                                </div>
+                              </dl>
+                            </div>
+                          ))}
                         </div>
-                        <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
-                          <div>
-                            <dt className="text-xs font-semibold text-lead-gray">{funCopy.perMeeting}</dt>
-                            <dd className="mt-1 font-bold text-lead-navy">{perMeeting}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs font-semibold text-lead-gray">{funCopy.perMonth}</dt>
-                            <dd className="mt-1 font-bold text-lead-navy">{perMonth}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs font-semibold text-lead-gray">{funCopy.meetings}</dt>
-                            <dd className="mt-1 font-bold text-lead-navy">{meetings}</dd>
-                          </div>
-                        </dl>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="border-t border-slate-100 p-5">
-                    <Button asChild className="w-full">
-                      <Link href={`/${locale}#contact`}>{copy.cta.enroll}</Link>
-                    </Button>
-                  </div>
+                      </details>
+                      <Button asChild className="w-full">
+                        <Link href={`/${locale}#contact`} className="mt-6">{copy.cta.enroll}</Link>
+                      </Button>
+                    </div>
                 </Card>
               );
             })}
