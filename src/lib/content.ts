@@ -203,7 +203,7 @@ export const content = {
     ],
     pricing: [
       [
-        "Foundation English / Pre-school",
+        "Foundation English",
         "green",
         [
           ["Beginner", "Basic", "Rp15,000", "Rp180,000", "12 meetings"],
@@ -212,7 +212,7 @@ export const content = {
         ]
       ],
       [
-        "Confident English / Elementary",
+        "Confident English",
         "red",
         [
           ["Beginner", "Basic", "Rp16,000", "Rp256,000", "16 meetings"],
@@ -221,7 +221,7 @@ export const content = {
         ]
       ],
       [
-        "Fluent English / High School",
+        "Fluent English",
         "yellow",
         [
           ["Beginner", "Basic", "Rp17,000", "Rp272,000", "16 meetings"],
@@ -337,7 +337,7 @@ export const content = {
     ],
     pricing: [
       [
-        "Foundation English / Pra-sekolah",
+        "Foundation English",
         "green",
         [
           ["Pemula", "Basic", "Rp15,000", "Rp180,000", "12 pertemuan"],
@@ -346,7 +346,7 @@ export const content = {
         ]
       ],
       [
-        "Confident English / Elementary",
+        "Confident English",
         "red",
         [
           ["Pemula", "Basic", "Rp16,000", "Rp256,000", "16 pertemuan"],
@@ -355,7 +355,7 @@ export const content = {
         ]
       ],
       [
-        "Fluent English / Sekolah Menengah",
+        "Fluent English",
         "yellow",
         [
           ["Pemula", "Basic", "Rp17,000", "Rp272,000", "16 pertemuan"],
