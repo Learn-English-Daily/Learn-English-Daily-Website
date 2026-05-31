@@ -73,13 +73,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           perMeeting: "Per pertemuan",
           perMonth: "Per bulan",
           meetings: "Pertemuan",
-          startingFrom: "Mulai dari",
-          moreInformation: "Informasi lebih lanjut",
-          packageFormats: {
-            Basic: "Kelas grup · 6 siswa",
-            "Standard / Buddy": "Kelas buddy · 2 siswa",
-            Premium: "Kelas privat · 1-on-1"
-          }
+          startingFrom: "Mulai dari"
         }
       : {
           pills: ["Daily speaking quests", "Vocabulary streaks", "Friendly feedback"],
@@ -94,13 +88,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           perMeeting: "Per meeting",
           perMonth: "Per month",
           meetings: "Meetings",
-          startingFrom: "Starting from",
-          moreInformation: "More information",
-          packageFormats: {
-            Basic: "Group class · 6 students",
-            "Standard / Buddy": "Buddy class · 2 students",
-            Premium: "Private class · 1-on-1"
-          }
+          startingFrom: "Starting from"
         };
 
   const jsonLd = {
@@ -417,39 +405,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                         {levels[0][3]}
                         <span className="ml-1 text-sm font-semibold text-lead-gray">/ {funCopy.perMonth.toLowerCase()}</span>
                       </p>
-                      <details className="mt-6 rounded-lg border border-slate-200 bg-slate-50">
-                        <summary className="focus-ring cursor-pointer rounded-lg px-4 py-3 text-sm font-bold text-lead-blue">
-                          {funCopy.moreInformation}
-                        </summary>
-                        <div className="divide-y divide-slate-200 border-t border-slate-200">
-                          {levels.map(([, plan, perMeeting, perMonth, meetings]) => (
-                            <div key={plan} className="p-4">
-                              <div>
-                                <h4 className="font-heading font-bold text-lead-navy">{plan}</h4>
-                                <p className="mt-1 text-xs font-semibold text-lead-gray">
-                                  {funCopy.packageFormats[plan as keyof typeof funCopy.packageFormats]}
-                                </p>
-                              </div>
-                              <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                                <div>
-                                  <dt className="font-semibold text-lead-gray">{funCopy.perMeeting}</dt>
-                                  <dd className="mt-1 font-bold text-lead-navy">{perMeeting}</dd>
-                                </div>
-                                <div>
-                                  <dt className="font-semibold text-lead-gray">{funCopy.perMonth}</dt>
-                                  <dd className="mt-1 font-bold text-lead-navy">{perMonth}</dd>
-                                </div>
-                                <div>
-                                  <dt className="font-semibold text-lead-gray">{funCopy.meetings}</dt>
-                                  <dd className="mt-1 font-bold text-lead-navy">{meetings}</dd>
-                                </div>
-                              </dl>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
                       <Button asChild className="w-full">
-                        <Link href={`/${locale}#contact`} className="mt-6">{copy.cta.enroll}</Link>
+                        <Link href={`/${locale}#contact`} className="mt-8">{copy.cta.enroll}</Link>
                       </Button>
                     </div>
                 </Card>
