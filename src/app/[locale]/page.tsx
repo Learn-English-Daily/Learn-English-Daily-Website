@@ -74,7 +74,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           perMonth: "Per bulan",
           meetings: "Pertemuan",
           startingFrom: "Mulai dari",
-          moreInformation: "Informasi lebih lanjut"
+          moreInformation: "Informasi lebih lanjut",
+          packageFormats: {
+            Basic: "Kelas grup · 6 siswa",
+            "Standard / Buddy": "Kelas buddy · 2 siswa",
+            Premium: "Kelas privat · 1-on-1"
+          }
         }
       : {
           pills: ["Daily speaking quests", "Vocabulary streaks", "Friendly feedback"],
@@ -90,7 +95,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           perMonth: "Per month",
           meetings: "Meetings",
           startingFrom: "Starting from",
-          moreInformation: "More information"
+          moreInformation: "More information",
+          packageFormats: {
+            Basic: "Group class · 6 students",
+            "Standard / Buddy": "Buddy class · 2 students",
+            Premium: "Private class · 1-on-1"
+          }
         };
 
   const jsonLd = {
@@ -412,11 +422,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                           {funCopy.moreInformation}
                         </summary>
                         <div className="divide-y divide-slate-200 border-t border-slate-200">
-                          {levels.map(([level, plan, perMeeting, perMonth, meetings]) => (
-                            <div key={level} className="p-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <h4 className="font-heading font-bold text-lead-navy">{level}</h4>
-                                <span className="rounded-lg bg-white px-2 py-1 text-xs font-bold text-lead-blue">{plan}</span>
+                          {levels.map(([, plan, perMeeting, perMonth, meetings]) => (
+                            <div key={plan} className="p-4">
+                              <div>
+                                <h4 className="font-heading font-bold text-lead-navy">{plan}</h4>
+                                <p className="mt-1 text-xs font-semibold text-lead-gray">
+                                  {funCopy.packageFormats[plan as keyof typeof funCopy.packageFormats]}
+                                </p>
                               </div>
                               <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
                                 <div>
