@@ -34,7 +34,7 @@ export function Header({ locale, content }: { locale: Locale; content: SiteConte
     }
   };
 
-  const navIds = ["home", "courses", "about", "teachers", "testimonials", "blog", "faq", "contact"];
+  const navIds = ["home", "courses", "about", "teachers", "testimonials", "pricing", "faq", "contact"];
 
   return (
     <header

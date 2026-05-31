@@ -128,7 +128,7 @@ export const content = {
       description:
         "Join LEAD online English academy for live speaking, grammar, IELTS, business English, and confidence-building classes with expert teachers."
     },
-    nav: ["Home", "Courses", "About Us", "Teachers", "Testimonials", "Blog", "FAQ", "Contact"],
+    nav: ["Home", "Courses", "About Us", "Teachers", "Testimonials", "Pricing", "FAQ", "Contact"],
     cta: {
       trial: "Book Free Trial",
       courses: "View Courses",
@@ -262,7 +262,7 @@ export const content = {
       description:
         "Ikuti akademi bahasa Inggris online LEAD untuk speaking, grammar, IELTS, business English, dan kelas percaya diri bersama guru ahli."
     },
-    nav: ["Beranda", "Kursus", "Tentang Kami", "Guru", "Testimoni", "Blog", "FAQ", "Kontak"],
+    nav: ["Beranda", "Kursus", "Tentang Kami", "Guru", "Testimoni", "Harga", "FAQ", "Kontak"],
     cta: {
       trial: "Coba Kelas Gratis",
       courses: "Lihat Kursus",

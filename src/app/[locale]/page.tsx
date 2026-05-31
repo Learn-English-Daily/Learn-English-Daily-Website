@@ -392,7 +392,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </div>
       </section>
 
-      <section className="section-pad bg-lead-soft">
+      <section id="pricing" className="section-pad bg-lead-soft">
         <div className="container-shell">
           <Reveal className="mx-auto max-w-3xl text-center">
             <h2 className="font-heading text-3xl font-bold text-lead-navy sm:text-4xl">{funCopy.pricingTitle}</h2>
