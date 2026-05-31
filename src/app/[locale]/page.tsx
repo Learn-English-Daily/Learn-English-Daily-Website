@@ -67,7 +67,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           confidenceScore: "Skor percaya diri",
           skillQuest: "Quest skill · Latihan live",
           step: "Langkah",
-          whatsappNudge: "Butuh bantuan?"
+          whatsappNudge: "Butuh bantuan?",
+          pricingTitle: "Pilih program belajar yang tepat",
+          pricingIntro: "Harga transparan untuk setiap tingkat belajar dan jumlah pertemuan.",
+          perMeeting: "Per pertemuan",
+          perMonth: "Per bulan",
+          meetings: "Pertemuan"
         }
       : {
           pills: ["Daily speaking quests", "Vocabulary streaks", "Friendly feedback"],
@@ -76,7 +81,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           confidenceScore: "Confidence score",
           skillQuest: "Skill quest · Live practice",
           step: "Step",
-          whatsappNudge: "Need help?"
+          whatsappNudge: "Need help?",
+          pricingTitle: "Choose the right learning program",
+          pricingIntro: "Clear pricing for each learning level and number of meetings.",
+          perMeeting: "Per meeting",
+          perMonth: "Per month",
+          meetings: "Meetings"
         };
 
   const jsonLd = {
@@ -369,25 +379,57 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       <section className="section-pad bg-lead-soft">
-        <div className="container-shell grid gap-6 md:grid-cols-3">
-          {copy.pricing.map(([plan, label, price, features], index) => (
-            <Card key={plan} className={`p-6 ${index === 1 ? "border-lead-blue shadow-soft ring-2 ring-lead-blue/15" : ""}`}>
-              <p className="text-sm font-bold text-lead-blue">{label}</p>
-              <h3 className="mt-3 font-heading text-2xl font-bold text-lead-navy">{plan}</h3>
-              <p className="mt-4 font-heading text-4xl font-extrabold text-lead-navy">{price}</p>
-              <ul className="mt-6 grid gap-3">
-                {features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-3 text-sm font-semibold text-lead-gray">
-                    <CheckCircle2 className="h-5 w-5 text-lead-blue" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              <Button className="mt-7 w-full" variant={index === 1 ? "primary" : "secondary"}>
-                {copy.cta.enroll}
-              </Button>
-            </Card>
-          ))}
+        <div className="container-shell">
+          <Reveal className="mx-auto max-w-3xl text-center">
+            <h2 className="font-heading text-3xl font-bold text-lead-navy sm:text-4xl">{funCopy.pricingTitle}</h2>
+            <p className="mt-4 text-lg leading-8 text-lead-gray">{funCopy.pricingIntro}</p>
+          </Reveal>
+          <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            {copy.pricing.map(([course, accent, levels]) => {
+              const headerStyle =
+                accent === "green"
+                  ? "bg-emerald-500 text-white"
+                  : accent === "red"
+                    ? "bg-rose-500 text-white"
+                    : "bg-lead-yellow text-lead-navy";
+              return (
+                <Card key={course} className="overflow-hidden">
+                  <div className={`min-h-24 p-6 ${headerStyle}`}>
+                    <h3 className="font-heading text-xl font-extrabold leading-7">{course}</h3>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {levels.map(([level, plan, perMeeting, perMonth, meetings]) => (
+                      <div key={level} className="p-5">
+                        <div className="flex items-center justify-between gap-3">
+                          <h4 className="font-heading text-lg font-bold text-lead-navy">{level}</h4>
+                          <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold text-lead-blue">{plan}</span>
+                        </div>
+                        <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <dt className="text-xs font-semibold text-lead-gray">{funCopy.perMeeting}</dt>
+                            <dd className="mt-1 font-bold text-lead-navy">{perMeeting}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-semibold text-lead-gray">{funCopy.perMonth}</dt>
+                            <dd className="mt-1 font-bold text-lead-navy">{perMonth}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-semibold text-lead-gray">{funCopy.meetings}</dt>
+                            <dd className="mt-1 font-bold text-lead-navy">{meetings}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-slate-100 p-5">
+                    <Button asChild className="w-full">
+                      <Link href={`/${locale}#contact`}>{copy.cta.enroll}</Link>
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         </div>
       </section>
 

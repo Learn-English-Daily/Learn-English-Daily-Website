@@ -202,9 +202,33 @@ export const content = {
       ["Blog Articles", "Helpful guidance for study, careers, and IELTS.", "BookOpen"]
     ],
     pricing: [
-      ["Basic", "For steady group learning", "Under consideration", ["Group Classes", "Weekly Assignments", "Community Support"]],
-      ["Standard", "Most Popular", "Under consideration", ["Group Classes", "Practice Sessions", "Teacher Feedback", "Progress Reports"]],
-      ["Premium", "For personal coaching", "Under consideration", ["One-to-One Coaching", "Personalized Plan", "Priority Support", "Certificate Guidance"]]
+      [
+        "Foundation English / Pre-school",
+        "green",
+        [
+          ["Beginner", "Basic", "Rp15,000", "Rp180,000", "12 meetings"],
+          ["Intermediate", "Standard / Buddy", "Rp45,000", "Rp540,000", "12 meetings"],
+          ["Advanced", "Premium", "Rp80,000", "Rp960,000", "12 meetings"]
+        ]
+      ],
+      [
+        "Confident English / Elementary",
+        "red",
+        [
+          ["Beginner", "Basic", "Rp16,000", "Rp256,000", "16 meetings"],
+          ["Intermediate", "Standard / Buddy", "Rp50,000", "Rp800,000", "16 meetings"],
+          ["Advanced", "Premium", "Rp85,000", "Rp1,360,000", "16 meetings"]
+        ]
+      ],
+      [
+        "Fluent English / High School",
+        "yellow",
+        [
+          ["Beginner", "Basic", "Rp17,000", "Rp272,000", "16 meetings"],
+          ["Intermediate", "Standard / Buddy", "Rp55,000", "Rp880,000", "16 meetings"],
+          ["Advanced", "Premium", "Rp90,000", "Rp1,440,000", "16 meetings"]
+        ]
+      ]
     ],
     faq: [
       ["Who can join LEAD?", "School students, university students, job seekers, professionals, homemakers, IELTS learners, and anyone who wants better English can join."],
@@ -312,9 +336,33 @@ export const content = {
       ["Artikel Blog", "Panduan belajar, karier, dan IELTS yang bermanfaat.", "BookOpen"]
     ],
     pricing: [
-      ["Basic", "Untuk belajar grup rutin", "Sedang dipertimbangkan", ["Kelas Grup", "Tugas Mingguan", "Dukungan Komunitas"]],
-      ["Standard", "Paling Populer", "Sedang dipertimbangkan", ["Kelas Grup", "Sesi Praktik", "Feedback Guru", "Laporan Progres"]],
-      ["Premium", "Untuk coaching personal", "Sedang dipertimbangkan", ["Coaching 1:1", "Rencana Personal", "Prioritas Support", "Panduan Sertifikat"]]
+      [
+        "Foundation English / Pra-sekolah",
+        "green",
+        [
+          ["Pemula", "Basic", "Rp15,000", "Rp180,000", "12 pertemuan"],
+          ["Menengah", "Standard / Buddy", "Rp45,000", "Rp540,000", "12 pertemuan"],
+          ["Lanjutan", "Premium", "Rp80,000", "Rp960,000", "12 pertemuan"]
+        ]
+      ],
+      [
+        "Confident English / Elementary",
+        "red",
+        [
+          ["Pemula", "Basic", "Rp16,000", "Rp256,000", "16 pertemuan"],
+          ["Menengah", "Standard / Buddy", "Rp50,000", "Rp800,000", "16 pertemuan"],
+          ["Lanjutan", "Premium", "Rp85,000", "Rp1,360,000", "16 pertemuan"]
+        ]
+      ],
+      [
+        "Fluent English / Sekolah Menengah",
+        "yellow",
+        [
+          ["Pemula", "Basic", "Rp17,000", "Rp272,000", "16 pertemuan"],
+          ["Menengah", "Standard / Buddy", "Rp55,000", "Rp880,000", "16 pertemuan"],
+          ["Lanjutan", "Premium", "Rp90,000", "Rp1,440,000", "16 pertemuan"]
+        ]
+      ]
     ],
     faq: [
       ["Siapa yang bisa bergabung dengan LEAD?", "Siswa sekolah, mahasiswa, pencari kerja, profesional, ibu rumah tangga, peserta IELTS, dan siapa pun yang ingin meningkatkan bahasa Inggris."],
