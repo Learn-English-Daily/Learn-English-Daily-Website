@@ -387,7 +387,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <p className="mt-4 text-lg leading-8 text-lead-gray">{funCopy.pricingIntro}</p>
           </Reveal>
           <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {copy.pricing.map(([course, accent, levels]) => {
+            {copy.pricing.map(([course, accent, benefits, levels]) => {
               const headerStyle =
                 accent === "green"
                   ? "border-b border-emerald-100 bg-emerald-50 text-emerald-900"
@@ -405,6 +405,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                         {levels[0][3]}
                         <span className="ml-1 text-sm font-semibold text-lead-gray">/ {funCopy.perMonth.toLowerCase()}</span>
                       </p>
+                      <ul className="mt-6 grid gap-3">
+                        {benefits.map((benefit) => (
+                          <li key={benefit} className="flex items-center gap-3 text-sm font-semibold text-lead-gray">
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-lead-blue" />
+                            {benefit}
+                          </li>
+                        ))}
+                      </ul>
                       <Button asChild className="w-full">
                         <Link href={`/${locale}#contact`} className="mt-8">{copy.cta.enroll}</Link>
                       </Button>

@@ -205,6 +205,7 @@ export const content = {
       [
         "Foundation English",
         "green",
+        ["Basic Vocabulary", "Everyday Conversations", "Fun Interactive Activities", "Speaking Confidence"],
         [
           ["Beginner", "Basic", "Rp15,000", "Rp180,000", "12 meetings"],
           ["Intermediate", "Standard / Buddy", "Rp45,000", "Rp540,000", "12 meetings"],
@@ -214,6 +215,7 @@ export const content = {
       [
         "Confident English",
         "red",
+        ["Real-Life Communication", "Fluency Building", "Discussion Practice", "Practical English Skills"],
         [
           ["Beginner", "Basic", "Rp16,000", "Rp256,000", "16 meetings"],
           ["Intermediate", "Standard / Buddy", "Rp50,000", "Rp800,000", "16 meetings"],
@@ -223,6 +225,7 @@ export const content = {
       [
         "Fluent English",
         "yellow",
+        ["Advanced Communication", "Professional English", "Public Speaking Confidence", "Natural Fluency"],
         [
           ["Beginner", "Basic", "Rp17,000", "Rp272,000", "16 meetings"],
           ["Intermediate", "Standard / Buddy", "Rp55,000", "Rp880,000", "16 meetings"],
@@ -339,6 +342,7 @@ export const content = {
       [
         "Foundation English",
         "green",
+        ["Kosakata Dasar", "Percakapan Sehari-hari", "Aktivitas Interaktif Seru", "Percaya Diri Berbicara"],
         [
           ["Pemula", "Basic", "Rp15,000", "Rp180,000", "12 pertemuan"],
           ["Menengah", "Standard / Buddy", "Rp45,000", "Rp540,000", "12 pertemuan"],
@@ -348,6 +352,7 @@ export const content = {
       [
         "Confident English",
         "red",
+        ["Komunikasi Dunia Nyata", "Membangun Kelancaran", "Latihan Diskusi", "Keterampilan Bahasa Inggris Praktis"],
         [
           ["Pemula", "Basic", "Rp16,000", "Rp256,000", "16 pertemuan"],
           ["Menengah", "Standard / Buddy", "Rp50,000", "Rp800,000", "16 pertemuan"],
@@ -357,6 +362,7 @@ export const content = {
       [
         "Fluent English",
         "yellow",
+        ["Komunikasi Tingkat Lanjut", "Bahasa Inggris Profesional", "Percaya Diri Berbicara di Depan Umum", "Kelancaran Alami"],
         [
           ["Pemula", "Basic", "Rp17,000", "Rp272,000", "16 pertemuan"],
           ["Menengah", "Standard / Buddy", "Rp55,000", "Rp880,000", "16 pertemuan"],
