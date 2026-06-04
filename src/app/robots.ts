@@ -6,7 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/"
     },
-    sitemap: "https://learnenglishdaily.example/sitemap.xml"
+    sitemap: "https://www.learn-english-daily.com/sitemap.xml"
   };
 }
-

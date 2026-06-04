@@ -95,7 +95,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     "@context": "https://schema.org",
     "@type": "EducationalOrganization",
     name: "LEAD (Learn English Daily)",
-    url: "https://learnenglishdaily.example",
+    url: "https://www.learn-english-daily.com",
     slogan: "Speak English with Confidence.",
     sameAs: ["https://instagram.com", "https://facebook.com", "https://tiktok.com", "https://youtube.com"]
   };
