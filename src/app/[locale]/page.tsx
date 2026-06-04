@@ -330,10 +330,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <Reveal className="text-center">
             <h2 className="font-heading text-3xl font-bold text-lead-navy sm:text-4xl">{copy.testimonialsTitle}</h2>
           </Reveal>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+          <div className="mt-10 flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 [scrollbar-width:thin]">
             <ApprovedReviews />
             {sharedContent.testimonials.map((student, index) => (
-              <Card key={student.name} className="p-6">
+              <Card key={student.name} className="w-[min(86vw,360px)] flex-none snap-start p-6">
                 <div className="flex items-center gap-4">
                   <Image src={student.photo} alt={student.name} width={72} height={72} className="h-14 w-14 rounded-full object-cover" />
                   <div>

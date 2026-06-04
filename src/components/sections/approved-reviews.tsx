@@ -39,7 +39,7 @@ export function ApprovedReviews() {
   }, []);
 
   return reviews.map((review) => (
-    <Card key={review.id} className="p-6">
+    <Card key={review.id} className="w-[min(86vw,360px)] flex-none snap-start p-6">
       <div className="flex items-center gap-4">
         <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-blue-50 font-heading text-lg font-extrabold text-lead-blue">
           {review.name.slice(0, 2).toUpperCase()}
