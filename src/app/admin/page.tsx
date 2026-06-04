@@ -122,7 +122,10 @@ export default async function AdminPage({
               {searchQuery ? `Showing ${leads.length} result${leads.length === 1 ? "" : "s"} for "${searchQuery}".` : `Showing latest ${leads.length} form submissions.`}
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="secondary">
+              <a href="/admin/reviews">Reviews</a>
+            </Button>
             <Button asChild variant="secondary">
               <a href="/admin">
                 <RefreshCcw className="h-4 w-4" />

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ContactForm } from "@/components/sections/contact-form";
 import { Counter, MotionDiv, Reveal } from "@/components/sections/motion";
+import { ReviewForm } from "@/components/sections/review-form";
 import { content, iconMap, sharedContent, type Locale } from "@/lib/content";
 
 function Icon({ name, className = "h-5 w-5" }: { name: string; className?: string }) {
@@ -346,6 +347,30 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 <p className="mt-4 leading-7 text-lead-gray">{copy.feedback[index]}</p>
               </Card>
             ))}
+          </div>
+          <div className="mt-12 grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
+            <Reveal>
+              <Card className="h-full overflow-hidden">
+                <div className="bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_54%,#fff7d6_100%)] p-6">
+                  <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">{copy.reviews.eyebrow}</p>
+                  <h3 className="mt-4 font-heading text-2xl font-extrabold leading-tight text-lead-navy">{copy.reviews.title}</h3>
+                  <p className="mt-4 leading-7 text-lead-gray">{copy.reviews.subtitle}</p>
+                  <div className="mt-6 grid gap-3">
+                    {copy.reviews.courseOptions.map(([value, label]) => (
+                      <div key={value} className="flex items-center gap-3 rounded-lg border border-white bg-white/80 px-4 py-3 text-sm font-bold text-lead-navy">
+                        <CheckCircle2 className="h-5 w-5 text-lead-blue" />
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            </Reveal>
+            <Reveal delay={0.08}>
+              <Card className="p-6">
+                <ReviewForm content={copy} locale={locale} />
+              </Card>
+            </Reveal>
           </div>
         </div>
       </section>

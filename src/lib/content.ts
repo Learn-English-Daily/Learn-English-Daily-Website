@@ -188,6 +188,40 @@ export const content = {
     ],
     teachersTitle: "Meet our teachers",
     testimonialsTitle: "Students are speaking with more confidence",
+    reviews: {
+      eyebrow: "Student and parent reviews",
+      title: "Share your LEAD learning experience",
+      subtitle: "Tell us how your class helped. Reviews are checked by the LEAD team before they appear publicly.",
+      roles: [
+        ["student", "Student"],
+        ["parent", "Parent"]
+      ],
+      courseOptions: [
+        ["Trial Class", "Trial Class"],
+        ["Foundation English", "Foundation English"],
+        ["Confident English", "Confident English"],
+        ["Fluent English", "Fluent English"]
+      ],
+      displayOptions: [
+        ["full", "Show my name"],
+        ["initials", "Show initials only"],
+        ["anonymous", "Anonymous"]
+      ],
+      form: {
+        name: "Your name",
+        role: "I am a",
+        course: "Class or course taken",
+        rating: "Rating",
+        feedback: "Feedback comment",
+        displayName: "Public display name",
+        choose: "Choose an option",
+        stars: "stars",
+        permission: "I allow LEAD to review and publish this feedback on the website or social media.",
+        submit: "Submit Review",
+        sending: "Submitting...",
+        success: "Thank you. Your review has been received and is waiting for approval."
+      }
+    },
     feedback: [
       "LEAD helped me stop translating in my head. I can now speak during meetings with much more confidence.",
       "The classes are friendly and practical. My teacher corrected my mistakes without making me nervous.",
@@ -325,6 +359,40 @@ export const content = {
     ],
     teachersTitle: "Kenali guru kami",
     testimonialsTitle: "Siswa berbicara dengan lebih percaya diri",
+    reviews: {
+      eyebrow: "Review siswa dan orang tua",
+      title: "Bagikan pengalaman belajarmu di LEAD",
+      subtitle: "Ceritakan bagaimana kelasmu membantu. Review akan dicek oleh tim LEAD sebelum tampil secara publik.",
+      roles: [
+        ["student", "Siswa"],
+        ["parent", "Orang tua"]
+      ],
+      courseOptions: [
+        ["Trial Class", "Kelas Trial"],
+        ["Foundation English", "Foundation English"],
+        ["Confident English", "Confident English"],
+        ["Fluent English", "Fluent English"]
+      ],
+      displayOptions: [
+        ["full", "Tampilkan nama saya"],
+        ["initials", "Tampilkan inisial saja"],
+        ["anonymous", "Anonim"]
+      ],
+      form: {
+        name: "Nama kamu",
+        role: "Saya adalah",
+        course: "Kelas atau kursus yang diikuti",
+        rating: "Rating",
+        feedback: "Komentar feedback",
+        displayName: "Nama yang ditampilkan",
+        choose: "Pilih opsi",
+        stars: "bintang",
+        permission: "Saya mengizinkan LEAD mengecek dan mempublikasikan feedback ini di website atau media sosial.",
+        submit: "Kirim Review",
+        sending: "Mengirim...",
+        success: "Terima kasih. Review kamu sudah diterima dan menunggu persetujuan."
+      }
+    },
     feedback: [
       "LEAD membantu saya berhenti menerjemahkan di kepala. Sekarang saya lebih percaya diri saat meeting.",
       "Kelasnya ramah dan praktis. Guru mengoreksi kesalahan saya tanpa membuat saya gugup.",
