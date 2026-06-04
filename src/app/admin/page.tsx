@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { Mail, MessageCircle, RefreshCcw } from "lucide-react";
-import type { WithId } from "mongodb";
+import { Mail, MessageCircle, RefreshCcw, Search } from "lucide-react";
+import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -32,10 +32,22 @@ type Lead = {
   createdAt: string;
 };
 
-async function getLeads(): Promise<Lead[]> {
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function getLeads(query = ""): Promise<Lead[]> {
   const db = await getMongoDb();
   const collectionName = process.env.MONGODB_COLLECTION || "leads";
-  const docs = (await db.collection<LeadDocument>(collectionName).find({}).sort({ createdAt: -1 }).limit(100).toArray()) as WithId<LeadDocument>[];
+  const search = query.trim();
+  const filter: Filter<LeadDocument> = search
+    ? {
+        $or: ["name", "email", "whatsapp", "goal", "locale", "source"].map((field) => ({
+          [field]: { $regex: escapeRegex(search), $options: "i" }
+        }))
+      }
+    : {};
+  const docs = (await db.collection<LeadDocument>(collectionName).find(filter).sort({ createdAt: -1 }).limit(100).toArray()) as WithId<LeadDocument>[];
 
   return docs.map((doc) => ({
     id: doc._id.toString(),
@@ -58,10 +70,16 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ q?: string | string[] }>;
+}) {
   noStore();
   const cookieStore = await cookies();
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const resolvedSearchParams = await searchParams;
+  const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
 
   if (!isAdminConfigured()) {
     return (
@@ -91,7 +109,7 @@ export default async function AdminPage() {
     );
   }
 
-  const leads = await getLeads();
+  const leads = await getLeads(searchQuery);
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -100,7 +118,9 @@ export default async function AdminPage() {
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
             <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Student inquiries</h1>
-            <p className="mt-2 text-sm text-lead-gray">Showing latest {leads.length} form submissions.</p>
+            <p className="mt-2 text-sm text-lead-gray">
+              {searchQuery ? `Showing ${leads.length} result${leads.length === 1 ? "" : "s"} for "${searchQuery}".` : `Showing latest ${leads.length} form submissions.`}
+            </p>
           </div>
           <div className="flex gap-3">
             <Button asChild variant="secondary">
@@ -117,6 +137,29 @@ export default async function AdminPage() {
       </header>
 
       <section className="container-shell py-8">
+        <Card className="mb-6 p-4">
+          <form action="/admin" className="flex flex-col gap-3 md:flex-row">
+            <label className="relative flex-1">
+              <span className="sr-only">Search inquiries</span>
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
+              <input
+                name="q"
+                defaultValue={searchQuery}
+                placeholder="Search by name, email, WhatsApp, message, locale..."
+                className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy"
+              />
+            </label>
+            <Button type="submit" size="lg">
+              <Search className="h-4 w-4" />
+              Search
+            </Button>
+            {searchQuery ? (
+              <Button asChild variant="secondary" size="lg">
+                <a href="/admin">Clear</a>
+              </Button>
+            ) : null}
+          </form>
+        </Card>
         {leads.length ? (
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
             <div className="overflow-x-auto">
@@ -171,8 +214,10 @@ export default async function AdminPage() {
           </div>
         ) : (
           <Card className="p-8 text-center">
-            <h2 className="font-heading text-2xl font-bold text-lead-navy">No inquiries yet</h2>
-            <p className="mt-3 text-lead-gray">New contact form submissions will appear here.</p>
+            <h2 className="font-heading text-2xl font-bold text-lead-navy">{searchQuery ? "No matching inquiries" : "No inquiries yet"}</h2>
+            <p className="mt-3 text-lead-gray">
+              {searchQuery ? "Try a different name, email, WhatsApp number, or message keyword." : "New contact form submissions will appear here."}
+            </p>
           </Card>
         )}
       </section>
