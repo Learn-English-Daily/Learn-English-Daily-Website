@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMongoDb } from "@/lib/mongodb";
 import {
+  getApprovedReviews,
   getReviewCollectionName,
   isReviewCourseValue,
   isReviewDisplayOption,
@@ -22,6 +23,11 @@ type ReviewPayload = {
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+export async function GET() {
+  const reviews = await getApprovedReviews();
+  return NextResponse.json({ ok: true, reviews });
 }
 
 export async function POST(request: Request) {

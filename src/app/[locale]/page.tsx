@@ -4,6 +4,7 @@ import { CheckCircle2, Mail, MessageCircle, Star } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ApprovedReviews } from "@/components/sections/approved-reviews";
 import { ContactForm } from "@/components/sections/contact-form";
 import { Counter, MotionDiv, Reveal } from "@/components/sections/motion";
 import { ReviewForm } from "@/components/sections/review-form";
@@ -330,6 +331,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <h2 className="font-heading text-3xl font-bold text-lead-navy sm:text-4xl">{copy.testimonialsTitle}</h2>
           </Reveal>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
+            <ApprovedReviews />
             {sharedContent.testimonials.map((student, index) => (
               <Card key={student.name} className="p-6">
                 <div className="flex items-center gap-4">
