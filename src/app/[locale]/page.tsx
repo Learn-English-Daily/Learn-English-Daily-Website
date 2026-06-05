@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ApprovedReviews } from "@/components/sections/approved-reviews";
 import { ContactForm } from "@/components/sections/contact-form";
-import { Counter, MotionDiv, Reveal } from "@/components/sections/motion";
+import { MotionDiv, Reveal } from "@/components/sections/motion";
 import { ReviewForm } from "@/components/sections/review-form";
 import { content, iconMap, sharedContent, type Locale } from "@/lib/content";
 
@@ -377,22 +377,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </div>
       </section>
 
-      <section className="bg-lead-blue py-12 text-white">
-        <div className="container-shell grid gap-6 md:grid-cols-4">
-          {copy.statLabels.map((label, index) => {
-            const stat = sharedStat(index);
-            return (
-              <div key={label} className="text-center">
-                <p className="font-heading text-4xl font-extrabold">
-                  <Counter value={stat.value} suffix={stat.suffix} />
-                </p>
-                <p className="mt-2 text-sm font-semibold text-blue-100">{label}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
       <section id="blog" className="section-pad bg-white">
         <div className="container-shell">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
@@ -572,14 +556,4 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </div>
     </main>
   );
-}
-
-function sharedStat(index: number) {
-  const stats = [
-    { value: 1000, suffix: "+" },
-    { value: 50, suffix: "+" },
-    { value: 20, suffix: "+" },
-    { value: 95, suffix: "%" }
-  ];
-  return stats[index];
 }
