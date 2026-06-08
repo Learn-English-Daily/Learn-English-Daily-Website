@@ -124,9 +124,9 @@ export const sharedContent = {
 export const content = {
   en: {
     meta: {
-      title: "LEAD | Online English Classes for Confident Speaking",
+      title: "LEAD | Speak English with Confidence",
       description:
-        "Join LEAD online English academy for live speaking, grammar, IELTS, business English, and confidence-building classes with expert teachers."
+        "Learn English the fun way with interactive live classes designed to build confidence, improve communication skills, and make learning enjoyable."
     },
     nav: ["Home", "Courses", "About Us", "Teachers", "Testimonials", "Pricing", "FAQ", "Contact"],
     cta: {
@@ -159,7 +159,7 @@ export const content = {
       ]
     },
     coursesTitle: "Courses for every goal and level",
-    coursesIntro: "Choose focused programs for speaking, grammar, IELTS, business, school success, and kids.",
+    coursesIntro: "Choose focused programs for speaking, grammar, business, school success, and kids.",
     courses: [
       ["Spoken English for Beginners", "Build basic fluency, sentence confidence, and everyday conversation skills.", "8 weeks", "Beginner", "Mic"],
       ["Elementary English", "Strengthen core grammar, reading, writing, and speaking foundations.", "10 weeks", "Elementary", "BookOpen"],
@@ -225,7 +225,7 @@ export const content = {
     feedback: [
       "LEAD helped me stop translating in my head. I can now speak during meetings with much more confidence.",
       "The classes are friendly and practical. My teacher corrected my mistakes without making me nervous.",
-      "I improved my IELTS speaking score and learned how to organize answers naturally."
+      "I learned how to organize my ideas and answer questions more naturally."
     ],
     statLabels: ["Students Trained", "Courses", "Expert Teachers", "Satisfaction Rate"],
     resources: [
@@ -233,7 +233,7 @@ export const content = {
       ["Grammar Tips", "Simple explanations for common grammar problems.", "PenTool"],
       ["Speaking Practice", "Prompts and drills to build speaking confidence.", "MessageCircle"],
       ["Free Worksheets", "Printable practice sheets for self-study.", "FileText"],
-      ["Blog Articles", "Helpful guidance for study, careers, and IELTS.", "BookOpen"]
+      ["Blog Articles", "Helpful guidance for study, careers, and everyday communication.", "BookOpen"]
     ],
     pricing: [
       [
@@ -268,7 +268,7 @@ export const content = {
       ]
     ],
     faq: [
-      ["Who can join LEAD?", "School students, university students, job seekers, professionals, homemakers, IELTS learners, and anyone who wants better English can join."],
+      ["Who can join LEAD?", "School students, university students, job seekers, professionals, homemakers, and anyone who wants better English can join."],
       ["Are classes live?", "Yes. Classes are live, interactive, and guided by teachers so you can practice speaking in real time."],
       ["Do you provide certificates?", "Yes. Eligible students receive completion certificates after finishing their program requirements."],
       ["How long is each class?", "Most classes are 45 to 60 minutes, depending on the course and learning plan."],
@@ -287,7 +287,7 @@ export const content = {
     },
     pages: {
       about: "LEAD was created to make high-quality English learning practical, friendly, and accessible from anywhere.",
-      blog: "Read short, useful English learning articles for vocabulary, grammar, pronunciation, IELTS, and career communication.",
+      blog: "Read short, useful English learning articles for vocabulary, grammar, pronunciation, and confident communication.",
       privacy: "We collect only the information needed to respond to inquiries, deliver learning services, and improve the student experience.",
       terms: "By enrolling in LEAD programs, students agree to respectful participation, timely payment, and fair use of learning materials."
     },
@@ -297,7 +297,7 @@ export const content = {
     meta: {
       title: "LEAD | Kelas Bahasa Inggris Online untuk Percaya Diri Berbicara",
       description:
-        "Ikuti akademi bahasa Inggris online LEAD untuk speaking, grammar, IELTS, business English, dan kelas percaya diri bersama guru ahli."
+        "Ikuti kelas bahasa Inggris online LEAD yang seru dan interaktif untuk membangun percaya diri, komunikasi, dan kemampuan bahasa Inggris sehari-hari."
     },
     nav: ["Beranda", "Kursus", "Tentang Kami", "Guru", "Testimoni", "Harga", "FAQ", "Kontak"],
     cta: {
@@ -330,7 +330,7 @@ export const content = {
       ]
     },
     coursesTitle: "Kursus untuk setiap tujuan dan level",
-    coursesIntro: "Pilih program untuk speaking, grammar, IELTS, bisnis, sekolah, dan anak-anak.",
+    coursesIntro: "Pilih program untuk speaking, grammar, bisnis, sekolah, dan anak-anak.",
     courses: [
       ["Spoken English untuk Pemula", "Bangun kefasihan dasar, percaya diri membuat kalimat, dan percakapan harian.", "8 minggu", "Pemula", "Mic"],
       ["Elementary English", "Perkuat grammar, reading, writing, dan speaking dasar.", "10 minggu", "Dasar", "BookOpen"],
@@ -396,7 +396,7 @@ export const content = {
     feedback: [
       "LEAD membantu saya berhenti menerjemahkan di kepala. Sekarang saya lebih percaya diri saat meeting.",
       "Kelasnya ramah dan praktis. Guru mengoreksi kesalahan saya tanpa membuat saya gugup.",
-      "Skor IELTS speaking saya naik dan saya belajar menyusun jawaban dengan natural."
+      "Saya belajar menyusun ide dan menjawab pertanyaan dengan lebih natural."
     ],
     statLabels: ["Siswa Dilatih", "Kursus", "Guru Ahli", "Tingkat Kepuasan"],
     resources: [
@@ -404,7 +404,7 @@ export const content = {
       ["Tips Grammar", "Penjelasan sederhana untuk masalah grammar umum.", "PenTool"],
       ["Latihan Speaking", "Prompt dan drill untuk membangun percaya diri berbicara.", "MessageCircle"],
       ["Worksheet Gratis", "Lembar latihan cetak untuk belajar mandiri.", "FileText"],
-      ["Artikel Blog", "Panduan belajar, karier, dan IELTS yang bermanfaat.", "BookOpen"]
+      ["Artikel Blog", "Panduan belajar, karier, dan komunikasi sehari-hari yang bermanfaat.", "BookOpen"]
     ],
     pricing: [
       [
@@ -439,7 +439,7 @@ export const content = {
       ]
     ],
     faq: [
-      ["Siapa yang bisa bergabung dengan LEAD?", "Siswa sekolah, mahasiswa, pencari kerja, profesional, ibu rumah tangga, peserta IELTS, dan siapa pun yang ingin meningkatkan bahasa Inggris."],
+      ["Siapa yang bisa bergabung dengan LEAD?", "Siswa sekolah, mahasiswa, pencari kerja, profesional, ibu rumah tangga, dan siapa pun yang ingin meningkatkan bahasa Inggris."],
       ["Apakah kelasnya live?", "Ya. Kelas berlangsung live, interaktif, dan dipandu guru agar kamu bisa latihan speaking secara langsung."],
       ["Apakah ada sertifikat?", "Ya. Siswa yang memenuhi syarat akan menerima sertifikat setelah menyelesaikan program."],
       ["Berapa lama setiap kelas?", "Sebagian besar kelas berdurasi 45 sampai 60 menit, tergantung kursus dan rencana belajar."],
@@ -458,7 +458,7 @@ export const content = {
     },
     pages: {
       about: "LEAD dibuat untuk menjadikan pembelajaran bahasa Inggris berkualitas tinggi lebih praktis, ramah, dan bisa diakses dari mana saja.",
-      blog: "Baca artikel singkat dan berguna tentang vocabulary, grammar, pronunciation, IELTS, dan komunikasi karier.",
+      blog: "Baca artikel singkat dan berguna tentang vocabulary, grammar, pronunciation, dan komunikasi percaya diri.",
       privacy: "Kami hanya mengumpulkan informasi yang diperlukan untuk menjawab pertanyaan, memberikan layanan belajar, dan meningkatkan pengalaman siswa.",
       terms: "Dengan mengikuti program LEAD, siswa setuju untuk berpartisipasi dengan hormat, membayar tepat waktu, dan menggunakan materi belajar secara wajar."
     },

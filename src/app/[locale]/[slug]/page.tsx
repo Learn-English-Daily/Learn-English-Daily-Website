@@ -54,7 +54,7 @@ export default async function InfoPage({ params }: { params: Promise<{ locale: s
           ) : null}
           {slug === "blog" ? (
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              {["5 speaking habits for daily English", "Simple grammar mistakes to fix", "IELTS speaking practice plan"].map((post) => (
+              {["5 speaking habits for daily English", "Simple grammar mistakes to fix", "How to speak confidently in class"].map((post) => (
                 <div key={post} className="rounded-lg border border-slate-200 p-5">
                   <h2 className="font-heading text-lg font-bold text-lead-navy">{post}</h2>
                   <p className="mt-2 text-sm leading-7 text-lead-gray">Short, practical guidance for building English confidence step by step.</p>

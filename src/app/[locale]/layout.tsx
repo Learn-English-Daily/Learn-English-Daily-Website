@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       "Spoken English course",
       "Learn English online",
       "English speaking classes",
-      "IELTS preparation",
+      "English communication skills",
       "Grammar course"
     ]
   };
