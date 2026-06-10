@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { notifyNewLead } from "@/lib/admin-notifications";
 import { getMongoDb } from "@/lib/mongodb";
 
 export const runtime = "nodejs";
@@ -43,6 +44,9 @@ export async function POST(request: Request) {
     const db = await getMongoDb();
     const collectionName = process.env.MONGODB_COLLECTION || "leads";
     const result = await db.collection(collectionName).insertOne(lead);
+    await notifyNewLead(lead).catch((notificationError) => {
+      console.error("Lead admin notification failed", notificationError);
+    });
 
     return NextResponse.json({ ok: true, id: result.insertedId.toString() }, { status: 201 });
   } catch (error) {

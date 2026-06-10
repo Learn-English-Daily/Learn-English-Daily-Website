@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { notifyNewReview } from "@/lib/admin-notifications";
 import { getMongoDb } from "@/lib/mongodb";
 import {
   getApprovedReviews,
@@ -89,6 +90,9 @@ export async function POST(request: Request) {
   try {
     const db = await getMongoDb();
     const result = await db.collection(getReviewCollectionName()).insertOne(review);
+    await notifyNewReview(review).catch((notificationError) => {
+      console.error("Review admin notification failed", notificationError);
+    });
 
     return NextResponse.json({ ok: true, id: result.insertedId.toString() }, { status: 201 });
   } catch (error) {
