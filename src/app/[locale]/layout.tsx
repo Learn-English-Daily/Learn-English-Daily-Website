@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Header } from "@/components/sections/header";
+import { TrialPosterPopup } from "@/components/sections/trial-poster-popup";
 import { content, locales, type Locale } from "@/lib/content";
 
 export function generateStaticParams() {
@@ -59,6 +60,7 @@ export default async function LocaleLayout({
     <>
       <Header locale={locale} content={copy} />
       {children}
+      <TrialPosterPopup content={copy} locale={locale} />
     </>
   );
 }
