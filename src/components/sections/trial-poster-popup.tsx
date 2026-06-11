@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { MessageCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,13 @@ const DISMISS_DURATION = 1000 * 60 * 60 * 24;
 
 export function TrialPosterPopup({ content, locale }: { content: SiteContent; locale: Locale }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
+    if (pathname.includes("/student-registration")) {
+      return;
+    }
+
     const dismissedAt = Number(localStorage.getItem(STORAGE_KEY) || 0);
     if (dismissedAt && Date.now() - dismissedAt < DISMISS_DURATION) {
       return;
@@ -22,7 +28,7 @@ export function TrialPosterPopup({ content, locale }: { content: SiteContent; lo
 
     const timer = window.setTimeout(() => setOpen(true), 1400);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [pathname]);
 
   function rememberDismissal() {
     localStorage.setItem(STORAGE_KEY, String(Date.now()));

@@ -149,6 +149,9 @@ export default async function AdminReviewsPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="secondary">
+              <a href="/admin/students">Registrations</a>
+            </Button>
+            <Button asChild variant="secondary">
               <a href="/admin">Inquiries</a>
             </Button>
             <Button asChild variant="secondary">

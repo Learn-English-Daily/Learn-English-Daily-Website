@@ -15,6 +15,22 @@ type ReviewNotification = {
   locale: string;
 };
 
+type StudentRegistrationNotification = {
+  studentName: string;
+  whatsapp: string;
+  parentName: string;
+  age: string;
+  grade: string;
+  preferredSchedule: string;
+  preferredTime: string;
+  courseJoined: string;
+  classType: string;
+  englishLevel: string;
+  learningGoal: string;
+  countryCity: string;
+  locale: string;
+};
+
 type NotificationMessage = {
   subject: string;
   preview: string;
@@ -128,6 +144,29 @@ export async function notifyNewReview(review: ReviewNotification) {
       `Rating: ${review.rating}/5`,
       `Locale: ${review.locale}`,
       `Feedback: ${review.feedback}`
+    ]
+  });
+}
+
+export async function notifyNewStudentRegistration(registration: StudentRegistrationNotification) {
+  await sendAdminNotification({
+    subject: `New LEAD student registration: ${registration.studentName}`,
+    preview: "A new enrolled student registration form was submitted.",
+    adminPath: "/admin/students",
+    lines: [
+      `Student: ${registration.studentName}`,
+      `Parent: ${registration.parentName}`,
+      `WhatsApp: ${registration.whatsapp}`,
+      `Age: ${registration.age}`,
+      `Grade: ${registration.grade}`,
+      `Course Joined: ${registration.courseJoined}`,
+      `Class Type: ${registration.classType}`,
+      `English Level: ${registration.englishLevel}`,
+      `Learning Goal: ${registration.learningGoal}`,
+      `Preferred Schedule: ${registration.preferredSchedule}`,
+      `Preferred Time: ${registration.preferredTime}`,
+      `Country/City: ${registration.countryCity || "Not provided"}`,
+      `Locale: ${registration.locale}`
     ]
   });
 }
