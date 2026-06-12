@@ -182,6 +182,9 @@ export default async function AdminStudentsPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="secondary">
+              <a href="/admin/payments">Payments</a>
+            </Button>
+            <Button asChild variant="secondary">
               <a href="/admin">Inquiries</a>
             </Button>
             <Button asChild variant="secondary">
@@ -255,6 +258,13 @@ export default async function AdminStudentsPage({
                       </a>
                     ) : null}
                   </div>
+                  {registration.studentId ? (
+                    <Button asChild variant="secondary" size="sm">
+                      <a href={`/admin/payments?studentId=${encodeURIComponent(registration.studentId)}`}>
+                        Payments
+                      </a>
+                    </Button>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     {[registration.courseJoined, registration.classType, registration.englishLevel, registration.locale.toUpperCase()].map((item) => (
                       <span key={item} className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">
