@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
+import type { ObjectId } from "mongodb";
 import { notifyNewStudentRegistration } from "@/lib/admin-notifications";
 import { getMongoDb } from "@/lib/mongodb";
 import {
+  getStudentIdCountersCollectionName,
   getStudentRegistrationCollectionName,
   isClassType,
   isCourseJoined,
   isEnglishLevel,
-  isLearningGoal
+  isLearningGoal,
+  isTrialCourse
 } from "@/lib/student-registration";
 
 export const runtime = "nodejs";
@@ -28,12 +31,36 @@ type StudentRegistrationPayload = {
   locale?: string;
 };
 
+type ExistingTrialRegistration = {
+  _id: ObjectId;
+  studentId?: string;
+};
+
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 function isReasonableShortText(value: string, max = 120) {
   return value.length > 0 && value.length <= max;
+}
+
+function normalizeWhatsapp(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function formatStudentId(prefix: "STU" | "TR", sequence: number) {
+  return `${prefix}${String(sequence).padStart(3, "0")}`;
+}
+
+async function getNextStudentId(prefix: "STU" | "TR") {
+  const db = await getMongoDb();
+  const counter = await db.collection<{ _id: string; seq: number }>(getStudentIdCountersCollectionName()).findOneAndUpdate(
+    { _id: prefix },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: "after" }
+  );
+
+  return formatStudentId(prefix, counter?.seq || 1);
 }
 
 export async function POST(request: Request) {
@@ -45,6 +72,7 @@ export async function POST(request: Request) {
   const registration = {
     studentName: clean(payload.studentName),
     whatsapp: clean(payload.whatsapp),
+    normalizedWhatsapp: normalizeWhatsapp(clean(payload.whatsapp)),
     parentName: clean(payload.parentName),
     age: clean(payload.age),
     grade: clean(payload.grade),
@@ -57,8 +85,7 @@ export async function POST(request: Request) {
     countryCity: clean(payload.countryCity),
     locale: clean(payload.locale) || "en",
     consent: payload.consent === true,
-    source: "student-registration",
-    createdAt: new Date()
+    source: "student-registration"
   };
 
   if (
@@ -95,12 +122,54 @@ export async function POST(request: Request) {
 
   try {
     const db = await getMongoDb();
-    const result = await db.collection(getStudentRegistrationCollectionName()).insertOne(registration);
-    await notifyNewStudentRegistration(registration).catch((notificationError) => {
+    const collection = db.collection(getStudentRegistrationCollectionName());
+    const now = new Date();
+    const joinedStudent = !isTrialCourse(registration.courseJoined);
+    const studentId = await getNextStudentId(joinedStudent ? "STU" : "TR");
+    const existingTrial = joinedStudent
+      ? await collection.findOne<ExistingTrialRegistration>({
+          normalizedWhatsapp: registration.normalizedWhatsapp,
+          courseJoined: "Trial Class",
+          studentId: { $regex: "^TR" },
+          upgradedToStudentId: { $exists: false }
+        })
+      : null;
+    const savedRegistration = {
+      ...registration,
+      studentId,
+      studentIdType: joinedStudent ? "student" : "trial",
+      updatedAt: now
+    };
+
+    if (existingTrial) {
+      await collection.updateOne(
+        { _id: existingTrial._id },
+        {
+          $set: {
+            ...savedRegistration,
+            previousStudentId: existingTrial.studentId || "",
+            upgradedToStudentId: studentId,
+            upgradedFromTrial: true,
+            upgradedAt: now
+          }
+        }
+      );
+      await notifyNewStudentRegistration(savedRegistration).catch((notificationError) => {
+        console.error("Student registration admin notification failed", notificationError);
+      });
+
+      return NextResponse.json({ ok: true, id: String(existingTrial._id), studentId, upgraded: true }, { status: 200 });
+    }
+
+    const result = await collection.insertOne({
+      ...savedRegistration,
+      createdAt: now
+    });
+    await notifyNewStudentRegistration(savedRegistration).catch((notificationError) => {
       console.error("Student registration admin notification failed", notificationError);
     });
 
-    return NextResponse.json({ ok: true, id: result.insertedId.toString() }, { status: 201 });
+    return NextResponse.json({ ok: true, id: result.insertedId.toString(), studentId }, { status: 201 });
   } catch (error) {
     console.error("Student registration MongoDB insert failed", error);
     return NextResponse.json({ ok: false, error: "Unable to submit right now. Please try again." }, { status: 500 });

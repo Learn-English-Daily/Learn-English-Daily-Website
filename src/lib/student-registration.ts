@@ -12,6 +12,14 @@ export function getStudentRegistrationCollectionName() {
   return process.env.MONGODB_STUDENTS_COLLECTION || "student_registrations";
 }
 
+export function getStudentIdCountersCollectionName() {
+  return process.env.MONGODB_STUDENT_ID_COUNTERS_COLLECTION || "student_id_counters";
+}
+
+export function isTrialCourse(courseJoined: string) {
+  return courseJoined === "Trial Class";
+}
+
 export function isCourseJoined(value: string): value is CourseJoined {
   return courseJoinedOptions.includes(value as CourseJoined);
 }

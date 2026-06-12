@@ -16,6 +16,7 @@ type ReviewNotification = {
 };
 
 type StudentRegistrationNotification = {
+  studentId: string;
   studentName: string;
   whatsapp: string;
   parentName: string;
@@ -154,6 +155,7 @@ export async function notifyNewStudentRegistration(registration: StudentRegistra
     preview: "A new enrolled student registration form was submitted.",
     adminPath: "/admin/students",
     lines: [
+      `Student ID: ${registration.studentId}`,
       `Student: ${registration.studentName}`,
       `Parent: ${registration.parentName}`,
       `WhatsApp: ${registration.whatsapp}`,

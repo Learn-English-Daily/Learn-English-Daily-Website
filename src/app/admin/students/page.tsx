@@ -13,8 +13,13 @@ import { getStudentRegistrationCollectionName } from "@/lib/student-registration
 export const dynamic = "force-dynamic";
 
 type StudentRegistrationDocument = {
+  studentId?: string;
+  previousStudentId?: string;
+  upgradedToStudentId?: string;
+  upgradedFromTrial?: boolean;
   studentName?: string;
   whatsapp?: string;
+  normalizedWhatsapp?: string;
   parentName?: string;
   age?: string;
   grade?: string;
@@ -30,8 +35,25 @@ type StudentRegistrationDocument = {
   createdAt?: Date;
 };
 
-type StudentRegistration = Required<Omit<StudentRegistrationDocument, "createdAt">> & {
+type StudentRegistration = {
   id: string;
+  studentId: string;
+  previousStudentId: string;
+  upgradedFromTrial: boolean;
+  studentName: string;
+  whatsapp: string;
+  parentName: string;
+  age: string;
+  grade: string;
+  preferredSchedule: string;
+  preferredTime: string;
+  courseJoined: string;
+  classType: string;
+  englishLevel: string;
+  learningGoal: string;
+  countryCity: string;
+  locale: string;
+  source: string;
   createdAt: string;
 };
 
@@ -46,7 +68,10 @@ async function getStudentRegistrations(query = ""): Promise<StudentRegistration[
     ? {
         $or: [
           "studentName",
+          "studentId",
+          "previousStudentId",
           "whatsapp",
+          "normalizedWhatsapp",
           "parentName",
           "age",
           "grade",
@@ -73,6 +98,9 @@ async function getStudentRegistrations(query = ""): Promise<StudentRegistration[
 
   return docs.map((doc) => ({
     id: doc._id.toString(),
+    studentId: doc.studentId || "",
+    previousStudentId: doc.previousStudentId || "",
+    upgradedFromTrial: doc.upgradedFromTrial || false,
     studentName: doc.studentName || "Unknown",
     whatsapp: doc.whatsapp || "",
     parentName: doc.parentName || "",
@@ -203,7 +231,17 @@ export default async function AdminStudentsPage({
               <Card key={registration.id} className="p-5">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <h2 className="font-heading text-xl font-bold text-lead-navy">{registration.studentName}</h2>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h2 className="font-heading text-xl font-bold text-lead-navy">{registration.studentName}</h2>
+                      {registration.studentId ? (
+                        <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{registration.studentId}</span>
+                      ) : null}
+                      {registration.upgradedFromTrial && registration.previousStudentId ? (
+                        <span className="rounded-lg bg-yellow-50 px-3 py-1 text-xs font-bold uppercase text-yellow-800">
+                          Upgraded from {registration.previousStudentId}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="mt-2 text-sm font-semibold text-lead-gray">Parent: {registration.parentName}</p>
                     {registration.whatsapp ? (
                       <a
