@@ -182,6 +182,9 @@ export default async function AdminStudentsPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="secondary">
+              <a href="/admin/attendance">Attendance</a>
+            </Button>
+            <Button asChild variant="secondary">
               <a href="/admin/payments">Payments</a>
             </Button>
             <Button asChild variant="secondary">
@@ -259,11 +262,18 @@ export default async function AdminStudentsPage({
                     ) : null}
                   </div>
                   {registration.studentId ? (
-                    <Button asChild variant="secondary" size="sm">
-                      <a href={`/admin/payments?studentId=${encodeURIComponent(registration.studentId)}`}>
-                        Payments
-                      </a>
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild variant="secondary" size="sm">
+                        <a href={`/admin/attendance?studentId=${encodeURIComponent(registration.studentId)}`}>
+                          Attendance
+                        </a>
+                      </Button>
+                      <Button asChild variant="secondary" size="sm">
+                        <a href={`/admin/payments?studentId=${encodeURIComponent(registration.studentId)}`}>
+                          Payments
+                        </a>
+                      </Button>
+                    </div>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
                     {[registration.courseJoined, registration.classType, registration.englishLevel, registration.locale.toUpperCase()].map((item) => (

@@ -1,22 +1,20 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CreditCard, RefreshCcw, Search } from "lucide-react";
+import { CalendarCheck, RefreshCcw, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
+import type { ReactNode } from "react";
+import { logoutAdmin } from "@/app/admin/actions";
+import { saveStudentAttendance, updateStudentAttendance } from "@/app/admin/attendance/actions";
+import { AdminLoginForm } from "@/app/admin/login-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { logoutAdmin } from "@/app/admin/actions";
-import { AdminLoginForm } from "@/app/admin/login-form";
-import { createStudentPayment, updateStudentPaymentStatus } from "@/app/admin/payments/actions";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
-import { getMongoDb } from "@/lib/mongodb";
 import {
-  formatRupiah,
-  getStudentPaymentsCollectionName,
-  getSuggestedPerMeetingPrice,
-  paymentMethods,
-  paymentStatuses,
-  type PaymentStatus
-} from "@/lib/payments";
+  attendanceStatuses,
+  getStudentAttendanceCollectionName,
+  type AttendanceStatus
+} from "@/lib/attendance";
+import { getMongoDb } from "@/lib/mongodb";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
 export const dynamic = "force-dynamic";
@@ -42,29 +40,23 @@ type Student = {
   englishLevel: string;
 };
 
-type PaymentDocument = {
+type AttendanceDocument = {
   studentId?: string;
   studentName?: string;
   courseJoined?: string;
   classType?: string;
   meetingNumber?: number;
   meetingDate?: string;
-  amountDue?: number;
-  status?: PaymentStatus;
-  paidDate?: string;
-  paymentMethod?: string;
+  status?: AttendanceStatus;
   notes?: string;
   createdAt?: Date;
 };
 
-type Payment = {
+type Attendance = {
   id: string;
   meetingNumber: number;
   meetingDate: string;
-  amountDue: number;
-  status: PaymentStatus;
-  paidDate: string;
-  paymentMethod: string;
+  status: AttendanceStatus;
   notes: string;
   createdAt: string;
 };
@@ -130,39 +122,50 @@ async function getSelectedStudent(studentId = "") {
   };
 }
 
-async function getPayments(studentId = ""): Promise<Payment[]> {
+async function getAttendance(studentId = ""): Promise<Attendance[]> {
   if (!studentId) return [];
 
   const db = await getMongoDb();
   const docs = (await db
-    .collection<PaymentDocument>(getStudentPaymentsCollectionName())
+    .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
     .find({ studentId })
     .sort({ meetingNumber: 1, meetingDate: 1 })
     .limit(200)
-    .toArray()) as WithId<PaymentDocument>[];
+    .toArray()) as WithId<AttendanceDocument>[];
 
   return docs.map((doc) => ({
     id: doc._id.toString(),
     meetingNumber: doc.meetingNumber || 0,
     meetingDate: doc.meetingDate || "",
-    amountDue: doc.amountDue || 0,
-    status: doc.status || "Unpaid",
-    paidDate: doc.paidDate || "",
-    paymentMethod: doc.paymentMethod || "",
+    status: doc.status || "Present",
     notes: doc.notes || "",
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
   }));
 }
 
-function nextMeetingNumber(payments: Payment[]) {
-  return payments.reduce((highest, payment) => Math.max(highest, payment.meetingNumber), 0) + 1;
+function nextMeetingNumber(attendance: Attendance[]) {
+  return attendance.reduce((highest, record) => Math.max(highest, record.meetingNumber), 0) + 1;
 }
 
-function statusClassName(status: PaymentStatus) {
-  return status === "Paid" ? "bg-emerald-50 text-emerald-700" : "bg-yellow-50 text-yellow-800";
+function statusClassName(status: AttendanceStatus) {
+  if (status === "Present") return "bg-emerald-50 text-emerald-700";
+  if (status === "Absent") return "bg-rose-50 text-rose-700";
+  if (status === "Late") return "bg-yellow-50 text-yellow-800";
+  return "bg-slate-100 text-slate-600";
 }
 
-export default async function AdminPaymentsPage({
+function summaryTextClassName(status: AttendanceStatus) {
+  if (status === "Present") return "text-emerald-600";
+  if (status === "Absent") return "text-rose-600";
+  if (status === "Late") return "text-yellow-700";
+  return "text-slate-600";
+}
+
+function countStatus(attendance: Attendance[], status: AttendanceStatus) {
+  return attendance.filter((record) => record.status === status).length;
+}
+
+export default async function AdminAttendancePage({
   searchParams
 }: {
   searchParams?: Promise<{ q?: string | string[]; studentId?: string | string[] }>;
@@ -172,7 +175,9 @@ export default async function AdminPaymentsPage({
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
   const resolvedSearchParams = await searchParams;
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
-  const selectedStudentId = Array.isArray(resolvedSearchParams?.studentId) ? resolvedSearchParams?.studentId[0] || "" : resolvedSearchParams?.studentId || "";
+  const selectedStudentId = Array.isArray(resolvedSearchParams?.studentId)
+    ? resolvedSearchParams?.studentId[0] || ""
+    : resolvedSearchParams?.studentId || "";
 
   if (!isAdminConfigured()) {
     return (
@@ -194,8 +199,8 @@ export default async function AdminPaymentsPage({
       <main className="grid min-h-screen place-items-center bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#fff7d6_100%)] px-4 py-10">
         <Card className="w-full max-w-md p-8 shadow-soft">
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Track student payments</h1>
-          <p className="mt-3 leading-7 text-lead-gray">Sign in to record per-meeting payments.</p>
+          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Track student attendance</h1>
+          <p className="mt-3 leading-7 text-lead-gray">Sign in to mark attendance for each class meeting.</p>
           <AdminLoginForm />
         </Card>
       </main>
@@ -203,10 +208,7 @@ export default async function AdminPaymentsPage({
   }
 
   const [students, selectedStudent] = await Promise.all([getStudents(searchQuery), getSelectedStudent(selectedStudentId)]);
-  const payments = selectedStudent ? await getPayments(selectedStudent.studentId) : [];
-  const suggestedAmount = selectedStudent ? getSuggestedPerMeetingPrice(selectedStudent.courseJoined, selectedStudent.classType) : 0;
-  const totalPaid = payments.filter((payment) => payment.status === "Paid").reduce((sum, payment) => sum + payment.amountDue, 0);
-  const totalUnpaid = payments.filter((payment) => payment.status === "Unpaid").reduce((sum, payment) => sum + payment.amountDue, 0);
+  const attendance = selectedStudent ? await getAttendance(selectedStudent.studentId) : [];
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -214,16 +216,16 @@ export default async function AdminPaymentsPage({
         <div className="container-shell flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Student payments</h1>
-            <p className="mt-2 text-sm text-lead-gray">Record payment after each meeting and track unpaid sessions.</p>
+            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Student attendance</h1>
+            <p className="mt-2 text-sm text-lead-gray">Mark attendance by meeting and review each student&apos;s class history.</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button asChild variant="secondary"><a href="/admin/attendance">Attendance</a></Button>
+            <Button asChild variant="secondary"><a href="/admin/payments">Payments</a></Button>
             <Button asChild variant="secondary"><a href="/admin/students">Registrations</a></Button>
             <Button asChild variant="secondary"><a href="/admin/reviews">Reviews</a></Button>
             <Button asChild variant="secondary"><a href="/admin">Inquiries</a></Button>
             <Button asChild variant="secondary">
-              <a href="/admin/payments">
+              <a href="/admin/attendance">
                 <RefreshCcw className="h-4 w-4" />
                 Refresh
               </a>
@@ -238,7 +240,7 @@ export default async function AdminPaymentsPage({
       <section className="container-shell grid gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="grid gap-6">
           <Card className="p-4">
-            <form action="/admin/payments" className="flex flex-col gap-3 md:flex-row">
+            <form action="/admin/attendance" className="flex flex-col gap-3 md:flex-row">
               <label className="relative flex-1">
                 <span className="sr-only">Search students</span>
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
@@ -262,7 +264,7 @@ export default async function AdminPaymentsPage({
               {students.map((student) => (
                 <a
                   key={student.id}
-                  href={`/admin/payments?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
+                  href={`/admin/attendance?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
                   className={`focus-ring rounded-lg border p-4 transition hover:border-lead-blue hover:bg-blue-50 ${
                     selectedStudent?.studentId === student.studentId ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white"
                   }`}
@@ -271,7 +273,7 @@ export default async function AdminPaymentsPage({
                     <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{student.studentId || "No ID"}</span>
                     <span className="font-heading font-bold text-lead-navy">{student.studentName}</span>
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined} · {student.classType}</p>
+                  <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined} / {student.classType}</p>
                   <p className="mt-1 text-xs text-lead-gray">Parent: {student.parentName || "Not set"}</p>
                 </a>
               ))}
@@ -290,43 +292,34 @@ export default async function AdminPaymentsPage({
                       <h2 className="font-heading text-2xl font-bold text-lead-navy">{selectedStudent.studentName}</h2>
                       <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{selectedStudent.studentId}</span>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-lead-gray">{selectedStudent.courseJoined} · {selectedStudent.classType}</p>
+                    <p className="mt-2 text-sm font-semibold text-lead-gray">{selectedStudent.courseJoined} / {selectedStudent.classType}</p>
                   </div>
-                  <div className="grid gap-2 text-sm font-bold md:text-right">
-                    <p className="text-emerald-600">Paid: {formatRupiah(totalPaid)}</p>
-                    <p className="text-yellow-700">Unpaid: {formatRupiah(totalUnpaid)}</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm font-bold md:text-right">
+                    {attendanceStatuses.map((status) => (
+                      <p key={status} className={summaryTextClassName(status)}>
+                        {status}: {countStatus(attendance, status)}
+                      </p>
+                    ))}
                   </div>
                 </div>
               </Card>
 
               <Card className="p-5">
-                <h2 className="font-heading text-xl font-bold text-lead-navy">Add meeting payment</h2>
-                <form action={createStudentPayment} className="mt-5 grid gap-4 md:grid-cols-2">
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Mark attendance</h2>
+                <form action={saveStudentAttendance} className="mt-5 grid gap-4 md:grid-cols-2">
                   <input type="hidden" name="studentId" value={selectedStudent.studentId} />
                   <input type="hidden" name="studentName" value={selectedStudent.studentName} />
                   <input type="hidden" name="courseJoined" value={selectedStudent.courseJoined} />
                   <input type="hidden" name="classType" value={selectedStudent.classType} />
                   <Field label="Meeting Number">
-                    <input name="meetingNumber" type="number" min="1" required defaultValue={nextMeetingNumber(payments)} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                    <input name="meetingNumber" type="number" min="1" required defaultValue={nextMeetingNumber(attendance)} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
                   </Field>
                   <Field label="Meeting Date">
                     <input name="meetingDate" type="date" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
                   </Field>
-                  <Field label="Amount Due">
-                    <input name="amountDue" type="number" min="0" required defaultValue={suggestedAmount || ""} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
-                  </Field>
                   <Field label="Status">
-                    <select name="status" defaultValue="Unpaid" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
-                      {paymentStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Paid Date">
-                    <input name="paidDate" type="date" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
-                  </Field>
-                  <Field label="Payment Method">
-                    <select name="paymentMethod" defaultValue="" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
-                      <option value="">Not set</option>
-                      {paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}
+                    <select name="status" defaultValue="Present" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
+                      {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                     </select>
                   </Field>
                   <label className="grid gap-2 text-sm font-semibold text-lead-navy md:col-span-2">
@@ -334,51 +327,46 @@ export default async function AdminPaymentsPage({
                     <textarea name="notes" rows={3} className="focus-ring resize-none rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" />
                   </label>
                   <Button type="submit" size="lg" className="md:col-span-2">
-                    <CreditCard className="h-4 w-4" />
-                    Save Payment
+                    <CalendarCheck className="h-4 w-4" />
+                    Save Attendance
                   </Button>
                 </form>
               </Card>
 
               <Card className="p-5">
-                <h2 className="font-heading text-xl font-bold text-lead-navy">Payment history</h2>
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Attendance history</h2>
                 <div className="mt-5 grid gap-4">
-                  {payments.map((payment) => (
-                    <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                  {attendance.map((record) => (
+                    <div key={record.id} className="rounded-lg border border-slate-200 bg-white p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-heading font-bold text-lead-navy">Meeting {payment.meetingNumber}</h3>
-                            <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(payment.status)}`}>{payment.status}</span>
+                            <h3 className="font-heading font-bold text-lead-navy">Meeting {record.meetingNumber}</h3>
+                            <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>{record.status}</span>
                           </div>
-                          <p className="mt-2 text-sm text-lead-gray">{formatDate(payment.meetingDate)} · {formatRupiah(payment.amountDue)}</p>
-                          <p className="mt-1 text-xs text-lead-gray">Paid date: {payment.paidDate ? formatDate(payment.paidDate) : "Not paid yet"} · Method: {payment.paymentMethod || "Not set"}</p>
-                          {payment.notes ? <p className="mt-2 text-sm leading-6 text-lead-gray">{payment.notes}</p> : null}
+                          <p className="mt-2 text-sm text-lead-gray">{formatDate(record.meetingDate)}</p>
+                          {record.notes ? <p className="mt-2 text-sm leading-6 text-lead-gray">{record.notes}</p> : null}
                         </div>
-                        <form action={updateStudentPaymentStatus} className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
-                          <input type="hidden" name="id" value={payment.id} />
-                          <select name="status" defaultValue={payment.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
-                            {paymentStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                        <form action={updateStudentAttendance} className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
+                          <input type="hidden" name="id" value={record.id} />
+                          <input name="meetingDate" type="date" defaultValue={record.meetingDate} required className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
+                          <select name="status" defaultValue={record.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
+                            {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                           </select>
-                          <input name="paidDate" type="date" defaultValue={payment.paidDate} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
-                          <select name="paymentMethod" defaultValue={payment.paymentMethod} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
-                            <option value="">Not set</option>
-                            {paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}
-                          </select>
-                          <input name="notes" defaultValue={payment.notes} placeholder="Notes" className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
+                          <input name="notes" defaultValue={record.notes} placeholder="Notes" className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy sm:col-span-2" />
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
                         </form>
                       </div>
                     </div>
                   ))}
-                  {!payments.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No payment records yet.</p> : null}
+                  {!attendance.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance records yet.</p> : null}
                 </div>
               </Card>
             </>
           ) : (
             <Card className="p-8 text-center">
               <h2 className="font-heading text-2xl font-bold text-lead-navy">Choose a student</h2>
-              <p className="mt-3 text-lead-gray">Search or select a student to add and review per-meeting payments.</p>
+              <p className="mt-3 text-lead-gray">Search or select a student to mark and review attendance.</p>
             </Card>
           )}
         </div>
@@ -387,7 +375,7 @@ export default async function AdminPaymentsPage({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="grid gap-2 text-sm font-semibold text-lead-navy">
       {label}
