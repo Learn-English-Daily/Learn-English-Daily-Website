@@ -10,6 +10,10 @@ import {
   type AttendanceStatus
 } from "@/lib/attendance";
 import { getMongoDb } from "@/lib/mongodb";
+import {
+  getStudentPaymentsCollectionName,
+  getSuggestedPerMeetingPrice
+} from "@/lib/payments";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -27,6 +31,85 @@ async function assertAdmin() {
   if (!isAuthenticated) {
     throw new Error("Unauthorized");
   }
+}
+
+function isBillableAttendance(status: AttendanceStatus) {
+  return status === "Present" || status === "Late";
+}
+
+async function syncPaymentFromAttendance({
+  studentId,
+  studentName,
+  courseJoined,
+  classType,
+  meetingNumber,
+  meetingDate,
+  status
+}: {
+  studentId: string;
+  studentName: string;
+  courseJoined: string;
+  classType: string;
+  meetingNumber: number;
+  meetingDate: string;
+  status: AttendanceStatus;
+}) {
+  const db = await getMongoDb();
+  const payments = db.collection(getStudentPaymentsCollectionName());
+  const amountDue = getSuggestedPerMeetingPrice(courseJoined, classType);
+
+  if (!isBillableAttendance(status) || amountDue <= 0) {
+    await payments.updateOne(
+      {
+        studentId,
+        meetingNumber,
+        status: "Paid",
+        source: "attendance"
+      },
+      {
+        $set: {
+          meetingDate,
+          attendanceStatus: status,
+          updatedAt: new Date()
+        }
+      }
+    );
+    await payments.deleteOne({
+      studentId,
+      meetingNumber,
+      status: "Unpaid",
+      source: "attendance"
+    });
+    return;
+  }
+
+  const now = new Date();
+
+  await payments.updateOne(
+    { studentId, meetingNumber },
+    {
+      $set: {
+        studentId,
+        studentName,
+        courseJoined,
+        classType,
+        meetingNumber,
+        meetingDate,
+        amountDue,
+        source: "attendance",
+        attendanceStatus: status,
+        updatedAt: now
+      },
+      $setOnInsert: {
+        status: "Unpaid",
+        paidDate: "",
+        paymentMethod: "",
+        notes: "",
+        createdAt: now
+      }
+    },
+    { upsert: true }
+  );
 }
 
 export async function saveStudentAttendance(formData: FormData) {
@@ -67,8 +150,18 @@ export async function saveStudentAttendance(formData: FormData) {
     },
     { upsert: true }
   );
+  await syncPaymentFromAttendance({
+    studentId,
+    studentName,
+    courseJoined,
+    classType,
+    meetingNumber,
+    meetingDate,
+    status
+  });
 
   revalidatePath("/admin/attendance");
+  revalidatePath("/admin/payments");
 }
 
 export async function updateStudentAttendance(formData: FormData) {
@@ -84,6 +177,24 @@ export async function updateStudentAttendance(formData: FormData) {
   }
 
   const db = await getMongoDb();
+  const existingAttendance = await db.collection<{
+    studentId?: string;
+    studentName?: string;
+    courseJoined?: string;
+    classType?: string;
+    meetingNumber?: number;
+  }>(getStudentAttendanceCollectionName()).findOne({ _id: new ObjectId(id) });
+
+  if (
+    !existingAttendance?.studentId ||
+    !existingAttendance.studentName ||
+    !existingAttendance.courseJoined ||
+    !existingAttendance.classType ||
+    !existingAttendance.meetingNumber
+  ) {
+    throw new Error("Attendance record not found");
+  }
+
   await db.collection(getStudentAttendanceCollectionName()).updateOne(
     { _id: new ObjectId(id) },
     {
@@ -95,6 +206,16 @@ export async function updateStudentAttendance(formData: FormData) {
       }
     }
   );
+  await syncPaymentFromAttendance({
+    studentId: existingAttendance.studentId,
+    studentName: existingAttendance.studentName,
+    courseJoined: existingAttendance.courseJoined,
+    classType: existingAttendance.classType,
+    meetingNumber: existingAttendance.meetingNumber,
+    meetingDate,
+    status
+  });
 
   revalidatePath("/admin/attendance");
+  revalidatePath("/admin/payments");
 }
