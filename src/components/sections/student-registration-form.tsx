@@ -17,6 +17,7 @@ const copy = {
     fields: {
       studentName: "Student Name",
       whatsapp: "WhatsApp Number",
+      email: "Email Address",
       parentName: "Parent Name",
       age: "Age",
       grade: "Grade",
@@ -30,6 +31,7 @@ const copy = {
     },
     placeholders: {
       whatsapp: "+62...",
+      email: "student@example.com",
       grade: "Example: Grade 5",
       preferredSchedule: "Example: Weekdays or weekend",
       preferredTime: "Example: 5 PM Jakarta time",
@@ -46,6 +48,7 @@ const copy = {
     fields: {
       studentName: "Nama Siswa",
       whatsapp: "Nomor WhatsApp",
+      email: "Alamat Email",
       parentName: "Nama Orang Tua",
       age: "Usia",
       grade: "Kelas",
@@ -59,6 +62,7 @@ const copy = {
     },
     placeholders: {
       whatsapp: "+62...",
+      email: "siswa@example.com",
       grade: "Contoh: Kelas 5",
       preferredSchedule: "Contoh: Weekdays atau weekend",
       preferredTime: "Contoh: 5 sore WIB",
@@ -84,6 +88,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
     const payload = {
       studentName: String(formData.get("studentName") || ""),
       whatsapp: String(formData.get("whatsapp") || ""),
+      email: String(formData.get("email") || ""),
       parentName: String(formData.get("parentName") || ""),
       age: String(formData.get("age") || ""),
       grade: String(formData.get("grade") || ""),
@@ -124,6 +129,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
       <div className="grid gap-4 md:grid-cols-2">
         <TextField name="studentName" label={text.fields.studentName} requiredText={text.required} required />
         <TextField name="whatsapp" label={text.fields.whatsapp} requiredText={text.required} placeholder={text.placeholders.whatsapp} required />
+        <TextField name="email" label={text.fields.email} requiredText={text.required} placeholder={text.placeholders.email} type="email" required />
         <TextField name="parentName" label={text.fields.parentName} requiredText={text.required} required />
         <TextField name="age" label={text.fields.age} requiredText={text.required} inputMode="numeric" required />
         <TextField name="grade" label={text.fields.grade} requiredText={text.required} placeholder={text.placeholders.grade} required />
@@ -160,7 +166,8 @@ function TextField({
   required,
   requiredText,
   placeholder,
-  inputMode
+  inputMode,
+  type = "text"
 }: {
   name: string;
   label: string;
@@ -168,6 +175,7 @@ function TextField({
   requiredText?: string;
   placeholder?: string;
   inputMode?: "numeric";
+  type?: "email" | "text";
 }) {
   return (
     <label className="grid gap-2 text-sm font-semibold text-lead-navy">
@@ -177,6 +185,7 @@ function TextField({
       <input
         required={required}
         name={name}
+        type={type}
         placeholder={placeholder}
         inputMode={inputMode}
         className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy"

@@ -26,6 +26,10 @@ function isReasonableShortText(value: string, max = 120) {
   return value.length > 0 && value.length <= max;
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 160;
+}
+
 async function assertAdmin() {
   const cookieStore = await cookies();
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
@@ -42,6 +46,7 @@ export async function updateStudentRegistration(formData: FormData) {
   const registration = {
     studentName: clean(formData.get("studentName")),
     whatsapp: clean(formData.get("whatsapp")),
+    email: clean(formData.get("email")).toLowerCase(),
     normalizedWhatsapp: normalizeWhatsapp(clean(formData.get("whatsapp"))),
     parentName: clean(formData.get("parentName")),
     age: clean(formData.get("age")),
@@ -60,6 +65,7 @@ export async function updateStudentRegistration(formData: FormData) {
     !ObjectId.isValid(id) ||
     !isReasonableShortText(registration.studentName) ||
     !isReasonableShortText(registration.whatsapp) ||
+    !isValidEmail(registration.email) ||
     !isReasonableShortText(registration.parentName) ||
     !isReasonableShortText(registration.age, 20) ||
     !isReasonableShortText(registration.grade, 60) ||

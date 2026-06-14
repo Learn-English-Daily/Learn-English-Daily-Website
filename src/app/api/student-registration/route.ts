@@ -17,6 +17,7 @@ export const runtime = "nodejs";
 type StudentRegistrationPayload = {
   studentName?: string;
   whatsapp?: string;
+  email?: string;
   parentName?: string;
   age?: string;
   grade?: string;
@@ -42,6 +43,10 @@ function clean(value: unknown) {
 
 function isReasonableShortText(value: string, max = 120) {
   return value.length > 0 && value.length <= max;
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 160;
 }
 
 function normalizeWhatsapp(value: string) {
@@ -72,6 +77,7 @@ export async function POST(request: Request) {
   const registration = {
     studentName: clean(payload.studentName),
     whatsapp: clean(payload.whatsapp),
+    email: clean(payload.email).toLowerCase(),
     normalizedWhatsapp: normalizeWhatsapp(clean(payload.whatsapp)),
     parentName: clean(payload.parentName),
     age: clean(payload.age),
@@ -91,6 +97,7 @@ export async function POST(request: Request) {
   if (
     !isReasonableShortText(registration.studentName) ||
     !isReasonableShortText(registration.whatsapp) ||
+    !isValidEmail(registration.email) ||
     !isReasonableShortText(registration.parentName) ||
     !isReasonableShortText(registration.age, 20) ||
     !isReasonableShortText(registration.grade, 60) ||

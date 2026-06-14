@@ -19,6 +19,7 @@ type StudentRegistrationDocument = {
   upgradedFromTrial?: boolean;
   studentName?: string;
   whatsapp?: string;
+  email?: string;
   normalizedWhatsapp?: string;
   parentName?: string;
   age?: string;
@@ -42,6 +43,7 @@ type StudentRegistration = {
   upgradedFromTrial: boolean;
   studentName: string;
   whatsapp: string;
+  email: string;
   parentName: string;
   age: string;
   grade: string;
@@ -71,6 +73,7 @@ async function getStudentRegistrations(query = ""): Promise<StudentRegistration[
           "studentId",
           "previousStudentId",
           "whatsapp",
+          "email",
           "normalizedWhatsapp",
           "parentName",
           "age",
@@ -103,6 +106,7 @@ async function getStudentRegistrations(query = ""): Promise<StudentRegistration[
     upgradedFromTrial: doc.upgradedFromTrial || false,
     studentName: doc.studentName || "Unknown",
     whatsapp: doc.whatsapp || "",
+    email: doc.email || "",
     parentName: doc.parentName || "",
     age: doc.age || "",
     grade: doc.grade || "",
@@ -215,7 +219,7 @@ export default async function AdminStudentsPage({
               <input
                 name="q"
                 defaultValue={searchQuery}
-                placeholder="Search by student, parent, WhatsApp, course, schedule..."
+                placeholder="Search by student, parent, email, WhatsApp, course, schedule..."
                 className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy"
               />
             </label>
@@ -258,6 +262,14 @@ export default async function AdminStudentsPage({
                       >
                         <MessageCircle className="h-4 w-4" />
                         {registration.whatsapp}
+                      </a>
+                    ) : null}
+                    {registration.email ? (
+                      <a
+                        href={`mailto:${registration.email}`}
+                        className="mt-2 block font-semibold text-lead-blue hover:text-blue-700"
+                      >
+                        {registration.email}
                       </a>
                     ) : null}
                   </div>
@@ -305,7 +317,7 @@ export default async function AdminStudentsPage({
           <Card className="p-8 text-center">
             <h2 className="font-heading text-2xl font-bold text-lead-navy">{searchQuery ? "No matching registrations" : "No registrations yet"}</h2>
             <p className="mt-3 text-lead-gray">
-              {searchQuery ? "Try a different student name, parent name, WhatsApp, course, or schedule." : "New student registration submissions will appear here."}
+              {searchQuery ? "Try a different student name, parent name, email, WhatsApp, course, or schedule." : "New student registration submissions will appear here."}
             </p>
           </Card>
         )}

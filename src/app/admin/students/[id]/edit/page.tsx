@@ -27,6 +27,7 @@ type StudentRegistrationDocument = {
   upgradedFromTrial?: boolean;
   studentName?: string;
   whatsapp?: string;
+  email?: string;
   parentName?: string;
   age?: string;
   grade?: string;
@@ -49,6 +50,7 @@ type StudentRegistration = {
   upgradedFromTrial: boolean;
   studentName: string;
   whatsapp: string;
+  email: string;
   parentName: string;
   age: string;
   grade: string;
@@ -81,6 +83,7 @@ async function getStudentRegistration(id: string): Promise<StudentRegistration |
     upgradedFromTrial: doc.upgradedFromTrial || false,
     studentName: doc.studentName || "",
     whatsapp: doc.whatsapp || "",
+    email: doc.email || "",
     parentName: doc.parentName || "",
     age: doc.age || "",
     grade: doc.grade || "",
@@ -211,6 +214,9 @@ export default async function EditStudentRegistrationPage({
             </Field>
             <Field label="WhatsApp Number">
               <input name="whatsapp" required defaultValue={registration.whatsapp} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+            </Field>
+            <Field label="Email Address">
+              <input name="email" type="email" required defaultValue={registration.email} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
             </Field>
             <Field label="Parent Name">
               <input name="parentName" required defaultValue={registration.parentName} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />

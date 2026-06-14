@@ -19,6 +19,7 @@ type StudentRegistrationNotification = {
   studentId: string;
   studentName: string;
   whatsapp: string;
+  email: string;
   parentName: string;
   age: string;
   grade: string;
@@ -159,6 +160,7 @@ export async function notifyNewStudentRegistration(registration: StudentRegistra
       `Student: ${registration.studentName}`,
       `Parent: ${registration.parentName}`,
       `WhatsApp: ${registration.whatsapp}`,
+      `Email: ${registration.email}`,
       `Age: ${registration.age}`,
       `Grade: ${registration.grade}`,
       `Course Joined: ${registration.courseJoined}`,
