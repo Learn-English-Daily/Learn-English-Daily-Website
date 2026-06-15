@@ -39,7 +39,6 @@ type AttendanceDocument = {
 };
 
 type Student = {
-  studentId: string;
   studentName: string;
   parentName: string;
   courseJoined: string;
@@ -90,7 +89,6 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
 
   return {
     student: {
-      studentId: studentDoc.studentId,
       studentName: studentDoc.studentName || "Student",
       parentName: studentDoc.parentName || "Parent",
       courseJoined: studentDoc.courseJoined || "",
@@ -123,14 +121,11 @@ export default async function ParentAttendancePortalPage({
   return (
     <main className="min-h-screen bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#fff7d6_100%)] px-4 py-8">
       <section className="mx-auto grid w-full max-w-5xl gap-6">
-        <header className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-soft md:flex-row md:items-center md:justify-between">
+        <header className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Parent Portal</p>
             <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Attendance Report</h1>
             <p className="mt-2 text-sm text-lead-gray">Read-only attendance view for parents.</p>
-          </div>
-          <div className="rounded-lg bg-lead-navy px-4 py-3 text-sm font-bold text-white">
-            {student.studentId}
           </div>
         </header>
 
