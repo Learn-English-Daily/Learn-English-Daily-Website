@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { ObjectId } from "mongodb";
 import { notifyNewStudentRegistration } from "@/lib/admin-notifications";
 import { getMongoDb } from "@/lib/mongodb";
+import { generateParentAccessToken } from "@/lib/parent-access";
 import {
   getStudentIdCountersCollectionName,
   getStudentRegistrationCollectionName,
@@ -145,6 +146,7 @@ export async function POST(request: Request) {
       ...registration,
       studentId,
       studentIdType: joinedStudent ? "student" : "trial",
+      parentAccessToken: generateParentAccessToken(),
       updatedAt: now
     };
 

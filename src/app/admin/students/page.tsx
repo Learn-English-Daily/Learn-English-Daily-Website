@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { MessageCircle, Pencil, RefreshCcw, Search } from "lucide-react";
+import { MessageCircle, Pencil, QrCode, RefreshCcw, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -279,6 +279,12 @@ export default async function AdminStudentsPage({
                         <a href={`/admin/students/${registration.id}/edit`}>
                           <Pencil className="h-4 w-4" />
                           Edit
+                        </a>
+                      </Button>
+                      <Button asChild variant="secondary" size="sm">
+                        <a href={`/admin/students/${registration.id}/parent-qr`}>
+                          <QrCode className="h-4 w-4" />
+                          Parent QR
                         </a>
                       </Button>
                       <Button asChild variant="secondary" size="sm">

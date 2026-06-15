@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { generateParentAccessToken } from "@/lib/parent-access";
 import {
   getStudentRegistrationCollectionName,
   isClassType,
@@ -94,4 +95,31 @@ export async function updateStudentRegistration(formData: FormData) {
   revalidatePath("/admin/students");
   revalidatePath(`/admin/students/${id}/edit`);
   redirect(`/admin/students/${id}/edit?updated=1`);
+}
+
+export async function regenerateParentAccessToken(formData: FormData) {
+  await assertAdmin();
+
+  const id = clean(formData.get("id"));
+
+  if (!ObjectId.isValid(id)) {
+    throw new Error("Invalid student");
+  }
+
+  const db = await getMongoDb();
+  const parentAccessToken = generateParentAccessToken();
+  await db.collection(getStudentRegistrationCollectionName()).updateOne(
+    { _id: new ObjectId(id) },
+    {
+      $set: {
+        parentAccessToken,
+        parentAccessTokenUpdatedAt: new Date(),
+        updatedAt: new Date()
+      }
+    }
+  );
+
+  revalidatePath("/admin/students");
+  revalidatePath(`/admin/students/${id}/parent-qr`);
+  redirect(`/admin/students/${id}/parent-qr?regenerated=1`);
 }
