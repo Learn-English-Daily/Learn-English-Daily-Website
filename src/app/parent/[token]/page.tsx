@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import type { WithId } from "mongodb";
-import { CalendarCheck, Clock, UserRound } from "lucide-react";
+import { CalendarCheck, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import {
   getStudentAttendanceCollectionName,
@@ -24,7 +24,6 @@ export const metadata: Metadata = {
 type StudentDocument = {
   studentId?: string;
   studentName?: string;
-  parentName?: string;
   courseJoined?: string;
   classType?: string;
   parentAccessToken?: string;
@@ -35,12 +34,12 @@ type AttendanceDocument = {
   meetingNumber?: number;
   meetingDate?: string;
   status?: AttendanceStatus;
+  notes?: string;
   createdAt?: Date;
 };
 
 type Student = {
   studentName: string;
-  parentName: string;
   courseJoined: string;
   classType: string;
 };
@@ -49,6 +48,7 @@ type Attendance = {
   meetingNumber: number;
   meetingDate: string;
   status: AttendanceStatus;
+  notes: string;
 };
 
 function formatDate(value: string) {
@@ -90,14 +90,14 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
   return {
     student: {
       studentName: studentDoc.studentName || "Student",
-      parentName: studentDoc.parentName || "Parent",
       courseJoined: studentDoc.courseJoined || "",
       classType: studentDoc.classType || ""
     },
     attendance: attendanceDocs.map((record) => ({
       meetingNumber: record.meetingNumber || 0,
       meetingDate: record.meetingDate || "",
-      status: record.status || "Present"
+      status: record.status || "Present",
+      notes: record.notes || ""
     }))
   };
 }
@@ -131,16 +131,10 @@ export default async function ParentAttendancePortalPage({
 
         <Card className="overflow-hidden">
           <div className="bg-lead-blue p-5 text-white">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.14em] text-blue-100">Student</p>
-                <h2 className="mt-2 font-heading text-3xl font-extrabold">{student.studentName}</h2>
-                <p className="mt-2 text-blue-50">{student.courseJoined} / {student.classType}</p>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-lg bg-white/15 px-4 py-3 text-sm font-bold">
-                <UserRound className="h-4 w-4" />
-                Parent: {student.parentName}
-              </div>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.14em] text-blue-100">Student</p>
+              <h2 className="mt-2 font-heading text-3xl font-extrabold">{student.studentName}</h2>
+              <p className="mt-2 text-blue-50">{student.courseJoined} / {student.classType}</p>
             </div>
           </div>
 
@@ -170,6 +164,11 @@ export default async function ParentAttendancePortalPage({
                 <span className={`mt-3 inline-flex rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(latestAttendance.status)}`}>
                   {latestAttendance.status}
                 </span>
+                {latestAttendance.notes ? (
+                  <p className="mt-3 text-sm leading-6 text-lead-gray">
+                    <span className="font-bold text-lead-navy">Notes:</span> {latestAttendance.notes}
+                  </p>
+                ) : null}
               </div>
             ) : (
               <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance has been marked yet.</p>
@@ -188,14 +187,21 @@ export default async function ParentAttendancePortalPage({
             </div>
             <div className="mt-5 grid gap-3">
               {attendance.map((record) => (
-                <div key={`${record.meetingNumber}-${record.meetingDate}`} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-heading font-bold text-lead-navy">Meeting {record.meetingNumber}</p>
-                    <p className="mt-1 text-sm text-lead-gray">{formatDate(record.meetingDate)}</p>
+                <div key={`${record.meetingNumber}-${record.meetingDate}`} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-heading font-bold text-lead-navy">Meeting {record.meetingNumber}</p>
+                      <p className="mt-1 text-sm text-lead-gray">{formatDate(record.meetingDate)}</p>
+                    </div>
+                    <span className={`w-fit rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>
+                      {record.status}
+                    </span>
                   </div>
-                  <span className={`w-fit rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>
-                    {record.status}
-                  </span>
+                  {record.notes ? (
+                    <div className="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-sm leading-6 text-lead-gray">
+                      <span className="font-bold text-lead-navy">Notes:</span> {record.notes}
+                    </div>
+                  ) : null}
                 </div>
               ))}
               {!attendance.length ? (
