@@ -214,7 +214,19 @@ export default async function PaymentRequestPage({
       </article>
 
       <div className="mx-auto mt-5 w-full max-w-3xl">
-        <PaymentRequestActions />
+        <PaymentRequestActions
+          receipt={{
+            receiptNumber,
+            studentName: payment.studentName,
+            courseJoined: payment.courseJoined,
+            classType: payment.classType,
+            meetingNumber: payment.meetingNumber,
+            meetingDate: formatDate(payment.meetingDate),
+            attendanceStatus: payment.attendanceStatus,
+            amountDue: formatRupiah(payment.amountDue),
+            status: payment.status
+          }}
+        />
       </div>
     </main>
   );
