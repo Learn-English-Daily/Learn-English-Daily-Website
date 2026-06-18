@@ -3,6 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import type { WithId } from "mongodb";
 import { CalendarCheck, Clock } from "lucide-react";
+import { TranslateJournalButton } from "@/components/parent/translate-journal-button";
 import { Card } from "@/components/ui/card";
 import {
   getStudentAttendanceCollectionName,
@@ -35,6 +36,7 @@ type AttendanceDocument = {
   meetingDate?: string;
   status?: AttendanceStatus;
   notes?: string;
+  teacherNames?: string[];
   createdAt?: Date;
 };
 
@@ -49,6 +51,7 @@ type Attendance = {
   meetingDate: string;
   status: AttendanceStatus;
   notes: string;
+  teacherNames: string[];
 };
 
 function formatDate(value: string) {
@@ -97,7 +100,8 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
       meetingNumber: record.meetingNumber || 0,
       meetingDate: record.meetingDate || "",
       status: record.status || "Present",
-      notes: record.notes || ""
+      notes: record.notes || "",
+      teacherNames: record.teacherNames || []
     }))
   };
 }
@@ -146,7 +150,7 @@ export default async function ParentAttendancePortalPage({
           </div>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="grid gap-6">
           <Card className="p-5">
             <div className="flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-lg bg-blue-50 text-lead-blue">
@@ -164,11 +168,9 @@ export default async function ParentAttendancePortalPage({
                 <span className={`mt-3 inline-flex rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(latestAttendance.status)}`}>
                   {latestAttendance.status}
                 </span>
-                {latestAttendance.notes ? (
-                  <p className="mt-3 text-sm leading-6 text-lead-gray">
-                    <span className="font-bold text-lead-navy">Notes:</span> {latestAttendance.notes}
-                  </p>
-                ) : null}
+                <p className="mt-3 text-sm text-lead-gray">
+                  <span className="font-bold text-lead-navy">Teachers:</span> {latestAttendance.teacherNames.length ? latestAttendance.teacherNames.join(", ") : "Not assigned"}
+                </p>
               </div>
             ) : (
               <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance has been marked yet.</p>
@@ -181,13 +183,14 @@ export default async function ParentAttendancePortalPage({
                 <CalendarCheck className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="font-heading text-xl font-bold text-lead-navy">Class Attendance</h2>
-                <p className="text-sm text-lead-gray">Meeting-by-meeting attendance history.</p>
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Class Journal</h2>
+                <p className="text-sm text-lead-gray">Meeting attendance, teachers, and complete journal notes.</p>
               </div>
             </div>
             <div className="mt-5 grid gap-3">
               {attendance.map((record) => (
-                <div key={`${record.meetingNumber}-${record.meetingDate}`} className="rounded-lg border border-slate-200 bg-white p-4">
+                <article key={`${record.meetingNumber}-${record.meetingDate}`} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                  <div className="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="font-heading font-bold text-lead-navy">Meeting {record.meetingNumber}</p>
@@ -197,12 +200,26 @@ export default async function ParentAttendancePortalPage({
                       {record.status}
                     </span>
                   </div>
-                  {record.notes ? (
-                    <div className="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-sm leading-6 text-lead-gray">
-                      <span className="font-bold text-lead-navy">Notes:</span> {record.notes}
+                  <p className="mt-3 text-sm text-lead-gray">
+                    <span className="font-bold text-lead-navy">Teachers:</span> {record.teacherNames.length ? record.teacherNames.join(", ") : "Not assigned"}
+                  </p>
+                  </div>
+                  <div className="p-4 sm:p-5">
+                    <h3 className="font-heading text-lg font-bold text-lead-navy">Journal Notes</h3>
+                    {record.notes ? (
+                      <>
+                        <p lang="en" className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-7 text-lead-gray">
+                          {record.notes}
+                        </p>
+                        <div className="mt-5 border-t border-slate-100 pt-4">
+                          <TranslateJournalButton text={record.notes} />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-3 text-sm text-lead-gray">No journal notes were added for this meeting.</p>
+                    )}
                     </div>
-                  ) : null}
-                </div>
+                </article>
               ))}
               {!attendance.length ? (
                 <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">Attendance records will appear here after classes begin.</p>

@@ -16,6 +16,11 @@ import {
 } from "@/lib/attendance";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import {
+  ensureDefaultTeachers,
+  getTeachersCollectionName,
+  type TeacherDocument
+} from "@/lib/teachers";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +54,8 @@ type AttendanceDocument = {
   meetingDate?: string;
   status?: AttendanceStatus;
   notes?: string;
+  teacherIds?: string[];
+  teacherNames?: string[];
   createdAt?: Date;
 };
 
@@ -58,7 +65,14 @@ type Attendance = {
   meetingDate: string;
   status: AttendanceStatus;
   notes: string;
+  teacherIds: string[];
+  teacherNames: string[];
   createdAt: string;
+};
+
+type Teacher = {
+  id: string;
+  name: string;
 };
 
 function escapeRegex(value: string) {
@@ -139,8 +153,22 @@ async function getAttendance(studentId = ""): Promise<Attendance[]> {
     meetingDate: doc.meetingDate || "",
     status: doc.status || "Present",
     notes: doc.notes || "",
+    teacherIds: doc.teacherIds || [],
+    teacherNames: doc.teacherNames || [],
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
   }));
+}
+
+async function getTeachers(): Promise<Teacher[]> {
+  const db = await getMongoDb();
+  await ensureDefaultTeachers(db);
+  const teachers = await db
+    .collection<TeacherDocument>(getTeachersCollectionName())
+    .find({ active: true })
+    .sort({ name: 1 })
+    .toArray();
+
+  return teachers.map((teacher) => ({ id: teacher._id, name: teacher.name }));
 }
 
 function nextMeetingNumber(attendance: Attendance[]) {
@@ -207,7 +235,11 @@ export default async function AdminAttendancePage({
     );
   }
 
-  const [students, selectedStudent] = await Promise.all([getStudents(searchQuery), getSelectedStudent(selectedStudentId)]);
+  const [students, selectedStudent, teachers] = await Promise.all([
+    getStudents(searchQuery),
+    getSelectedStudent(selectedStudentId),
+    getTeachers()
+  ]);
   const attendance = selectedStudent ? await getAttendance(selectedStudent.studentId) : [];
 
   return (
@@ -322,9 +354,10 @@ export default async function AdminAttendancePage({
                       {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                     </select>
                   </Field>
+                  <TeacherSelector teachers={teachers} />
                   <label className="grid gap-2 text-sm font-semibold text-lead-navy md:col-span-2">
-                    Notes
-                    <textarea name="notes" rows={3} className="focus-ring resize-none rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" />
+                    Journal Notes
+                    <textarea name="notes" rows={8} className="focus-ring resize-y rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal leading-7 text-lead-navy" />
                   </label>
                   <Button type="submit" size="lg" className="md:col-span-2">
                     <CalendarCheck className="h-4 w-4" />
@@ -345,7 +378,10 @@ export default async function AdminAttendancePage({
                             <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>{record.status}</span>
                           </div>
                           <p className="mt-2 text-sm text-lead-gray">{formatDate(record.meetingDate)}</p>
-                          {record.notes ? <p className="mt-2 text-sm leading-6 text-lead-gray">{record.notes}</p> : null}
+                          <p className="mt-1 text-sm text-lead-gray">
+                            <span className="font-bold text-lead-navy">Teachers:</span> {record.teacherNames.length ? record.teacherNames.join(", ") : "Not assigned"}
+                          </p>
+                          {record.notes ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-lead-gray">{record.notes}</p> : null}
                         </div>
                         <form action={updateStudentAttendance} className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
                           <input type="hidden" name="id" value={record.id} />
@@ -353,7 +389,8 @@ export default async function AdminAttendancePage({
                           <select name="status" defaultValue={record.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
                             {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                           </select>
-                          <input name="notes" defaultValue={record.notes} placeholder="Notes" className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy sm:col-span-2" />
+                          <TeacherSelector teachers={teachers} selectedTeacherIds={record.teacherIds} compact />
+                          <textarea name="notes" rows={5} defaultValue={record.notes} placeholder="Journal notes" className="focus-ring resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-lead-navy sm:col-span-2" />
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
                         </form>
                       </div>
@@ -381,5 +418,36 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {label}
       {children}
     </label>
+  );
+}
+
+function TeacherSelector({
+  teachers,
+  selectedTeacherIds = [],
+  compact = false
+}: {
+  teachers: Teacher[];
+  selectedTeacherIds?: string[];
+  compact?: boolean;
+}) {
+  return (
+    <fieldset className={`rounded-lg border border-slate-200 bg-white ${compact ? "p-3 sm:col-span-2" : "p-4 md:col-span-2"}`}>
+      <legend className="px-1 text-sm font-semibold text-lead-navy">Teachers <span className="text-lead-blue">*</span></legend>
+      <p className="mb-3 text-xs text-lead-gray">Select one or more teachers for this meeting.</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {teachers.map((teacher) => (
+          <label key={teacher.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-lead-navy">
+            <input
+              type="checkbox"
+              name="teacherIds"
+              value={teacher.id}
+              defaultChecked={selectedTeacherIds.includes(teacher.id)}
+              className="h-4 w-4 accent-lead-blue"
+            />
+            {teacher.name}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

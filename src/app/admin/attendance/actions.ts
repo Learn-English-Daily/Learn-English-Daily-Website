@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
+import type { Db } from "mongodb";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import {
   getStudentAttendanceCollectionName,
@@ -14,6 +15,11 @@ import {
   getStudentPaymentsCollectionName,
   getSuggestedPerMeetingPrice
 } from "@/lib/payments";
+import {
+  ensureDefaultTeachers,
+  getTeachersCollectionName,
+  type TeacherDocument
+} from "@/lib/teachers";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -22,6 +28,28 @@ function clean(value: unknown) {
 function getPositiveInteger(value: FormDataEntryValue | null) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+async function resolveSelectedTeachers(db: Db, formData: FormData) {
+  await ensureDefaultTeachers(db);
+  const teacherIds = [...new Set(formData.getAll("teacherIds").map(clean).filter(Boolean))];
+
+  if (!teacherIds.length) {
+    throw new Error("Select at least one teacher");
+  }
+
+  const teachers = await db
+    .collection<TeacherDocument>(getTeachersCollectionName())
+    .find({ _id: { $in: teacherIds }, active: true })
+    .toArray();
+  const namesById = new Map(teachers.map((teacher) => [teacher._id, teacher.name]));
+  const teacherNames = teacherIds.map((id) => namesById.get(id)).filter((name): name is string => Boolean(name));
+
+  if (teacherNames.length !== teacherIds.length) {
+    throw new Error("Invalid teacher selection");
+  }
+
+  return { teacherIds, teacherNames };
 }
 
 async function assertAdmin() {
@@ -130,6 +158,7 @@ export async function saveStudentAttendance(formData: FormData) {
 
   const now = new Date();
   const db = await getMongoDb();
+  const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
   await db.collection(getStudentAttendanceCollectionName()).updateOne(
     { studentId, meetingNumber },
     {
@@ -142,6 +171,8 @@ export async function saveStudentAttendance(formData: FormData) {
         meetingDate,
         status,
         notes,
+        teacherIds,
+        teacherNames,
         updatedAt: now
       },
       $setOnInsert: {
@@ -177,6 +208,7 @@ export async function updateStudentAttendance(formData: FormData) {
   }
 
   const db = await getMongoDb();
+  const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
   const existingAttendance = await db.collection<{
     studentId?: string;
     studentName?: string;
@@ -202,6 +234,8 @@ export async function updateStudentAttendance(formData: FormData) {
         meetingDate,
         status,
         notes,
+        teacherIds,
+        teacherNames,
         updatedAt: new Date()
       }
     }
