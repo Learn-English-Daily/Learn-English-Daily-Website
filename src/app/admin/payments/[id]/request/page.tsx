@@ -159,7 +159,7 @@ export default async function PaymentRequestPage({
       </div>
 
       <article className="mx-auto w-full max-w-3xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft print:max-w-none print:rounded-none print:border-0 print:shadow-none">
-        <div className="border-b-4 border-lead-yellow bg-lead-navy px-6 py-6 text-white sm:px-8">
+        <div className="border-b-4 border-lead-yellow bg-lead-blue px-6 py-6 text-white sm:px-8">
           <div className="flex items-center justify-between gap-5">
             <div className="flex items-center gap-4">
               <div className="grid h-14 w-14 place-items-center rounded-lg bg-white p-1">
