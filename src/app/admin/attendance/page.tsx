@@ -381,7 +381,6 @@ export default async function AdminAttendancePage({
                           <p className="mt-1 text-sm text-lead-gray">
                             <span className="font-bold text-lead-navy">Teachers:</span> {record.teacherNames.length ? record.teacherNames.join(", ") : "Not assigned"}
                           </p>
-                          {record.notes ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-lead-gray">{record.notes}</p> : null}
                         </div>
                         <form action={updateStudentAttendance} className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
                           <input type="hidden" name="id" value={record.id} />
