@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
 import { saveStudentAttendance, updateStudentAttendance } from "@/app/admin/attendance/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
+import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
@@ -338,7 +339,7 @@ export default async function AdminAttendancePage({
 
               <Card className="p-5">
                 <h2 className="font-heading text-xl font-bold text-lead-navy">Mark attendance</h2>
-                <form action={saveStudentAttendance} className="mt-5 grid gap-4 md:grid-cols-2">
+                <ActionFeedbackForm action={saveStudentAttendance} successMessage="Attendance saved successfully." className="mt-5 grid gap-4 md:grid-cols-2">
                   <input type="hidden" name="studentId" value={selectedStudent.studentId} />
                   <input type="hidden" name="studentName" value={selectedStudent.studentName} />
                   <input type="hidden" name="courseJoined" value={selectedStudent.courseJoined} />
@@ -363,7 +364,7 @@ export default async function AdminAttendancePage({
                     <CalendarCheck className="h-4 w-4" />
                     Save Attendance
                   </Button>
-                </form>
+                </ActionFeedbackForm>
               </Card>
 
               <Card className="p-5">
@@ -382,7 +383,7 @@ export default async function AdminAttendancePage({
                             <span className="font-bold text-lead-navy">Teachers:</span> {record.teacherNames.length ? record.teacherNames.join(", ") : "Not assigned"}
                           </p>
                         </div>
-                        <form action={updateStudentAttendance} className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
+                        <ActionFeedbackForm action={updateStudentAttendance} successMessage="Attendance updated successfully." className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
                           <input type="hidden" name="id" value={record.id} />
                           <input name="meetingDate" type="date" defaultValue={record.meetingDate} required className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
                           <select name="status" defaultValue={record.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
@@ -391,7 +392,7 @@ export default async function AdminAttendancePage({
                           <TeacherSelector teachers={teachers} selectedTeacherIds={record.teacherIds} compact />
                           <textarea name="notes" rows={5} defaultValue={record.notes} placeholder="Journal notes" className="focus-ring resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-lead-navy sm:col-span-2" />
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
-                        </form>
+                        </ActionFeedbackForm>
                       </div>
                     </div>
                   ))}

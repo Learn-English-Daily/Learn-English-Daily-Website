@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { updateReviewStatus } from "@/app/admin/reviews/actions";
+import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 import { getReviewCollectionName, type ReviewDisplayOption, type ReviewRole, type ReviewStatus } from "@/lib/reviews";
@@ -226,7 +227,7 @@ export default async function AdminReviewsPage({
                   </div>
                   <div className="flex flex-wrap items-start gap-2 lg:justify-end">
                     {(["pending", "approved", "hidden"] as const).map((status) => (
-                      <form key={status} action={updateReviewStatus}>
+                      <ActionFeedbackForm key={status} action={updateReviewStatus} successMessage={`Review marked ${statusLabel(status).toLowerCase()}.`}>
                         <input type="hidden" name="id" value={review.id} />
                         <input type="hidden" name="status" value={status} />
                         <Button
@@ -237,7 +238,7 @@ export default async function AdminReviewsPage({
                         >
                           {statusLabel(status)}
                         </Button>
-                      </form>
+                      </ActionFeedbackForm>
                     ))}
                   </div>
                 </div>

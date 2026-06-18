@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { updateStudentPaymentStatus } from "@/app/admin/payments/actions";
+import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 import {
@@ -329,7 +330,7 @@ export default async function AdminPaymentsPage({
                             </Button>
                           ) : null}
                         </div>
-                        <form action={updateStudentPaymentStatus} className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
+                        <ActionFeedbackForm action={updateStudentPaymentStatus} successMessage="Payment updated successfully." className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
                           <input type="hidden" name="id" value={payment.id} />
                           <select name="status" defaultValue={payment.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
                             {paymentStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -341,7 +342,7 @@ export default async function AdminPaymentsPage({
                           </select>
                           <input name="notes" defaultValue={payment.notes} placeholder="Notes" className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
-                        </form>
+                        </ActionFeedbackForm>
                       </div>
                     </div>
                   ))}
