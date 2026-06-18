@@ -121,6 +121,12 @@ export default async function ParentAttendancePortalPage({
 
   const { student, attendance } = data;
   const latestAttendance = attendance[attendance.length - 1];
+  const presentCount = countStatus(attendance, "Present");
+  const lateCount = countStatus(attendance, "Late");
+  const absentCount = countStatus(attendance, "Absent");
+  const cancelledCount = countStatus(attendance, "Cancelled");
+  const countedMeetings = presentCount + lateCount + absentCount;
+  const attendanceRate = countedMeetings ? Math.round(((presentCount + lateCount) / countedMeetings) * 100) : null;
 
   return (
     <main className="min-h-screen bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#fff7d6_100%)] px-4 py-8">
@@ -142,11 +148,22 @@ export default async function ParentAttendancePortalPage({
             </div>
           </div>
 
-          <div className="grid gap-4 p-5 md:grid-cols-4">
-            <Summary label="Present" value={countStatus(attendance, "Present")} className="text-emerald-600" description="Classes attended as scheduled." />
-            <Summary label="Late" value={countStatus(attendance, "Late")} className="text-yellow-700" description="Classes attended after the scheduled start time." />
-            <Summary label="Absent" value={countStatus(attendance, "Absent")} className="text-rose-600" description="Scheduled classes the student did not attend." />
-            <Summary label="Cancelled" value={countStatus(attendance, "Cancelled")} className="text-slate-600" description="Classes cancelled and not treated as an absence." />
+          <div className="p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="font-heading text-xl font-bold text-lead-navy">Attendance to date</h3>
+                <p className="mt-1 text-sm text-lead-gray">Cumulative results for all recorded meetings.</p>
+              </div>
+              <p className="text-sm font-semibold text-lead-gray">
+                Attendance rate: <span className="font-heading text-xl font-extrabold text-lead-blue">{attendanceRate === null ? "Not available" : `${attendanceRate}%`}</span>
+              </p>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-4">
+              <Summary label="Present" value={presentCount} total={countedMeetings} className="text-emerald-600" description={`Attended ${presentCount} ${meetingWord(presentCount)} on time.`} />
+              <Summary label="Late" value={lateCount} total={countedMeetings} className="text-yellow-700" description={`Attended ${lateCount} ${meetingWord(lateCount)} after the scheduled start time.`} />
+              <Summary label="Absent" value={absentCount} total={countedMeetings} className="text-rose-600" description={`Missed ${absentCount} scheduled ${meetingWord(absentCount)}.`} />
+              <Summary label="Cancelled" value={cancelledCount} total={attendance.length} className="text-slate-600" description={`${cancelledCount} ${meetingWord(cancelledCount)} cancelled and excluded from the attendance rate.`} />
+            </div>
           </div>
         </Card>
 
@@ -204,11 +221,13 @@ export default async function ParentAttendancePortalPage({
 function Summary({
   label,
   value,
+  total,
   className,
   description
 }: {
   label: string;
   value: number;
+  total: number;
   className: string;
   description: string;
 }) {
@@ -218,7 +237,9 @@ function Summary({
       aria-label={`${label}: ${value}. ${description}`}
       className="group rounded-lg bg-slate-50 p-4 outline-none transition focus-ring"
     >
-      <p className={`font-heading text-3xl font-extrabold ${className}`}>{value}</p>
+      <p className={`font-heading text-3xl font-extrabold ${className}`}>
+        {value} <span className="text-base font-bold text-lead-gray">of {total} {meetingWord(total)}</span>
+      </p>
       <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-lead-gray">
         <span>{label}</span>
         <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
@@ -228,4 +249,8 @@ function Summary({
       </p>
     </div>
   );
+}
+
+function meetingWord(count: number) {
+  return count === 1 ? "meeting" : "meetings";
 }
