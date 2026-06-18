@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { ReceiptText, RefreshCcw, Search } from "lucide-react";
+import { ExternalLink, ReceiptText, RefreshCcw, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,6 +20,8 @@ import {
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
 export const dynamic = "force-dynamic";
+
+const paymentReceiptsDriveUrl = "https://drive.google.com/drive/folders/1E7IPAVCN_oRlYGYGkpQk3hTrHNuOVF4B?usp=drive_link";
 
 type StudentDocument = {
   studentId?: string;
@@ -349,15 +351,23 @@ export default async function AdminPaymentsPage({
                             {paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}
                           </select>
                           <input name="notes" defaultValue={payment.notes} placeholder="Notes" className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
-                          <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-lead-navy sm:col-span-2">
-                            <input
-                              type="checkbox"
-                              name="receiptUploadedToDrive"
-                              defaultChecked={payment.receiptUploadedToDrive}
-                              className="h-4 w-4 accent-lead-blue"
-                            />
-                            Payment receipt uploaded to Google Drive
-                          </label>
+                          <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-stretch">
+                            <label className="flex flex-1 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-lead-navy">
+                              <input
+                                type="checkbox"
+                                name="receiptUploadedToDrive"
+                                defaultChecked={payment.receiptUploadedToDrive}
+                                className="h-4 w-4 accent-lead-blue"
+                              />
+                              Payment receipt uploaded to Google Drive
+                            </label>
+                            <Button asChild type="button" variant="secondary" className="h-auto min-h-11">
+                              <a href={paymentReceiptsDriveUrl} target="_blank" rel="noreferrer">
+                                <ExternalLink className="h-4 w-4" />
+                                Open Google Drive
+                              </a>
+                            </Button>
+                          </div>
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
                         </ActionFeedbackForm>
                       </div>
