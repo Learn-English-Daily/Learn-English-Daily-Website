@@ -33,7 +33,6 @@ type PaymentDocument = {
 type StudentDocument = {
   studentId?: string;
   studentName?: string;
-  whatsapp?: string;
   courseJoined?: string;
   classType?: string;
 };
@@ -42,7 +41,6 @@ type PaymentRequest = {
   id: string;
   studentId: string;
   studentName: string;
-  whatsapp: string;
   courseJoined: string;
   classType: string;
   meetingNumber: number;
@@ -80,7 +78,6 @@ async function getPaymentRequest(id: string): Promise<PaymentRequest | null> {
     id: payment._id.toString(),
     studentId: payment.studentId,
     studentName: student?.studentName || payment.studentName || "Student",
-    whatsapp: student?.whatsapp || "",
     courseJoined: student?.courseJoined || payment.courseJoined || "",
     classType: student?.classType || payment.classType || "",
     meetingNumber: payment.meetingNumber || 0,
@@ -133,17 +130,6 @@ export default async function PaymentRequestPage({
   }
 
   const receiptNumber = `LEAD-M${String(payment.meetingNumber).padStart(2, "0")}-${payment.id.slice(-6).toUpperCase()}`;
-  const whatsappNumber = payment.whatsapp.replace(/\D/g, "");
-  const message = [
-    `Hello, this is the LEAD payment request for ${payment.studentName}.`,
-    `Meeting: ${payment.meetingNumber} (${formatDate(payment.meetingDate)})`,
-    `Amount due: ${formatRupiah(payment.amountDue)}`,
-    "Please send payment confirmation after completing the payment. Thank you."
-  ].join("\n");
-  const whatsappUrl = whatsappNumber
-    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`;
-
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 print:bg-white print:p-0">
       <div className="mx-auto mb-5 flex w-full max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
@@ -228,7 +214,7 @@ export default async function PaymentRequestPage({
       </article>
 
       <div className="mx-auto mt-5 w-full max-w-3xl">
-        <PaymentRequestActions whatsappUrl={whatsappUrl} />
+        <PaymentRequestActions />
       </div>
     </main>
   );
