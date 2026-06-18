@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { RefreshCcw, Search } from "lucide-react";
+import { ReceiptText, RefreshCcw, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -320,6 +320,14 @@ export default async function AdminPaymentsPage({
                           <p className="mt-2 text-sm text-lead-gray">{formatDate(payment.meetingDate)} / {formatRupiah(payment.amountDue)}</p>
                           <p className="mt-1 text-xs text-lead-gray">Paid date: {payment.paidDate ? formatDate(payment.paidDate) : "Not paid yet"} / Method: {payment.paymentMethod || "Not set"}</p>
                           {payment.notes ? <p className="mt-2 text-sm leading-6 text-lead-gray">{payment.notes}</p> : null}
+                          {payment.status === "Unpaid" ? (
+                            <Button asChild variant="secondary" size="sm" className="mt-3">
+                              <a href={`/admin/payments/${payment.id}/request`} target="_blank" rel="noreferrer">
+                                <ReceiptText className="h-4 w-4" />
+                                Open Payment Request
+                              </a>
+                            </Button>
+                          ) : null}
                         </div>
                         <form action={updateStudentPaymentStatus} className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
                           <input type="hidden" name="id" value={payment.id} />
