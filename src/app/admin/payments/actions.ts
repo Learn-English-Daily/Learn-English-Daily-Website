@@ -33,6 +33,7 @@ export async function updateStudentPaymentStatus(formData: FormData) {
   const paidDate = clean(formData.get("paidDate"));
   const paymentMethod = clean(formData.get("paymentMethod"));
   const notes = clean(formData.get("notes"));
+  const receiptUploadedToDrive = formData.get("receiptUploadedToDrive") === "on";
 
   if (!ObjectId.isValid(id) || !isPaymentStatus(status)) {
     throw new Error("Invalid payment update");
@@ -51,6 +52,7 @@ export async function updateStudentPaymentStatus(formData: FormData) {
         paidDate: status === "Paid" ? paidDate || new Date().toISOString().slice(0, 10) : "",
         paymentMethod,
         notes,
+        receiptUploadedToDrive,
         updatedAt: new Date()
       }
     }

@@ -133,6 +133,7 @@ async function syncPaymentFromAttendance({
         paidDate: "",
         paymentMethod: "",
         notes: "",
+        receiptUploadedToDrive: false,
         createdAt: now
       }
     },

@@ -54,6 +54,7 @@ type PaymentDocument = {
   paidDate?: string;
   paymentMethod?: string;
   notes?: string;
+  receiptUploadedToDrive?: boolean;
   source?: string;
   attendanceStatus?: string;
   createdAt?: Date;
@@ -68,6 +69,7 @@ type Payment = {
   paidDate: string;
   paymentMethod: string;
   notes: string;
+  receiptUploadedToDrive: boolean;
   source: string;
   attendanceStatus: string;
   createdAt: string;
@@ -154,6 +156,7 @@ async function getPayments(studentId = ""): Promise<Payment[]> {
     paidDate: doc.paidDate || "",
     paymentMethod: doc.paymentMethod || "",
     notes: doc.notes || "",
+    receiptUploadedToDrive: doc.receiptUploadedToDrive === true,
     source: doc.source || "",
     attendanceStatus: doc.attendanceStatus || "",
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
@@ -317,6 +320,11 @@ export default async function AdminPaymentsPage({
                                 {payment.attendanceStatus}
                               </span>
                             ) : null}
+                            {payment.receiptUploadedToDrive ? (
+                              <span className="rounded-lg bg-emerald-50 px-3 py-1 text-xs font-bold uppercase text-emerald-700">
+                                Drive receipt uploaded
+                              </span>
+                            ) : null}
                           </div>
                           <p className="mt-2 text-sm text-lead-gray">{formatDate(payment.meetingDate)} / {formatRupiah(payment.amountDue)}</p>
                           <p className="mt-1 text-xs text-lead-gray">Paid date: {payment.paidDate ? formatDate(payment.paidDate) : "Not paid yet"} / Method: {payment.paymentMethod || "Not set"}</p>
@@ -341,6 +349,15 @@ export default async function AdminPaymentsPage({
                             {paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}
                           </select>
                           <input name="notes" defaultValue={payment.notes} placeholder="Notes" className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
+                          <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-lead-navy sm:col-span-2">
+                            <input
+                              type="checkbox"
+                              name="receiptUploadedToDrive"
+                              defaultChecked={payment.receiptUploadedToDrive}
+                              className="h-4 w-4 accent-lead-blue"
+                            />
+                            Payment receipt uploaded to Google Drive
+                          </label>
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
                         </ActionFeedbackForm>
                       </div>
