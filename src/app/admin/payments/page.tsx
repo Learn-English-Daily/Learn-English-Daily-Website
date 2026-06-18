@@ -141,7 +141,7 @@ async function getPayments(studentId = ""): Promise<Payment[]> {
   const docs = (await db
     .collection<PaymentDocument>(getStudentPaymentsCollectionName())
     .find({ studentId })
-    .sort({ meetingNumber: 1, meetingDate: 1 })
+    .sort({ meetingNumber: -1, meetingDate: -1 })
     .limit(200)
     .toArray()) as WithId<PaymentDocument>[];
 

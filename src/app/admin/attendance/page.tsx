@@ -144,7 +144,7 @@ async function getAttendance(studentId = ""): Promise<Attendance[]> {
   const docs = (await db
     .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
     .find({ studentId })
-    .sort({ meetingNumber: 1, meetingDate: 1 })
+    .sort({ meetingNumber: -1, meetingDate: -1 })
     .limit(200)
     .toArray()) as WithId<AttendanceDocument>[];
 
