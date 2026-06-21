@@ -179,6 +179,29 @@ async function getDashboardData(period: Period) {
   const revenue = paidInPeriod.reduce((sum, payment) => sum + (payment.amountDue || 0), 0);
   const unpaidPayments = payments.filter((payment) => payment.status === "Unpaid");
   const outstandingAmount = unpaidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0);
+  const outstandingByStudent = new Map<
+    string,
+    { studentId: string; name: string; amount: number; meetings: number; oldestDate: string; oldestMeeting: number }
+  >();
+  for (const payment of unpaidPayments) {
+    const key = payment.studentId || payment.studentName || "Unknown";
+    const current = outstandingByStudent.get(key) || {
+      studentId: payment.studentId || "",
+      name: payment.studentName || payment.studentId || "Unknown student",
+      amount: 0,
+      meetings: 0,
+      oldestDate: payment.meetingDate || "",
+      oldestMeeting: payment.meetingNumber || 0
+    };
+    current.amount += payment.amountDue || 0;
+    current.meetings += 1;
+    if (payment.meetingDate && (!current.oldestDate || payment.meetingDate < current.oldestDate)) {
+      current.oldestDate = payment.meetingDate;
+      current.oldestMeeting = payment.meetingNumber || 0;
+    }
+    outstandingByStudent.set(key, current);
+  }
+  const outstandingStudents = [...outstandingByStudent.values()].sort((a, b) => b.amount - a.amount);
   const pendingReceipts = payments.filter(
     (payment) => payment.status === "Paid" && payment.receiptUploadedToDrive !== true
   );
@@ -267,6 +290,7 @@ async function getDashboardData(period: Period) {
     },
     courses,
     teachers,
+    outstandingStudents,
     trendMonths,
     recent: {
       students: students.slice(0, 5),
@@ -360,6 +384,50 @@ export default async function CeoDashboardPage({
           <Kpi icon={CircleDollarSign} label="Outstanding" value={formatRupiah(data.kpis.outstandingAmount)} detail="Current unpaid balance" color="text-yellow-700" />
           <Kpi icon={Star} label="Average rating" value={data.kpis.averageRating ? data.kpis.averageRating.toFixed(1) : "N/A"} detail="Approved reviews" color="text-yellow-600" />
         </section>
+
+        <details className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
+          <summary className="focus-ring flex cursor-pointer list-none flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-yellow-50 text-yellow-700"><CircleDollarSign className="h-5 w-5" /></div>
+              <div>
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Outstanding students</h2>
+                <p className="mt-1 text-sm text-lead-gray">View balances, unpaid meetings, and the oldest outstanding class.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="rounded-lg bg-yellow-50 px-3 py-2 text-sm font-bold text-yellow-800">{plural(data.outstandingStudents.length, "student")}</span>
+              <span className="text-sm font-bold text-lead-blue group-open:hidden">View details</span>
+              <span className="hidden text-sm font-bold text-lead-blue group-open:inline">Hide details</span>
+            </div>
+          </summary>
+          <div className="border-t border-slate-200 p-4 sm:p-5">
+            {data.outstandingStudents.length ? (
+              <div className="grid gap-3">
+                {data.outstandingStudents.map((student) => (
+                  <div key={student.studentId || student.name} className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-[1.2fr_0.8fr_0.9fr_auto] sm:items-center">
+                    <div>
+                      <p className="font-heading font-bold text-lead-navy">{student.name}</p>
+                      <p className="mt-1 text-xs font-semibold text-lead-gray">{student.studentId || "No student ID"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.08em] text-lead-gray">Balance</p>
+                      <p className="mt-1 font-bold text-rose-600">{formatRupiah(student.amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-lead-navy">{plural(student.meetings, "unpaid meeting")}</p>
+                      <p className="mt-1 text-xs text-lead-gray">Oldest: Meeting {student.oldestMeeting} / {formatDate(student.oldestDate)}</p>
+                    </div>
+                    <Button asChild variant="secondary" size="sm">
+                      <a href={student.studentId ? `/admin/payments?studentId=${encodeURIComponent(student.studentId)}` : "/admin/payments"}>View payments</a>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Empty text="No outstanding payments. All current balances are clear." />
+            )}
+          </div>
+        </details>
 
         <section>
           <div className="mb-4 flex items-center gap-3">
