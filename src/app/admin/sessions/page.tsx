@@ -5,6 +5,7 @@ import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
 import { createClassSession, deleteClassSession } from "@/app/admin/sessions/actions";
+import { GchatSessionMessage } from "@/app/admin/sessions/gchat-session-message";
 import { TemporaryMeetLink } from "@/app/admin/sessions/temporary-meet-link";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
@@ -148,6 +149,22 @@ function formatDateTime(value: string) {
   if (!value) return "Not set";
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date(value));
+}
+
+function formatDate(value: string) {
+  if (!value) return "Not set";
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date(value));
+}
+
+function formatTime(value: string) {
+  if (!value) return "Not set";
+  return new Intl.DateTimeFormat("en", {
     timeStyle: "short",
     timeZone: "Asia/Jakarta"
   }).format(new Date(value));
@@ -318,6 +335,15 @@ export default async function AdminSessionsPage() {
                     <p className="mt-1 text-sm text-lead-gray">
                       <span className="font-bold text-lead-navy">Teachers:</span> {session.teacherNames.length ? session.teacherNames.join(", ") : "Not assigned"}
                     </p>
+                    <div className="mt-4">
+                      <GchatSessionMessage
+                        studentName={session.studentName}
+                        meetingNumber={session.meetingNumber}
+                        meetingDate={formatDate(session.scheduledAt)}
+                        meetingTime={formatTime(session.scheduledAt)}
+                        teachers={session.teacherNames}
+                      />
+                    </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button asChild size="sm" variant={session.status === "Completed" ? "secondary" : "primary"}>
                         <a href={attendanceHref(session)}>
