@@ -1,12 +1,17 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { Mail, MessageCircle, RefreshCcw, Search } from "lucide-react";
+import { CalendarClock, Mail, MessageCircle, RefreshCcw, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import {
+  getClassSessionsCollectionName,
+  getComputedClassSessionStatus,
+  type ClassSessionDocument
+} from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +35,14 @@ type Lead = {
   locale: string;
   source: string;
   createdAt: string;
+};
+
+type SessionReminder = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  meetingNumber: number;
+  scheduledAt: string;
 };
 
 function escapeRegex(value: string) {
@@ -59,6 +72,27 @@ async function getLeads(query = ""): Promise<Lead[]> {
     source: doc.source || "website",
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
   }));
+}
+
+async function getSessionReminders(): Promise<SessionReminder[]> {
+  const db = await getMongoDb();
+  const docs = (await db
+    .collection<ClassSessionDocument>(getClassSessionsCollectionName())
+    .find({ status: { $ne: "Completed" } })
+    .sort({ scheduledAt: 1 })
+    .limit(20)
+    .toArray()) as WithId<ClassSessionDocument>[];
+
+  return docs
+    .filter((doc) => getComputedClassSessionStatus({ status: doc.status, scheduledAt: doc.scheduledAt }) === "Needs Attendance")
+    .slice(0, 5)
+    .map((doc) => ({
+      id: doc._id.toString(),
+      studentId: doc.studentId || "",
+      studentName: doc.studentName || "Unknown",
+      meetingNumber: doc.meetingNumber || 0,
+      scheduledAt: doc.scheduledAt || ""
+    }));
 }
 
 function formatDate(value: string) {
@@ -109,7 +143,7 @@ export default async function AdminPage({
     );
   }
 
-  const leads = await getLeads(searchQuery);
+  const [leads, sessionReminders] = await Promise.all([getLeads(searchQuery), getSessionReminders()]);
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -123,6 +157,9 @@ export default async function AdminPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Button asChild variant="secondary">
+              <a href="/admin/sessions">Class Sessions</a>
+            </Button>
             <Button asChild variant="secondary">
               <a href="/admin/attendance">Attendance</a>
             </Button>
@@ -149,6 +186,32 @@ export default async function AdminPage({
       </header>
 
       <section className="container-shell py-8">
+        {sessionReminders.length ? (
+          <Card className="mb-6 border-rose-100 bg-rose-50 p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.12em] text-rose-700">
+                  <CalendarClock className="h-4 w-4" />
+                  Attendance needed
+                </p>
+                <h2 className="mt-2 font-heading text-2xl font-bold text-lead-navy">
+                  {sessionReminders.length} class{sessionReminders.length === 1 ? "" : "es"} need attendance
+                </h2>
+                <div className="mt-3 grid gap-2 text-sm text-lead-gray">
+                  {sessionReminders.map((session) => (
+                    <p key={session.id}>
+                      <span className="font-bold text-lead-navy">{session.studentName}</span> / Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)}
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <Button asChild>
+                <a href="/admin/sessions">Open Class Sessions</a>
+              </Button>
+            </div>
+          </Card>
+        ) : null}
+
         <Card className="mb-6 p-4">
           <form action="/admin" className="flex flex-col gap-3 md:flex-row">
             <label className="relative flex-1">

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import type { Db } from "mongodb";
+import { markClassSessionCompletedByAttendance } from "@/app/admin/sessions/actions";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import {
   getStudentAttendanceCollectionName,
@@ -160,7 +161,7 @@ export async function saveStudentAttendance(formData: FormData) {
   const now = new Date();
   const db = await getMongoDb();
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
-  await db.collection(getStudentAttendanceCollectionName()).updateOne(
+  const attendanceResult = await db.collection(getStudentAttendanceCollectionName()).updateOne(
     { studentId, meetingNumber },
     {
       $set: {
@@ -191,9 +192,15 @@ export async function saveStudentAttendance(formData: FormData) {
     meetingDate,
     status
   });
+  await markClassSessionCompletedByAttendance({
+    studentId,
+    meetingNumber,
+    attendanceId: attendanceResult.upsertedId?.toString()
+  });
 
   revalidatePath("/admin/attendance");
   revalidatePath("/admin/payments");
+  revalidatePath("/admin/sessions");
 }
 
 export async function updateStudentAttendance(formData: FormData) {
@@ -250,7 +257,13 @@ export async function updateStudentAttendance(formData: FormData) {
     meetingDate,
     status
   });
+  await markClassSessionCompletedByAttendance({
+    studentId: existingAttendance.studentId,
+    meetingNumber: existingAttendance.meetingNumber,
+    attendanceId: id
+  });
 
   revalidatePath("/admin/attendance");
   revalidatePath("/admin/payments");
+  revalidatePath("/admin/sessions");
 }

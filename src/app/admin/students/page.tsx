@@ -189,6 +189,9 @@ export default async function AdminStudentsPage({
               <a href="/admin/attendance">Attendance</a>
             </Button>
             <Button asChild variant="secondary">
+              <a href="/admin/sessions">Class Sessions</a>
+            </Button>
+            <Button asChild variant="secondary">
               <a href="/admin/payments">Payments</a>
             </Button>
             <Button asChild variant="secondary">

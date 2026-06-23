@@ -197,7 +197,13 @@ function countStatus(attendance: Attendance[], status: AttendanceStatus) {
 export default async function AdminAttendancePage({
   searchParams
 }: {
-  searchParams?: Promise<{ q?: string | string[]; studentId?: string | string[] }>;
+  searchParams?: Promise<{
+    q?: string | string[];
+    studentId?: string | string[];
+    meetingNumber?: string | string[];
+    meetingDate?: string | string[];
+    teacherIds?: string | string[];
+  }>;
 }) {
   noStore();
   const cookieStore = await cookies();
@@ -207,6 +213,18 @@ export default async function AdminAttendancePage({
   const selectedStudentId = Array.isArray(resolvedSearchParams?.studentId)
     ? resolvedSearchParams?.studentId[0] || ""
     : resolvedSearchParams?.studentId || "";
+  const prefillMeetingNumberValue = Array.isArray(resolvedSearchParams?.meetingNumber)
+    ? resolvedSearchParams?.meetingNumber[0] || ""
+    : resolvedSearchParams?.meetingNumber || "";
+  const prefillMeetingDate = Array.isArray(resolvedSearchParams?.meetingDate)
+    ? resolvedSearchParams?.meetingDate[0] || ""
+    : resolvedSearchParams?.meetingDate || "";
+  const prefillTeacherIds = Array.isArray(resolvedSearchParams?.teacherIds)
+    ? resolvedSearchParams?.teacherIds
+    : resolvedSearchParams?.teacherIds
+      ? [resolvedSearchParams.teacherIds]
+      : [];
+  const prefillMeetingNumber = Number(prefillMeetingNumberValue);
 
   if (!isAdminConfigured()) {
     return (
@@ -254,6 +272,7 @@ export default async function AdminAttendancePage({
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="secondary"><a href="/admin/payments">Payments</a></Button>
+            <Button asChild variant="secondary"><a href="/admin/sessions">Class Sessions</a></Button>
             <Button asChild variant="secondary"><a href="/admin/students">Registrations</a></Button>
             <Button asChild variant="secondary"><a href="/admin/reviews">Reviews</a></Button>
             <Button asChild variant="secondary"><a href="/admin">Inquiries</a></Button>
@@ -339,23 +358,28 @@ export default async function AdminAttendancePage({
 
               <Card className="p-5">
                 <h2 className="font-heading text-xl font-bold text-lead-navy">Mark attendance</h2>
+                {prefillMeetingNumber && prefillMeetingDate ? (
+                  <p className="mt-2 rounded-lg bg-blue-50 px-4 py-3 text-sm font-semibold text-lead-blue">
+                    Prefilled from class session: Meeting {prefillMeetingNumber} on {formatDate(prefillMeetingDate)}.
+                  </p>
+                ) : null}
                 <ActionFeedbackForm action={saveStudentAttendance} successMessage="Attendance saved successfully." className="mt-5 grid gap-4 md:grid-cols-2">
                   <input type="hidden" name="studentId" value={selectedStudent.studentId} />
                   <input type="hidden" name="studentName" value={selectedStudent.studentName} />
                   <input type="hidden" name="courseJoined" value={selectedStudent.courseJoined} />
                   <input type="hidden" name="classType" value={selectedStudent.classType} />
                   <Field label="Meeting Number">
-                    <input name="meetingNumber" type="number" min="1" required defaultValue={nextMeetingNumber(attendance)} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                    <input name="meetingNumber" type="number" min="1" required defaultValue={prefillMeetingNumber || nextMeetingNumber(attendance)} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
                   </Field>
                   <Field label="Meeting Date">
-                    <input name="meetingDate" type="date" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                    <input name="meetingDate" type="date" required defaultValue={prefillMeetingDate} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
                   </Field>
                   <Field label="Status">
                     <select name="status" defaultValue="Present" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
                       {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                     </select>
                   </Field>
-                  <TeacherSelector teachers={teachers} />
+                  <TeacherSelector teachers={teachers} selectedTeacherIds={prefillTeacherIds} />
                   <label className="grid gap-2 text-sm font-semibold text-lead-navy md:col-span-2">
                     Journal Notes
                     <textarea name="notes" rows={8} className="focus-ring resize-y rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal leading-7 text-lead-navy" />

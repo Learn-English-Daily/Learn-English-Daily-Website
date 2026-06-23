@@ -225,6 +225,7 @@ export default async function AdminPaymentsPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="secondary"><a href="/admin/attendance">Attendance</a></Button>
+            <Button asChild variant="secondary"><a href="/admin/sessions">Class Sessions</a></Button>
             <Button asChild variant="secondary"><a href="/admin/students">Registrations</a></Button>
             <Button asChild variant="secondary"><a href="/admin/reviews">Reviews</a></Button>
             <Button asChild variant="secondary"><a href="/admin">Inquiries</a></Button>
