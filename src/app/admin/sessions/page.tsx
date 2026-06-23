@@ -250,7 +250,7 @@ export default async function AdminSessionsPage() {
         </div>
       </header>
 
-      <section className="container-shell grid gap-6 py-8 xl:grid-cols-[0.8fr_1.2fr]">
+      <section className="container-shell grid gap-6 py-8 2xl:grid-cols-[0.85fr_1.15fr]">
         <div className="grid gap-6 content-start">
           <Card className="p-5">
             <h2 className="font-heading text-xl font-bold text-lead-navy">Schedule class</h2>
@@ -268,26 +268,26 @@ export default async function AdminSessionsPage() {
                   ))}
                 </select>
               </Field>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Meeting Number">
-                  <input name="meetingNumber" type="number" min="1" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                  <input name="meetingNumber" type="number" min="1" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
                 <Field label="Class Date">
-                  <input name="sessionDate" type="date" required defaultValue={getTomorrowDate()} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                  <input name="sessionDate" type="date" required defaultValue={getTomorrowDate()} className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
                 <Field label="Class Time">
-                  <input name="sessionTime" type="time" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                  <input name="sessionTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
               </div>
               <TeacherSelector teachers={teachers} />
-              <Button type="submit" size="lg">
+              <Button type="submit" size="lg" className="w-full sm:w-fit">
                 <CalendarClock className="h-4 w-4" />
                 Save Class Session
               </Button>
             </ActionFeedbackForm>
           </Card>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
             <SummaryCard label="Needs attendance" value={needsAttendance.length} tone="text-rose-600" />
             <SummaryCard label="Today scheduled" value={todaysSessions.length} tone="text-lead-blue" />
           </div>
@@ -352,7 +352,7 @@ export default async function AdminSessionsPage() {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="grid gap-2 text-sm font-semibold text-lead-navy">
+    <label className="grid min-w-0 gap-2 text-sm font-semibold text-lead-navy">
       {label}
       {children}
     </label>
