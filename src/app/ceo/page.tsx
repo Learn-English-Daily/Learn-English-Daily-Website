@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CalendarCheck,
   CircleDollarSign,
+  Clock,
   GraduationCap,
   RefreshCcw,
   Star,
@@ -18,6 +19,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getStudentAttendanceCollectionName, type AttendanceStatus } from "@/lib/attendance";
 import { CEO_SESSION_COOKIE, isCeoConfigured, isValidCeoSession } from "@/lib/ceo-auth";
+import {
+  getClassSessionsCollectionName,
+  getComputedClassSessionStatus,
+  type ClassSessionDocument,
+  type ComputedClassSessionStatus
+} from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { formatRupiah, getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
 import { getReviewCollectionName, type ReviewStatus } from "@/lib/reviews";
@@ -43,6 +50,7 @@ type StudentDocument = {
 type AttendanceDocument = {
   studentId?: string;
   studentName?: string;
+  meetingNumber?: number;
   meetingDate?: string;
   status?: AttendanceStatus;
   teacherNames?: string[];
@@ -73,6 +81,16 @@ type ReviewDocument = {
 };
 
 type DateRange = { start: string | null; end: string | null; label: string };
+
+type TodaySession = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  meetingNumber: number;
+  scheduledAt: string;
+  teacherNames: string[];
+  status: ComputedClassSessionStatus;
+};
 
 const periodOptions: Array<{ value: Period; label: string }> = [
   { value: "this_month", label: "This month" },
@@ -145,6 +163,14 @@ function formatDate(value?: Date | string) {
   }).format(new Date(value));
 }
 
+function formatTime(value?: string) {
+  if (!value) return "Not set";
+  return new Intl.DateTimeFormat("en", {
+    timeStyle: "short",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date(value));
+}
+
 function percentage(part: number, total: number) {
   return total ? Math.round((part / total) * 100) : 0;
 }
@@ -158,13 +184,15 @@ async function getDashboardData(period: Period) {
   const range = getDateRange(period);
   const leadCollectionName = process.env.MONGODB_COLLECTION || "leads";
 
-  const [students, attendance, payments, leads, reviews] = await Promise.all([
+  const [students, attendance, payments, leads, reviews, classSessions] = await Promise.all([
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<AttendanceDocument>(getStudentAttendanceCollectionName()).find({}).sort({ meetingDate: -1 }).limit(20000).toArray(),
     db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({}).sort({ meetingDate: -1 }).limit(20000).toArray(),
     db.collection<LeadDocument>(leadCollectionName).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
-    db.collection<ReviewDocument>(getReviewCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray()
+    db.collection<ReviewDocument>(getReviewCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
+    db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({}).sort({ scheduledAt: -1 }).limit(5000).toArray()
   ]);
+  const attendanceKeys = new Set(attendance.map((record) => `${record.studentId || ""}:${record.meetingNumber || 0}`));
 
   const periodAttendance = attendance.filter((record) => isInRange(record.meetingDate || "", range));
   const present = periodAttendance.filter((record) => record.status === "Present").length;
@@ -214,6 +242,37 @@ async function getDashboardData(period: Period) {
   const pendingReviews = reviews.filter((review) => review.status === "pending");
   const missingClassDetails = periodAttendance.filter(
     (record) => !record.teacherNames?.length || !record.notes?.trim()
+  );
+  const today = jakartaDateKey(new Date());
+  const todaySessions = classSessions
+    .filter((session) => session.sessionDate === today)
+    .map((session) => {
+      const studentId = session.studentId || "";
+      const meetingNumber = session.meetingNumber || 0;
+
+      return {
+        id: session._id.toString(),
+        studentId,
+        studentName: session.studentName || "Unknown student",
+        meetingNumber,
+        scheduledAt: session.scheduledAt || "",
+        teacherNames: session.teacherNames || [],
+        status: getComputedClassSessionStatus({
+          status: session.status,
+          scheduledAt: session.scheduledAt,
+          hasAttendance: attendanceKeys.has(`${studentId}:${meetingNumber}`)
+        })
+      };
+    })
+    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+  const scheduledInPeriod = classSessions.filter((session) => isInRange(session.sessionDate || "", range));
+  const sessionsNeedingAttendance = classSessions.filter(
+    (session) =>
+      getComputedClassSessionStatus({
+        status: session.status,
+        scheduledAt: session.scheduledAt,
+        hasAttendance: attendanceKeys.has(`${session.studentId || ""}:${session.meetingNumber || 0}`)
+      }) === "Needs Attendance"
   );
 
   const courseCounts = new Map<string, number>();
@@ -276,6 +335,7 @@ async function getDashboardData(period: Period) {
       newStudents: newStudents.length,
       inquiries: newLeads.length,
       classes: periodAttendance.length,
+      scheduledClasses: scheduledInPeriod.length,
       attendanceRate,
       revenue,
       outstandingAmount,
@@ -286,8 +346,10 @@ async function getDashboardData(period: Period) {
       pendingReceipts: pendingReceipts.length,
       pendingReviews: pendingReviews.length,
       missingClassDetails: missingClassDetails.length,
+      sessionsNeedingAttendance: sessionsNeedingAttendance.length,
       lowAttendance
     },
+    todaySessions,
     courses,
     teachers,
     outstandingStudents,
@@ -380,10 +442,41 @@ export default async function CeoDashboardPage({
           <Kpi icon={Users} label="Registered students" value={String(data.kpis.registeredStudents)} detail={`${plural(data.kpis.newStudents, "new registration")} in period`} color="text-blue-600" />
           <Kpi icon={UserPlus} label="New inquiries" value={String(data.kpis.inquiries)} detail={data.range.label} color="text-violet-600" />
           <Kpi icon={CalendarCheck} label="Classes recorded" value={String(data.kpis.classes)} detail={`${data.kpis.attendanceRate}% attendance rate`} color="text-emerald-600" />
+          <Kpi icon={Clock} label="Classes scheduled" value={String(data.kpis.scheduledClasses)} detail={`${data.actions.sessionsNeedingAttendance} need attendance`} color="text-blue-600" />
           <Kpi icon={WalletCards} label="Revenue collected" value={formatRupiah(data.kpis.revenue)} detail={data.range.label} color="text-emerald-600" />
           <Kpi icon={CircleDollarSign} label="Outstanding" value={formatRupiah(data.kpis.outstandingAmount)} detail="Current unpaid balance" color="text-yellow-700" />
           <Kpi icon={Star} label="Average rating" value={data.kpis.averageRating ? data.kpis.averageRating.toFixed(1) : "N/A"} detail="Approved reviews" color="text-yellow-600" />
         </section>
+
+        <Card className="p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-heading text-xl font-bold text-lead-navy">Today&apos;s scheduled classes</h2>
+              <p className="mt-1 text-sm text-lead-gray">Read-only view of class sessions and attendance status for today.</p>
+            </div>
+            <span className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue">{plural(data.todaySessions.length, "class", "classes")}</span>
+          </div>
+          <div className="mt-5 grid gap-3">
+            {data.todaySessions.map((session) => (
+              <div key={session.id} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-heading font-bold text-lead-navy">{session.studentName}</p>
+                    <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">Meeting {session.meetingNumber}</span>
+                    <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${sessionStatusClassName(session.status)}`}>{session.status}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-lead-gray">
+                    {formatTime(session.scheduledAt)} / {session.teacherNames.length ? session.teacherNames.join(", ") : "Teachers not assigned"}
+                  </p>
+                </div>
+                <Button asChild variant="secondary" size="sm">
+                  <a href={session.studentId ? `/admin/attendance?studentId=${encodeURIComponent(session.studentId)}` : "/admin/attendance"}>Open attendance</a>
+                </Button>
+              </div>
+            ))}
+            {!data.todaySessions.length ? <Empty text="No class sessions scheduled for today." /> : null}
+          </div>
+        </Card>
 
         <details className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
           <summary className="focus-ring flex cursor-pointer list-none flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
@@ -439,6 +532,7 @@ export default async function CeoDashboardPage({
             <ActionCard label="Drive receipts pending" value={data.actions.pendingReceipts} detail="Paid receipts not marked uploaded" href="/admin/payments" />
             <ActionCard label="Reviews pending" value={data.actions.pendingReviews} detail="Waiting for approval" href="/admin/reviews" />
             <ActionCard label="Class details missing" value={data.actions.missingClassDetails} detail="Missing journal or teacher in period" href="/admin/attendance" />
+            <ActionCard label="Sessions need attendance" value={data.actions.sessionsNeedingAttendance} detail="Scheduled classes past their time" href="/admin/sessions" />
           </div>
         </section>
 
@@ -521,6 +615,12 @@ function Kpi({ icon: Icon, label, value, detail, color }: { icon: typeof Users; 
 
 function ActionCard({ label, value, detail, href }: { label: string; value: number; detail: string; href: string }) {
   return <Card className="border-l-4 border-l-yellow-400 p-5"><p className="text-sm font-semibold text-lead-gray">{label}</p><p className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">{value}</p><p className="mt-2 text-xs leading-5 text-lead-gray">{detail}</p><a href={href} className="mt-4 inline-flex text-sm font-bold text-lead-blue hover:text-blue-700">Open admin page</a></Card>;
+}
+
+function sessionStatusClassName(status: ComputedClassSessionStatus) {
+  if (status === "Completed") return "bg-emerald-50 text-emerald-700";
+  if (status === "Needs Attendance") return "bg-rose-50 text-rose-700";
+  return "bg-blue-50 text-lead-blue";
 }
 
 function ListRow({ label, value, danger = false }: { label: string; value: string; danger?: boolean }) {
