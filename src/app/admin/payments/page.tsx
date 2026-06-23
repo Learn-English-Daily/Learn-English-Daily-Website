@@ -303,6 +303,14 @@ export default async function AdminPaymentsPage({
                   <div className="grid gap-2 text-sm font-bold md:text-right">
                     <p className="text-emerald-600">Paid: {formatRupiah(totalPaid)}</p>
                     <p className="text-yellow-700">Unpaid: {formatRupiah(totalUnpaid)}</p>
+                    {totalUnpaid > 0 ? (
+                      <Button asChild variant="secondary" size="sm">
+                        <a href={`/admin/payments/student/${encodeURIComponent(selectedStudent.studentId)}/request`} target="_blank" rel="noreferrer">
+                          <ReceiptText className="h-4 w-4" />
+                          Open Cumulative Request
+                        </a>
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </Card>
