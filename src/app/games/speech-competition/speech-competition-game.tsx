@@ -104,6 +104,7 @@ export function SpeechCompetitionGame() {
   const [message, setMessage] = useState("Paste a speech, load it, then start practice.");
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const processedRef = useRef(0);
+  const lastMismatchRef = useRef("");
 
   const completed = words.filter((word) => word.status === "correct").length;
   const total = words.length;
@@ -124,6 +125,7 @@ export function SpeechCompetitionGame() {
     setLiveTranscript("");
     setLastSpoken("");
     processedRef.current = 0;
+    lastMismatchRef.current = "";
     setMessage(nextWords.length ? "Speech loaded. Press Start Practice when the student is ready." : "Please paste at least one word.");
   }
 
@@ -136,6 +138,7 @@ export function SpeechCompetitionGame() {
     setLiveTranscript("");
     setLastSpoken("");
     processedRef.current = 0;
+    lastMismatchRef.current = "";
     setMessage("Speech cleared.");
   }
 
@@ -147,6 +150,7 @@ export function SpeechCompetitionGame() {
     setLiveTranscript("");
     setLastSpoken("");
     processedRef.current = 0;
+    lastMismatchRef.current = "";
     setMessage("Practice reset. Start again when ready.");
   }
 
@@ -168,34 +172,39 @@ export function SpeechCompetitionGame() {
     setMessage("Teacher bonus added: +5 confidence points.");
   }
 
-  function applySpokenWords(spokenWords: string[]) {
+  function applyRecognizedTranscript(spokenWords: string[]) {
     if (!spokenWords.length) return;
+    setLastSpoken(spokenWords[spokenWords.length - 1] || "");
 
     setWords((currentWords) => {
-      let cursor = currentWords.findIndex((word) => word.status === "pending");
       let changed = false;
-      const nextWords = [...currentWords];
+      const nextWords = currentWords.map((word) => ({ ...word }));
 
-      for (const spoken of spokenWords) {
-        if (cursor < 0) break;
-        const target = nextWords[cursor];
-        setLastSpoken(spoken);
+      for (let index = 0; index < nextWords.length && index < spokenWords.length; index += 1) {
+        const spoken = spokenWords[index];
+        const target = nextWords[index];
 
         if (spoken === target.normalized) {
-          nextWords[cursor] = { ...target, status: "correct" };
-          changed = true;
-          cursor = nextWords.findIndex((word, index) => index > cursor && word.status === "pending");
+          if (target.status !== "correct") {
+            nextWords[index] = { ...target, status: "correct" };
+            changed = true;
+          }
           continue;
         }
 
         if (levenshtein(spoken, target.normalized) <= 2 && Math.min(spoken.length, target.normalized.length) >= 4) {
-          nextWords[cursor] = { ...target, status: "missed" };
+          const mismatchKey = `${target.id}:${spoken}`;
+          nextWords[index] = { ...target, status: "missed" };
           changed = true;
-          setMistakes((value) => value + 1);
+          if (lastMismatchRef.current !== mismatchKey) {
+            lastMismatchRef.current = mismatchKey;
+            setMistakes((value) => value + 1);
+          }
           window.setTimeout(() => {
             setWords((wordsAfterShake) => wordsAfterShake.map((word) => (word.id === target.id && word.status === "missed" ? { ...word, status: "pending" } : word)));
           }, 700);
         }
+        break;
       }
 
       if (changed) setMessage("Great. Keep going.");
@@ -223,14 +232,13 @@ export function SpeechCompetitionGame() {
 
     recognition.onresult = (event) => {
       let transcript = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      for (let index = 0; index < event.results.length; index += 1) {
         transcript += ` ${event.results[index][0].transcript}`;
       }
       const normalizedWords = transcript.split(/\s+/).map(normalizeWord).filter(Boolean);
-      const newWords = normalizedWords.slice(processedRef.current);
       processedRef.current = normalizedWords.length;
       setLiveTranscript(transcript.trim());
-      applySpokenWords(newWords);
+      applyRecognizedTranscript(normalizedWords);
     };
 
     recognition.onerror = () => {
