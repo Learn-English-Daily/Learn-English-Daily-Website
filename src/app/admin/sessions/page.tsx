@@ -1,10 +1,11 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarClock, CalendarCheck, Pencil, RefreshCcw, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarCheck, Gamepad2, Pencil, RefreshCcw, Trash2 } from "lucide-react";
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
-import { createClassSession, deleteClassSession, updateClassSession } from "@/app/admin/sessions/actions";
+import { createClassSession, deleteClassSession, generateSpeechGameLink, updateClassSession } from "@/app/admin/sessions/actions";
+import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { GchatSessionMessage } from "@/app/admin/sessions/gchat-session-message";
 import { TemporaryMeetLink } from "@/app/admin/sessions/temporary-meet-link";
 import { AdminLoginForm } from "@/app/admin/login-form";
@@ -19,6 +20,12 @@ import {
   type ComputedClassSessionStatus
 } from "@/lib/class-sessions";
 import { getStudentAttendanceCollectionName } from "@/lib/attendance";
+import {
+  getGameSessionUrl,
+  getGameSessionsCollectionName,
+  isGameSessionExpired,
+  type GameSessionDocument
+} from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
@@ -72,6 +79,10 @@ type ClassSession = {
   teacherIds: string[];
   teacherNames: string[];
   status: ComputedClassSessionStatus;
+  gameLink: {
+    url: string;
+    expiresAt: string;
+  } | null;
 };
 
 async function getStudents(): Promise<Student[]> {
@@ -107,7 +118,7 @@ async function getTeachers(): Promise<Teacher[]> {
 
 async function getSessions(): Promise<ClassSession[]> {
   const db = await getMongoDb();
-  const [sessionDocs, attendanceDocs] = await Promise.all([
+  const [sessionDocs, attendanceDocs, gameSessionDocs] = await Promise.all([
     db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
       .find({})
@@ -119,16 +130,34 @@ async function getSessions(): Promise<ClassSession[]> {
       .find({})
       .project({ studentId: 1, meetingNumber: 1 })
       .limit(20000)
+      .toArray(),
+    db
+      .collection<GameSessionDocument>(getGameSessionsCollectionName())
+      .find({ gameType: "speech-competition" })
+      .sort({ updatedAt: -1 })
+      .limit(500)
       .toArray()
   ]);
   const attendanceKeys = new Set(attendanceDocs.map((doc) => `${doc.studentId || ""}:${doc.meetingNumber || 0}`));
+  const gameSessionsByClassId = new Map(
+    gameSessionDocs
+      .filter((doc) => doc.classSessionId && doc.token && !isGameSessionExpired(doc.expiresAt))
+      .map((doc) => [
+        doc.classSessionId || "",
+        {
+          url: getGameSessionUrl(doc.token || ""),
+          expiresAt: doc.expiresAt ? new Date(doc.expiresAt).toISOString() : ""
+        }
+      ])
+  );
 
   return sessionDocs.map((doc) => {
     const studentId = doc.studentId || "";
     const meetingNumber = doc.meetingNumber || 0;
+    const classSessionId = doc._id.toString();
 
     return {
-      id: doc._id.toString(),
+      id: classSessionId,
       studentId,
       studentName: doc.studentName || "Unknown",
       courseJoined: doc.courseJoined || "",
@@ -147,7 +176,8 @@ async function getSessions(): Promise<ClassSession[]> {
         scheduledAt: doc.scheduledAt,
         endsAt: doc.endsAt,
         hasAttendance: attendanceKeys.has(`${studentId}:${meetingNumber}`)
-      })
+      }),
+      gameLink: gameSessionsByClassId.get(classSessionId) || null
     };
   });
 }
@@ -350,6 +380,26 @@ export default async function AdminSessionsPage() {
                         meetingTime={formatTimeRange(session.scheduledAt, session.endsAt)}
                         teachers={session.teacherNames}
                       />
+                    </div>
+                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-lead-navy">Speech game class link</p>
+                          <p className="mt-1 text-xs text-lead-gray">Generate a private student link. It expires 1.5 hours after generation.</p>
+                        </div>
+                        <ActionFeedbackForm action={generateSpeechGameLink} successMessage="Game link generated." className="grid gap-2">
+                          <input type="hidden" name="classSessionId" value={session.id} />
+                          <Button type="submit" size="sm" variant="secondary">
+                            <Gamepad2 className="h-4 w-4" />
+                            {session.gameLink ? "Regenerate Link" : "Generate Game Link"}
+                          </Button>
+                        </ActionFeedbackForm>
+                      </div>
+                      {session.gameLink ? (
+                        <div className="mt-3">
+                          <GameSessionLink url={session.gameLink.url} expiresAt={session.gameLink.expiresAt} />
+                        </div>
+                      ) : null}
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button asChild size="sm" variant={session.status === "Completed" ? "secondary" : "primary"}>

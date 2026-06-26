@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
@@ -11,6 +12,11 @@ import {
   getSessionEndAt,
   type ClassSessionDocument
 } from "@/lib/class-sessions";
+import {
+  getGameSessionExpiry,
+  getGameSessionsCollectionName,
+  type GameSessionDocument
+} from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
@@ -209,5 +215,46 @@ export async function deleteClassSession(formData: FormData) {
   await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).deleteOne({ _id: new ObjectId(id) });
 
   revalidatePath("/admin");
+  revalidatePath("/admin/sessions");
+}
+
+export async function generateSpeechGameLink(formData: FormData) {
+  await assertAdmin();
+
+  const classSessionId = clean(formData.get("classSessionId"));
+  if (!ObjectId.isValid(classSessionId)) {
+    throw new Error("Invalid class session");
+  }
+
+  const db = await getMongoDb();
+  const classSession = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({ _id: new ObjectId(classSessionId) });
+
+  if (!classSession) {
+    throw new Error("Class session not found");
+  }
+
+  const now = new Date();
+  const token = randomBytes(24).toString("base64url");
+
+  await db.collection<GameSessionDocument>(getGameSessionsCollectionName()).updateOne(
+    { classSessionId, gameType: "speech-competition" },
+    {
+      $set: {
+        token,
+        gameType: "speech-competition",
+        classSessionId,
+        studentId: classSession.studentId || "",
+        studentName: classSession.studentName || "",
+        meetingNumber: classSession.meetingNumber || 0,
+        expiresAt: getGameSessionExpiry(now),
+        updatedAt: now
+      },
+      $setOnInsert: {
+        createdAt: now
+      }
+    },
+    { upsert: true }
+  );
+
   revalidatePath("/admin/sessions");
 }
