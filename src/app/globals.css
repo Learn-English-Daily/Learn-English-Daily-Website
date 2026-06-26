@@ -49,3 +49,24 @@ body {
 .soft-wave {
   clip-path: polygon(0 0, 100% 0, 100% 92%, 72% 97%, 38% 92%, 0 98%);
 }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes word-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
