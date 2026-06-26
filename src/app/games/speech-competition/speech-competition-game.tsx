@@ -172,6 +172,21 @@ export function SpeechCompetitionGame() {
     setMessage("Teacher bonus added: +5 confidence points.");
   }
 
+  function speakWord(word: WordState) {
+    if (!("speechSynthesis" in window)) {
+      setMessage("Text-to-speech is not supported in this browser.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(word.normalized || word.original);
+    utterance.lang = "en-US";
+    utterance.rate = 0.82;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+    setMessage(`Listen and repeat: ${word.original}`);
+  }
+
   function applyRecognizedTranscript(spokenWords: string[]) {
     if (!spokenWords.length) return;
     setLastSpoken(spokenWords[spokenWords.length - 1] || "");
@@ -330,20 +345,28 @@ export function SpeechCompetitionGame() {
           </div>
 
           <div className="mt-6 min-h-[220px] rounded-lg border border-slate-200 bg-white p-5">
+            <p className="mb-4 rounded-lg bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800">
+              Tip: if a word turns red, click it to hear the correct pronunciation.
+            </p>
             <div className="flex flex-wrap gap-2 text-lg leading-10">
               {words.map((word) => (
-                <span
+                <button
                   key={word.id}
-                  className={`inline-flex rounded-lg px-3 py-1 font-bold transition-all duration-500 ${
+                  type="button"
+                  onClick={() => word.status === "missed" ? speakWord(word) : undefined}
+                  disabled={word.status !== "missed"}
+                  title={word.status === "missed" ? `Hear pronunciation for ${word.original}` : undefined}
+                  className={`inline-flex rounded-lg px-3 py-1 font-bold transition-all duration-500 disabled:pointer-events-none ${
                     word.status === "correct"
                       ? "scale-75 bg-emerald-50 text-emerald-600 opacity-0"
                       : word.status === "missed"
-                        ? "bg-rose-50 text-rose-700 motion-safe:animate-[word-shake_0.2s_ease-in-out_3]"
+                        ? "cursor-pointer bg-rose-50 text-rose-700 ring-2 ring-rose-200 hover:bg-rose-100 motion-safe:animate-[word-shake_0.2s_ease-in-out_3]"
                         : "bg-blue-50 text-lead-blue"
                   }`}
                 >
                   {word.original}
-                </span>
+                  {word.status === "missed" ? <span className="ml-2 text-xs font-extrabold">Listen</span> : null}
+                </button>
               ))}
               {!words.length ? <p className="text-sm text-lead-gray">Load a speech to begin.</p> : null}
             </div>
