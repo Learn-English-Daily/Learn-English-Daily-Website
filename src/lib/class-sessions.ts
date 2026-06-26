@@ -11,7 +11,10 @@ export type ClassSessionDocument = {
   meetingNumber?: number;
   sessionDate?: string;
   sessionTime?: string;
+  startTime?: string;
+  endTime?: string;
   scheduledAt?: string;
+  endsAt?: string;
   teacherIds?: string[];
   teacherNames?: string[];
   status?: ClassSessionStatus;
@@ -30,18 +33,26 @@ export function getScheduledAt(sessionDate: string, sessionTime: string) {
   return `${sessionDate}T${sessionTime}:00+07:00`;
 }
 
+export function getSessionEndAt(sessionDate: string, endTime: string) {
+  if (!sessionDate || !endTime) return "";
+  return `${sessionDate}T${endTime}:00+07:00`;
+}
+
 export function getComputedClassSessionStatus({
   status,
   scheduledAt,
+  endsAt,
   hasAttendance,
   now = new Date()
 }: {
   status?: ClassSessionStatus;
   scheduledAt?: string;
+  endsAt?: string;
   hasAttendance?: boolean;
   now?: Date;
 }): ComputedClassSessionStatus {
   if (status === "Completed" || hasAttendance) return "Completed";
-  if (scheduledAt && new Date(scheduledAt).getTime() <= now.getTime()) return "Needs Attendance";
+  const attendanceDueAt = endsAt || scheduledAt;
+  if (attendanceDueAt && new Date(attendanceDueAt).getTime() <= now.getTime()) return "Needs Attendance";
   return "Scheduled";
 }

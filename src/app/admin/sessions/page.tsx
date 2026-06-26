@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarClock, CalendarCheck, RefreshCcw, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarCheck, Pencil, RefreshCcw, Trash2 } from "lucide-react";
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
-import { createClassSession, deleteClassSession } from "@/app/admin/sessions/actions";
+import { createClassSession, deleteClassSession, updateClassSession } from "@/app/admin/sessions/actions";
 import { GchatSessionMessage } from "@/app/admin/sessions/gchat-session-message";
 import { TemporaryMeetLink } from "@/app/admin/sessions/temporary-meet-link";
 import { AdminLoginForm } from "@/app/admin/login-form";
@@ -65,7 +65,10 @@ type ClassSession = {
   meetingNumber: number;
   sessionDate: string;
   sessionTime: string;
+  startTime: string;
+  endTime: string;
   scheduledAt: string;
+  endsAt: string;
   teacherIds: string[];
   teacherNames: string[];
   status: ComputedClassSessionStatus;
@@ -132,26 +135,27 @@ async function getSessions(): Promise<ClassSession[]> {
       classType: doc.classType || "",
       meetingNumber,
       sessionDate: doc.sessionDate || "",
-      sessionTime: doc.sessionTime || "",
+      sessionTime: doc.startTime || doc.sessionTime || "",
+      startTime: doc.startTime || doc.sessionTime || "",
+      endTime: doc.endTime || "",
       scheduledAt: doc.scheduledAt || "",
+      endsAt: doc.endsAt || "",
       teacherIds: doc.teacherIds || [],
       teacherNames: doc.teacherNames || [],
       status: getComputedClassSessionStatus({
         status: doc.status,
         scheduledAt: doc.scheduledAt,
+        endsAt: doc.endsAt,
         hasAttendance: attendanceKeys.has(`${studentId}:${meetingNumber}`)
       })
     };
   });
 }
 
-function formatDateTime(value: string) {
-  if (!value) return "Not set";
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Jakarta"
-  }).format(new Date(value));
+function formatTimeRange(startValue: string, endValue: string) {
+  if (!startValue && !endValue) return "Time not set";
+  if (!endValue) return formatTime(startValue);
+  return `${formatTime(startValue)} - ${formatTime(endValue)}`;
 }
 
 function formatDate(value: string) {
@@ -196,8 +200,8 @@ function attendanceHref(session: ClassSession) {
   return `/admin/attendance?${params.toString()}`;
 }
 
-function expiresAt(scheduledAt: string) {
-  const date = scheduledAt ? new Date(scheduledAt) : new Date();
+function expiresAt(endsAt: string, scheduledAt: string) {
+  const date = endsAt ? new Date(endsAt) : scheduledAt ? new Date(scheduledAt) : new Date();
   date.setHours(date.getHours() + 3);
   return date.toISOString();
 }
@@ -292,8 +296,11 @@ export default async function AdminSessionsPage() {
                 <Field label="Class Date">
                   <input name="sessionDate" type="date" required defaultValue={getTomorrowDate()} className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
-                <Field label="Class Time">
-                  <input name="sessionTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
+                <Field label="From Time">
+                  <input name="startTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
+                </Field>
+                <Field label="To Time">
+                  <input name="endTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
               </div>
               <TeacherSelector teachers={teachers} />
@@ -329,7 +336,7 @@ export default async function AdminSessionsPage() {
                       <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(session.status)}`}>{session.status}</span>
                     </div>
                     <p className="mt-2 text-sm font-semibold text-lead-gray">
-                      Meeting {session.meetingNumber} / {formatDateTime(session.scheduledAt)}
+                      Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
                     </p>
                     <p className="mt-1 text-sm text-lead-gray">{session.courseJoined} / {session.classType || "Class type not set"}</p>
                     <p className="mt-1 text-sm text-lead-gray">
@@ -340,7 +347,7 @@ export default async function AdminSessionsPage() {
                         studentName={session.studentName}
                         meetingNumber={session.meetingNumber}
                         meetingDate={formatDate(session.scheduledAt)}
-                        meetingTime={formatTime(session.scheduledAt)}
+                        meetingTime={formatTimeRange(session.scheduledAt, session.endsAt)}
                         teachers={session.teacherNames}
                       />
                     </div>
@@ -359,8 +366,31 @@ export default async function AdminSessionsPage() {
                         </Button>
                       </ActionFeedbackForm>
                     </div>
+                    <details className="mt-4 rounded-lg border border-slate-200 bg-slate-50">
+                      <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-bold text-lead-blue [&::-webkit-details-marker]:hidden">
+                        <Pencil className="h-4 w-4" />
+                        Edit class session
+                      </summary>
+                      <ActionFeedbackForm action={updateClassSession} successMessage="Class session updated successfully." className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2">
+                        <input type="hidden" name="id" value={session.id} />
+                        <Field label="Meeting Number">
+                          <input name="meetingNumber" type="number" min="1" required defaultValue={session.meetingNumber} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+                        </Field>
+                        <Field label="Class Date">
+                          <input name="sessionDate" type="date" required defaultValue={session.sessionDate} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+                        </Field>
+                        <Field label="From Time">
+                          <input name="startTime" type="time" required defaultValue={session.startTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+                        </Field>
+                        <Field label="To Time">
+                          <input name="endTime" type="time" required defaultValue={session.endTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+                        </Field>
+                        <TeacherSelector teachers={teachers} selectedTeacherIds={session.teacherIds} compact />
+                        <Button type="submit" size="sm" className="sm:col-span-2">Update Class Session</Button>
+                      </ActionFeedbackForm>
+                    </details>
                   </div>
-                  <TemporaryMeetLink sessionId={session.id} expiresAt={expiresAt(session.scheduledAt)} />
+                  <TemporaryMeetLink sessionId={session.id} expiresAt={expiresAt(session.endsAt, session.scheduledAt)} />
                 </div>
               </div>
             ))}
@@ -385,15 +415,23 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function TeacherSelector({ teachers }: { teachers: Teacher[] }) {
+function TeacherSelector({
+  teachers,
+  selectedTeacherIds = [],
+  compact = false
+}: {
+  teachers: Teacher[];
+  selectedTeacherIds?: string[];
+  compact?: boolean;
+}) {
   return (
-    <fieldset className="rounded-lg border border-slate-200 bg-white p-4">
+    <fieldset className={`rounded-lg border border-slate-200 bg-white ${compact ? "p-3 sm:col-span-2" : "p-4"}`}>
       <legend className="px-1 text-sm font-semibold text-lead-navy">Teachers <span className="text-lead-blue">*</span></legend>
       <p className="mb-3 text-xs text-lead-gray">Select one or more teachers for this class.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {teachers.map((teacher) => (
           <label key={teacher.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-lead-navy">
-            <input type="checkbox" name="teacherIds" value={teacher.id} className="h-4 w-4 accent-lead-blue" />
+            <input type="checkbox" name="teacherIds" value={teacher.id} defaultChecked={selectedTeacherIds.includes(teacher.id)} className="h-4 w-4 accent-lead-blue" />
             {teacher.name}
           </label>
         ))}

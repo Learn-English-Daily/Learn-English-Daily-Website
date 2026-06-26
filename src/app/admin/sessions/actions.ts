@@ -8,6 +8,7 @@ import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import {
   getClassSessionsCollectionName,
   getScheduledAt,
+  getSessionEndAt,
   type ClassSessionDocument
 } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
@@ -25,6 +26,20 @@ function clean(value: unknown) {
 function getPositiveInteger(value: FormDataEntryValue | null) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function addOneHour(time: string) {
+  if (!time) return "";
+  const [hours = "0", minutes = "0"] = time.split(":");
+  const date = new Date(Date.UTC(2000, 0, 1, Number(hours), Number(minutes)));
+  date.setUTCHours(date.getUTCHours() + 1);
+  return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+function resolveSessionTimes(formData: FormData) {
+  const startTime = clean(formData.get("startTime")) || clean(formData.get("sessionTime"));
+  const endTime = clean(formData.get("endTime")) || addOneHour(startTime);
+  return { startTime, endTime };
 }
 
 async function assertAdmin() {
@@ -64,9 +79,9 @@ export async function createClassSession(formData: FormData) {
   const studentId = clean(formData.get("studentId"));
   const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
   const sessionDate = clean(formData.get("sessionDate"));
-  const sessionTime = clean(formData.get("sessionTime"));
+  const { startTime, endTime } = resolveSessionTimes(formData);
 
-  if (!studentId || !meetingNumber || !sessionDate || !sessionTime) {
+  if (!studentId || !meetingNumber || !sessionDate || !startTime || !endTime) {
     throw new Error("Invalid class session");
   }
 
@@ -95,8 +110,11 @@ export async function createClassSession(formData: FormData) {
         classType: student.classType || "",
         meetingNumber,
         sessionDate,
-        sessionTime,
-        scheduledAt: getScheduledAt(sessionDate, sessionTime),
+        sessionTime: startTime,
+        startTime,
+        endTime,
+        scheduledAt: getScheduledAt(sessionDate, startTime),
+        endsAt: getSessionEndAt(sessionDate, endTime),
         teacherIds,
         teacherNames,
         status: "Scheduled",
@@ -111,6 +129,45 @@ export async function createClassSession(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/sessions");
+  revalidatePath("/ceo");
+}
+
+export async function updateClassSession(formData: FormData) {
+  await assertAdmin();
+
+  const id = clean(formData.get("id"));
+  const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
+  const sessionDate = clean(formData.get("sessionDate"));
+  const { startTime, endTime } = resolveSessionTimes(formData);
+
+  if (!ObjectId.isValid(id) || !meetingNumber || !sessionDate || !startTime || !endTime) {
+    throw new Error("Invalid class session update");
+  }
+
+  const db = await getMongoDb();
+  const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
+
+  await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
+    { _id: new ObjectId(id) },
+    {
+      $set: {
+        meetingNumber,
+        sessionDate,
+        sessionTime: startTime,
+        startTime,
+        endTime,
+        scheduledAt: getScheduledAt(sessionDate, startTime),
+        endsAt: getSessionEndAt(sessionDate, endTime),
+        teacherIds,
+        teacherNames,
+        updatedAt: new Date()
+      }
+    }
+  );
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/sessions");
+  revalidatePath("/ceo");
 }
 
 export async function markClassSessionCompletedByAttendance({

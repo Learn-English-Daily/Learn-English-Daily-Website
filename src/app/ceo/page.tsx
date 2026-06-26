@@ -260,6 +260,7 @@ async function getDashboardData(period: Period) {
         status: getComputedClassSessionStatus({
           status: session.status,
           scheduledAt: session.scheduledAt,
+          endsAt: session.endsAt,
           hasAttendance: attendanceKeys.has(`${studentId}:${meetingNumber}`)
         })
       };
@@ -271,6 +272,7 @@ async function getDashboardData(period: Period) {
       getComputedClassSessionStatus({
         status: session.status,
         scheduledAt: session.scheduledAt,
+        endsAt: session.endsAt,
         hasAttendance: attendanceKeys.has(`${session.studentId || ""}:${session.meetingNumber || 0}`)
       }) === "Needs Attendance"
   );

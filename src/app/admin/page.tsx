@@ -84,7 +84,7 @@ async function getSessionReminders(): Promise<SessionReminder[]> {
     .toArray()) as WithId<ClassSessionDocument>[];
 
   return docs
-    .filter((doc) => getComputedClassSessionStatus({ status: doc.status, scheduledAt: doc.scheduledAt }) === "Needs Attendance")
+    .filter((doc) => getComputedClassSessionStatus({ status: doc.status, scheduledAt: doc.scheduledAt, endsAt: doc.endsAt }) === "Needs Attendance")
     .slice(0, 5)
     .map((doc) => ({
       id: doc._id.toString(),
