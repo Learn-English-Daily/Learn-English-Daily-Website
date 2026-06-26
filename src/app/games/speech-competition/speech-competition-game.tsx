@@ -194,21 +194,26 @@ export function SpeechCompetitionGame() {
     setWords((currentWords) => {
       let changed = false;
       const nextWords = currentWords.map((word) => ({ ...word }));
+      let transcriptCursor = 0;
 
-      for (let index = 0; index < nextWords.length && index < spokenWords.length; index += 1) {
-        const spoken = spokenWords[index];
+      for (let index = 0; index < nextWords.length; index += 1) {
         const target = nextWords[index];
-
-        if (spoken === target.normalized) {
-          if (target.status !== "correct") {
-            nextWords[index] = { ...target, status: "correct" };
-            changed = true;
-          }
+        if (target.status === "correct") {
+          transcriptCursor += 1;
           continue;
         }
 
-        if (levenshtein(spoken, target.normalized) <= 2 && Math.min(spoken.length, target.normalized.length) >= 4) {
-          const mismatchKey = `${target.id}:${spoken}`;
+        const matchIndex = spokenWords.findIndex((spoken, spokenIndex) => spokenIndex >= transcriptCursor && spoken === target.normalized);
+        if (matchIndex >= 0) {
+          nextWords[index] = { ...target, status: "correct" };
+          transcriptCursor = matchIndex + 1;
+          changed = true;
+          continue;
+        }
+
+        const latestSpoken = spokenWords[spokenWords.length - 1] || "";
+        if (levenshtein(latestSpoken, target.normalized) <= 2 && Math.min(latestSpoken.length, target.normalized.length) >= 4) {
+          const mismatchKey = `${target.id}:${latestSpoken}`;
           nextWords[index] = { ...target, status: "missed" };
           changed = true;
           if (lastMismatchRef.current !== mismatchKey) {
