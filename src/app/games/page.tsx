@@ -1,28 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, Lock, Mic, Puzzle, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Link2, Lock, Mic, Puzzle, Sparkles, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-type GameCard =
-  | {
-      title: string;
-      description: string;
-      status: string;
-      href: string;
-      icon: typeof Mic;
-      accent: string;
-      available: true;
-    }
-  | {
-      title: string;
-      description: string;
-      status: string;
-      icon: typeof Mic;
-      accent: string;
-      available: false;
-    };
+type GameCard = {
+  title: string;
+  description: string;
+  status: string;
+  icon: typeof Mic;
+  accent: string;
+  available: boolean;
+};
 
 export const metadata: Metadata = {
   title: "LEAD Games | Learn English Daily",
@@ -32,12 +22,11 @@ export const metadata: Metadata = {
 const games: GameCard[] = [
   {
     title: "Speech Competition Game",
-    description: "Practice memorization, pronunciation, and confident delivery with live speech matching.",
-    status: "Available",
-    href: "/games/speech-competition",
+    description: "Practice memorization, pronunciation, and confident delivery through teacher-generated class links.",
+    status: "Private Class Link",
     icon: Mic,
     accent: "border-blue-100 bg-blue-50 text-lead-blue",
-    available: true
+    available: false
   },
   {
     title: "Pronunciation Challenge",
@@ -94,14 +83,14 @@ export default function GamesPage() {
               Practice speaking, pronunciation, vocabulary, and confidence through gamified learning.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg">
-                <Link href="/games/speech-competition">
-                  Play Speech Competition
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
               <Button asChild variant="secondary" size="lg">
                 <Link href="#games">Explore Games</Link>
+              </Button>
+              <Button asChild size="lg">
+                <Link href="/en#contact">
+                  Join a Class
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </Button>
             </div>
           </div>
@@ -171,19 +160,10 @@ export default function GamesPage() {
                     </div>
                     <h3 className="mt-5 font-heading text-xl font-bold text-lead-navy">{game.title}</h3>
                     <p className="mt-3 flex-1 text-sm leading-7 text-lead-gray">{game.description}</p>
-                    {game.available ? (
-                      <Button asChild className="mt-6">
-                        <Link href={game.href}>
-                          Play Now
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button disabled variant="secondary" className="mt-6">
-                        <Lock className="h-4 w-4" />
-                        Coming Soon
-                      </Button>
-                    )}
+                    <Button disabled variant="secondary" className="mt-6">
+                      {game.title === "Speech Competition Game" ? <Link2 className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                      {game.title === "Speech Competition Game" ? "Teacher Link Required" : "Coming Soon"}
+                    </Button>
                   </div>
                 </Card>
               );
