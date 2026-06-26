@@ -351,26 +351,27 @@ export function SpeechCompetitionGame() {
 
           <div className="mt-6 min-h-[220px] rounded-lg border border-slate-200 bg-white p-5">
             <p className="mb-4 rounded-lg bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800">
-              Tip: if a word turns red, click it to hear the correct pronunciation.
+              Tip: click any visible word to hear the correct pronunciation.
             </p>
             <div className="flex flex-wrap gap-2 text-lg leading-10">
               {words.map((word) => (
                 <button
                   key={word.id}
                   type="button"
-                  onClick={() => word.status === "missed" ? speakWord(word) : undefined}
-                  disabled={word.status !== "missed"}
-                  title={word.status === "missed" ? `Hear pronunciation for ${word.original}` : undefined}
-                  className={`inline-flex rounded-lg px-3 py-1 font-bold transition-all duration-500 disabled:pointer-events-none ${
+                  onClick={() => word.status !== "correct" ? speakWord(word) : undefined}
+                  disabled={word.status === "correct"}
+                  title={word.status !== "correct" ? `Hear pronunciation for ${word.original}` : undefined}
+                  className={`inline-flex items-center rounded-lg px-3 py-1 font-bold transition-all duration-500 disabled:pointer-events-none ${
                     word.status === "correct"
                       ? "scale-75 bg-emerald-50 text-emerald-600 opacity-0"
                       : word.status === "missed"
                         ? "cursor-pointer bg-rose-50 text-rose-700 ring-2 ring-rose-200 hover:bg-rose-100 motion-safe:animate-[word-shake_0.2s_ease-in-out_3]"
-                        : "bg-blue-50 text-lead-blue"
+                        : "cursor-pointer bg-blue-50 text-lead-blue hover:bg-blue-100"
                   }`}
                 >
                   {word.original}
                   {word.status === "missed" ? <span className="ml-2 text-xs font-extrabold">Listen</span> : null}
+                  {word.status === "pending" ? <span className="ml-2 text-[10px] font-extrabold uppercase opacity-60">Hear</span> : null}
                 </button>
               ))}
               {!words.length ? <p className="text-sm text-lead-gray">Load a speech to begin.</p> : null}
