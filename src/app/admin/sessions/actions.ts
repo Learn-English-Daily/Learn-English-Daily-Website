@@ -15,6 +15,7 @@ import {
 import {
   getGameSessionExpiry,
   getGameSessionsCollectionName,
+  type GameType,
   type GameSessionDocument
 } from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
@@ -218,7 +219,7 @@ export async function deleteClassSession(formData: FormData) {
   revalidatePath("/admin/sessions");
 }
 
-export async function generateSpeechGameLink(formData: FormData) {
+async function generateClassGameLink(formData: FormData, gameType: GameType) {
   await assertAdmin();
 
   const classSessionId = clean(formData.get("classSessionId"));
@@ -237,11 +238,11 @@ export async function generateSpeechGameLink(formData: FormData) {
   const token = randomBytes(24).toString("base64url");
 
   await db.collection<GameSessionDocument>(getGameSessionsCollectionName()).updateOne(
-    { classSessionId, gameType: "speech-competition" },
+    { classSessionId, gameType },
     {
       $set: {
         token,
-        gameType: "speech-competition",
+        gameType,
         classSessionId,
         studentId: classSession.studentId || "",
         studentName: classSession.studentName || "",
@@ -257,4 +258,12 @@ export async function generateSpeechGameLink(formData: FormData) {
   );
 
   revalidatePath("/admin/sessions");
+}
+
+export async function generateSpeechGameLink(formData: FormData) {
+  await generateClassGameLink(formData, "speech-competition");
+}
+
+export async function generateEscapeRoomGameLink(formData: FormData) {
+  await generateClassGameLink(formData, "escape-room");
 }

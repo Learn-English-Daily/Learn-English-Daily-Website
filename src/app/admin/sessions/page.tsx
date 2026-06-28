@@ -1,10 +1,16 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarClock, CalendarCheck, Gamepad2, Pencil, RefreshCcw, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarCheck, Gamepad2, KeyRound, Pencil, RefreshCcw, Trash2 } from "lucide-react";
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
-import { createClassSession, deleteClassSession, generateSpeechGameLink, updateClassSession } from "@/app/admin/sessions/actions";
+import {
+  createClassSession,
+  deleteClassSession,
+  generateEscapeRoomGameLink,
+  generateSpeechGameLink,
+  updateClassSession
+} from "@/app/admin/sessions/actions";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { GchatSessionMessage } from "@/app/admin/sessions/gchat-session-message";
 import { TemporaryMeetLink } from "@/app/admin/sessions/temporary-meet-link";
@@ -80,9 +86,14 @@ type ClassSession = {
   teacherNames: string[];
   status: ComputedClassSessionStatus;
   gameLink: {
-    url: string;
-    expiresAt: string;
-  } | null;
+    speechCompetition: GameLink | null;
+    escapeRoom: GameLink | null;
+  };
+};
+
+type GameLink = {
+  url: string;
+  expiresAt: string;
 };
 
 async function getStudents(): Promise<Student[]> {
@@ -133,23 +144,24 @@ async function getSessions(): Promise<ClassSession[]> {
       .toArray(),
     db
       .collection<GameSessionDocument>(getGameSessionsCollectionName())
-      .find({ gameType: "speech-competition" })
+      .find({ gameType: { $in: ["speech-competition", "escape-room"] } })
       .sort({ updatedAt: -1 })
       .limit(500)
       .toArray()
   ]);
   const attendanceKeys = new Set(attendanceDocs.map((doc) => `${doc.studentId || ""}:${doc.meetingNumber || 0}`));
-  const gameSessionsByClassId = new Map(
-    gameSessionDocs
-      .filter((doc) => doc.classSessionId && doc.token && !isGameSessionExpired(doc.expiresAt))
-      .map((doc) => [
-        doc.classSessionId || "",
-        {
-          url: getGameSessionUrl(doc.token || ""),
-          expiresAt: doc.expiresAt ? new Date(doc.expiresAt).toISOString() : ""
-        }
-      ])
-  );
+  const gameSessionsByClassId = new Map<string, Partial<Record<"speechCompetition" | "escapeRoom", GameLink>>>();
+
+  for (const doc of gameSessionDocs) {
+    if (!doc.classSessionId || !doc.token || !doc.gameType || isGameSessionExpired(doc.expiresAt)) continue;
+    const links = gameSessionsByClassId.get(doc.classSessionId) || {};
+    const key = doc.gameType === "escape-room" ? "escapeRoom" : "speechCompetition";
+    links[key] = {
+      url: getGameSessionUrl(doc.token),
+      expiresAt: doc.expiresAt ? new Date(doc.expiresAt).toISOString() : ""
+    };
+    gameSessionsByClassId.set(doc.classSessionId, links);
+  }
 
   return sessionDocs.map((doc) => {
     const studentId = doc.studentId || "";
@@ -177,7 +189,10 @@ async function getSessions(): Promise<ClassSession[]> {
         endsAt: doc.endsAt,
         hasAttendance: attendanceKeys.has(`${studentId}:${meetingNumber}`)
       }),
-      gameLink: gameSessionsByClassId.get(classSessionId) || null
+      gameLink: {
+        speechCompetition: gameSessionsByClassId.get(classSessionId)?.speechCompetition || null,
+        escapeRoom: gameSessionsByClassId.get(classSessionId)?.escapeRoom || null
+      }
     };
   });
 }
@@ -234,6 +249,45 @@ function expiresAt(endsAt: string, scheduledAt: string) {
   const date = endsAt ? new Date(endsAt) : scheduledAt ? new Date(scheduledAt) : new Date();
   date.setHours(date.getHours() + 3);
   return date.toISOString();
+}
+
+function ClassGamePanel({
+  title,
+  description,
+  icon,
+  action,
+  classSessionId,
+  link
+}: {
+  title: string;
+  description: string;
+  icon: ReactNode;
+  action: (formData: FormData) => Promise<void>;
+  classSessionId: string;
+  link: GameLink | null;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-bold text-lead-navy">{title}</p>
+          <p className="mt-1 text-xs text-lead-gray">{description}</p>
+        </div>
+        <ActionFeedbackForm action={action} successMessage="Game link generated." className="grid gap-2">
+          <input type="hidden" name="classSessionId" value={classSessionId} />
+          <Button type="submit" size="sm" variant="secondary">
+            {icon}
+            {link ? "Regenerate Link" : "Generate Game Link"}
+          </Button>
+        </ActionFeedbackForm>
+      </div>
+      {link ? (
+        <div className="mt-3">
+          <GameSessionLink url={link.url} expiresAt={link.expiresAt} />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default async function AdminSessionsPage() {
@@ -381,25 +435,23 @@ export default async function AdminSessionsPage() {
                         teachers={session.teacherNames}
                       />
                     </div>
-                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-bold text-lead-navy">Speech game class link</p>
-                          <p className="mt-1 text-xs text-lead-gray">Generate a private student link. It expires 1.5 hours after generation.</p>
-                        </div>
-                        <ActionFeedbackForm action={generateSpeechGameLink} successMessage="Game link generated." className="grid gap-2">
-                          <input type="hidden" name="classSessionId" value={session.id} />
-                          <Button type="submit" size="sm" variant="secondary">
-                            <Gamepad2 className="h-4 w-4" />
-                            {session.gameLink ? "Regenerate Link" : "Generate Game Link"}
-                          </Button>
-                        </ActionFeedbackForm>
-                      </div>
-                      {session.gameLink ? (
-                        <div className="mt-3">
-                          <GameSessionLink url={session.gameLink.url} expiresAt={session.gameLink.expiresAt} />
-                        </div>
-                      ) : null}
+                    <div className="mt-4 grid gap-3">
+                      <ClassGamePanel
+                        title="Speech game class link"
+                        description="Private speech-practice link. It expires 1.5 hours after generation."
+                        icon={<Gamepad2 className="h-4 w-4" />}
+                        action={generateSpeechGameLink}
+                        classSessionId={session.id}
+                        link={session.gameLink.speechCompetition}
+                      />
+                      <ClassGamePanel
+                        title="Escape Room class link"
+                        description="Private 5-room English escape game. It expires 1.5 hours after generation."
+                        icon={<KeyRound className="h-4 w-4" />}
+                        action={generateEscapeRoomGameLink}
+                        classSessionId={session.id}
+                        link={session.gameLink.escapeRoom}
+                      />
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button asChild size="sm" variant={session.status === "Completed" ? "secondary" : "primary"}>

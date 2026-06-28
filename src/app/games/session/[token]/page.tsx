@@ -1,13 +1,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { Clock, LockKeyhole, Mic } from "lucide-react";
+import { Clock, Gamepad2, LockKeyhole, Mic } from "lucide-react";
+import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { SpeechCompetitionGame } from "@/app/games/speech-competition/speech-competition-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   getGameSessionsCollectionName,
   isGameSessionExpired,
+  type GameType,
   type GameSessionDocument
 } from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
@@ -21,6 +23,7 @@ export const metadata: Metadata = {
 
 type GameSession = {
   token: string;
+  gameType: GameType;
   studentName: string;
   meetingNumber: number;
   expiresAt: string;
@@ -31,14 +34,14 @@ async function getGameSession(token: string): Promise<GameSession | null> {
 
   const db = await getMongoDb();
   const doc = await db.collection<GameSessionDocument>(getGameSessionsCollectionName()).findOne({
-    token,
-    gameType: "speech-competition"
+    token
   });
 
-  if (!doc?.token || isGameSessionExpired(doc.expiresAt)) return null;
+  if (!doc?.token || !doc.gameType || isGameSessionExpired(doc.expiresAt)) return null;
 
   return {
     token: doc.token,
+    gameType: doc.gameType,
     studentName: doc.studentName || "Student",
     meetingNumber: doc.meetingNumber || 0,
     expiresAt: doc.expiresAt ? new Date(doc.expiresAt).toISOString() : ""
@@ -62,6 +65,12 @@ export default async function GameSessionPage({
   noStore();
   const resolvedParams = await params;
   const gameSession = await getGameSession(resolvedParams.token || "");
+  const isEscapeRoom = gameSession?.gameType === "escape-room";
+  const gameTitle = isEscapeRoom ? "LEAD Escape Room" : "Speech Competition Game";
+  const gameDescription = isEscapeRoom
+    ? "Complete five English rooms, collect password digits, and escape before the class game window ends."
+    : "Practice your speech during class. This link is temporary and only works during the class game window.";
+  const GameIcon = isEscapeRoom ? Gamepad2 : Mic;
 
   if (!gameSession) {
     return (
@@ -91,14 +100,14 @@ export default async function GameSessionPage({
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               <p className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-lead-blue shadow-soft">
-                <Mic className="h-4 w-4" />
+                <GameIcon className="h-4 w-4" />
                 Private Class Game
               </p>
               <h1 className="mt-5 font-heading text-4xl font-extrabold tracking-tight text-lead-navy sm:text-5xl">
-                Speech Competition Game
+                {gameTitle}
               </h1>
               <p className="mt-4 max-w-2xl text-lg leading-8 text-lead-gray">
-                Practice your speech during class. This link is temporary and only works during the class game window.
+                {gameDescription}
               </p>
             </div>
             <Card className="p-4">
@@ -114,7 +123,7 @@ export default async function GameSessionPage({
       </section>
 
       <section className="container-shell grid gap-6 py-8">
-        <SpeechCompetitionGame />
+        {isEscapeRoom ? <EscapeRoomGame /> : <SpeechCompetitionGame />}
       </section>
     </main>
   );
