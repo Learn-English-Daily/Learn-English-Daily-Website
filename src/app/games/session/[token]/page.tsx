@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { Clock, Gamepad2, LockKeyhole, Mic } from "lucide-react";
+import { ArrowRight, Clock, Gamepad2, KeyRound, LockKeyhole, Mic } from "lucide-react";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { SpeechCompetitionGame } from "@/app/games/speech-competition/speech-competition-game";
 import { Button } from "@/components/ui/button";
@@ -58,19 +58,28 @@ function formatExpiry(value: string) {
 }
 
 export default async function GameSessionPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ game?: string }>;
 }) {
   noStore();
   const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
   const gameSession = await getGameSession(resolvedParams.token || "");
-  const isEscapeRoom = gameSession?.gameType === "escape-room";
-  const gameTitle = isEscapeRoom ? "LEAD Escape Room" : "Speech Competition Game";
-  const gameDescription = isEscapeRoom
+  const selectedGame = resolvedSearchParams.game;
+  const activeGame = gameSession?.gameType === "games-hub" ? selectedGame : gameSession?.gameType;
+  const isEscapeRoom = activeGame === "escape-room";
+  const isSpeechCompetition = activeGame === "speech-competition";
+  const shouldShowHub = gameSession?.gameType === "games-hub" && !isEscapeRoom && !isSpeechCompetition;
+  const gameTitle = shouldShowHub ? "LEAD Class Games" : isEscapeRoom ? "LEAD Escape Room" : "Speech Competition Game";
+  const gameDescription = shouldShowHub
+    ? "Choose a class game. This private link is temporary and only works during the class game window."
+    : isEscapeRoom
     ? "Complete five English rooms, collect password digits, and escape before the class game window ends."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = isEscapeRoom ? Gamepad2 : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isEscapeRoom ? KeyRound : Mic;
 
   if (!gameSession) {
     return (
@@ -123,8 +132,59 @@ export default async function GameSessionPage({
       </section>
 
       <section className="container-shell grid gap-6 py-8">
-        {isEscapeRoom ? <EscapeRoomGame /> : <SpeechCompetitionGame />}
+        {shouldShowHub ? (
+          <GameHub token={gameSession.token} />
+        ) : isEscapeRoom ? (
+          <EscapeRoomGame />
+        ) : (
+          <SpeechCompetitionGame />
+        )}
       </section>
     </main>
+  );
+}
+
+function GameHub({ token }: { token: string }) {
+  const games = [
+    {
+      title: "Speech Competition Game",
+      description: "Practice memorization, pronunciation, and confident delivery.",
+      href: `/games/session/${encodeURIComponent(token)}?game=speech-competition`,
+      icon: Mic,
+      accent: "border-blue-100 bg-blue-50 text-lead-blue"
+    },
+    {
+      title: "LEAD Escape Room",
+      description: "Solve five English rooms, collect digits, and unlock the final door.",
+      href: `/games/session/${encodeURIComponent(token)}?game=escape-room`,
+      icon: KeyRound,
+      accent: "border-yellow-100 bg-yellow-50 text-yellow-700"
+    }
+  ];
+
+  return (
+    <div className="grid gap-5 md:grid-cols-2">
+      {games.map((game) => {
+        const Icon = game.icon;
+        return (
+          <Card key={game.title} className="group overflow-hidden p-0 transition hover:-translate-y-1 hover:shadow-soft">
+            <div className="h-2 bg-lead-blue" />
+            <div className="p-6">
+              <div className={`grid h-14 w-14 place-items-center rounded-2xl border ${game.accent}`}>
+                <Icon className="h-6 w-6" />
+              </div>
+              <h2 className="mt-5 font-heading text-2xl font-extrabold text-lead-navy">{game.title}</h2>
+              <p className="mt-3 min-h-[56px] leading-7 text-lead-gray">{game.description}</p>
+              <Button asChild className="mt-6 w-full">
+                <Link href={game.href}>
+                  Play Now
+                  <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                </Link>
+              </Button>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
   );
 }

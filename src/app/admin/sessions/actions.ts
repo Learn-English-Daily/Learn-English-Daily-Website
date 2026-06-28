@@ -267,3 +267,7 @@ export async function generateSpeechGameLink(formData: FormData) {
 export async function generateEscapeRoomGameLink(formData: FormData) {
   await generateClassGameLink(formData, "escape-room");
 }
+
+export async function generateGamesLink(formData: FormData) {
+  await generateClassGameLink(formData, "games-hub");
+}
