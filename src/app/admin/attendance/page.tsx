@@ -16,7 +16,7 @@ import {
   type AttendanceStatus
 } from "@/lib/attendance";
 import { getMongoDb } from "@/lib/mongodb";
-import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
   ensureDefaultTeachers,
   getTeachersCollectionName,
@@ -91,13 +91,14 @@ function formatDate(value: string) {
 async function getStudents(query = ""): Promise<Student[]> {
   const db = await getMongoDb();
   const search = query.trim();
-  const filter: Filter<StudentDocument> = search
+  const searchFilter: Filter<StudentDocument> = search
     ? {
         $or: ["studentId", "studentName", "parentName", "whatsapp", "courseJoined", "classType"].map((field) => ({
           [field]: { $regex: escapeRegex(search), $options: "i" }
         }))
       }
     : {};
+  const filter = search ? { $and: [getActiveStudentFilter(), searchFilter] } : getActiveStudentFilter();
 
   const docs = (await db
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
@@ -122,7 +123,9 @@ async function getSelectedStudent(studentId = "") {
   if (!studentId) return null;
 
   const db = await getMongoDb();
-  const doc = await db.collection<StudentDocument>(getStudentRegistrationCollectionName()).findOne({ studentId });
+  const doc = await db.collection<StudentDocument>(getStudentRegistrationCollectionName()).findOne({
+    $and: [{ studentId }, getActiveStudentFilter()]
+  });
   if (!doc) return null;
 
   return {

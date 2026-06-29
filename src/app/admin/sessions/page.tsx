@@ -32,7 +32,7 @@ import {
   type GameSessionDocument
 } from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
-import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
   ensureDefaultTeachers,
   getTeachersCollectionName,
@@ -96,7 +96,7 @@ async function getStudents(): Promise<Student[]> {
   const db = await getMongoDb();
   const docs = (await db
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
-    .find({})
+    .find(getActiveStudentFilter())
     .sort({ createdAt: -1 })
     .limit(200)
     .toArray()) as WithId<StudentDocument>[];

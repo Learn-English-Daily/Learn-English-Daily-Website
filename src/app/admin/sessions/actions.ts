@@ -19,7 +19,7 @@ import {
   type GameSessionDocument
 } from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
-import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
   ensureDefaultTeachers,
   getTeachersCollectionName,
@@ -98,10 +98,12 @@ export async function createClassSession(formData: FormData) {
     studentName?: string;
     courseJoined?: string;
     classType?: string;
-  }>(getStudentRegistrationCollectionName()).findOne({ studentId });
+  }>(getStudentRegistrationCollectionName()).findOne({
+    $and: [{ studentId }, getActiveStudentFilter()]
+  });
 
   if (!student?.studentId || !student.studentName) {
-    throw new Error("Student not found");
+    throw new Error("Active course student not found");
   }
 
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);

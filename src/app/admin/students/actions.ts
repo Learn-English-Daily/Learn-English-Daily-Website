@@ -8,11 +8,13 @@ import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 import { generateParentAccessToken } from "@/lib/parent-access";
 import {
+  getStudentIdCountersCollectionName,
   getStudentRegistrationCollectionName,
   isClassType,
   isCourseJoined,
   isEnglishLevel,
-  isLearningGoal
+  isLearningGoal,
+  isTrialCourse
 } from "@/lib/student-registration";
 
 function clean(value: unknown) {
@@ -29,6 +31,21 @@ function isReasonableShortText(value: string, max = 120) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 160;
+}
+
+function formatStudentId(prefix: "STU" | "TR", sequence: number) {
+  return `${prefix}${String(sequence).padStart(3, "0")}`;
+}
+
+async function getNextStudentId(prefix: "STU" | "TR") {
+  const db = await getMongoDb();
+  const counter = await db.collection<{ _id: string; seq: number }>(getStudentIdCountersCollectionName()).findOneAndUpdate(
+    { _id: prefix },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: "after" }
+  );
+
+  return formatStudentId(prefix, counter?.seq || 1);
 }
 
 async function assertAdmin() {
@@ -82,17 +99,43 @@ export async function updateStudentRegistration(formData: FormData) {
   }
 
   const db = await getMongoDb();
+  const collection = db.collection<{
+    studentId?: string;
+    studentIdType?: string;
+    courseJoined?: string;
+  }>(getStudentRegistrationCollectionName());
+  const existingRegistration = await collection.findOne({ _id: new ObjectId(id) });
+  const isJoiningCourse = !isTrialCourse(registration.courseJoined);
+  const wasTrial =
+    existingRegistration?.studentIdType === "trial" ||
+    existingRegistration?.courseJoined === "Trial Class" ||
+    /^TR/i.test(existingRegistration?.studentId || "");
+  const upgradedStudentId = wasTrial && isJoiningCourse ? await getNextStudentId("STU") : "";
+
   await db.collection(getStudentRegistrationCollectionName()).updateOne(
     { _id: new ObjectId(id) },
     {
       $set: {
         ...registration,
+        ...(upgradedStudentId
+          ? {
+              studentId: upgradedStudentId,
+              studentIdType: "student",
+              previousStudentId: existingRegistration?.studentId || "",
+              upgradedToStudentId: upgradedStudentId,
+              upgradedFromTrial: true,
+              upgradedAt: new Date()
+            }
+          : {
+              studentIdType: isJoiningCourse ? "student" : existingRegistration?.studentIdType || "trial"
+            }),
         updatedAt: new Date()
       }
     }
   );
 
   revalidatePath("/admin/students");
+  revalidatePath("/admin/students/trials");
   revalidatePath(`/admin/students/${id}/edit`);
   redirect(`/admin/students/${id}/edit?updated=1`);
 }
@@ -120,6 +163,7 @@ export async function regenerateParentAccessToken(formData: FormData) {
   );
 
   revalidatePath("/admin/students");
+  revalidatePath("/admin/students/trials");
   revalidatePath(`/admin/students/${id}/parent-qr`);
   redirect(`/admin/students/${id}/parent-qr?regenerated=1`);
 }

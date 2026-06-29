@@ -8,7 +8,11 @@ import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
-import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import {
+  getActiveStudentFilter,
+  getStudentRegistrationCollectionName,
+  getTrialStudentFilter
+} from "@/lib/student-registration";
 
 export const dynamic = "force-dynamic";
 
@@ -59,14 +63,17 @@ type StudentRegistration = {
   createdAt: string;
 };
 
+type RegistrationViewMode = "active" | "trial";
+
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function getStudentRegistrations(query = ""): Promise<StudentRegistration[]> {
+async function getStudentRegistrations(query = "", mode: RegistrationViewMode): Promise<StudentRegistration[]> {
   const db = await getMongoDb();
   const search = query.trim();
-  const filter: Filter<StudentRegistrationDocument> = search
+  const modeFilter = mode === "trial" ? getTrialStudentFilter() : getActiveStudentFilter();
+  const searchFilter: Filter<StudentRegistrationDocument> = search
     ? {
         $or: [
           "studentName",
@@ -91,6 +98,7 @@ async function getStudentRegistrations(query = ""): Promise<StudentRegistration[
         }))
       }
     : {};
+  const filter = search ? { $and: [modeFilter, searchFilter] } : modeFilter;
 
   const docs = (await db
     .collection<StudentRegistrationDocument>(getStudentRegistrationCollectionName())
@@ -135,13 +143,15 @@ function formatDate(value: string) {
 export default async function AdminStudentsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ q?: string | string[] }>;
+  searchParams?: Promise<{ q?: string | string[]; view?: string | string[] }>;
 }) {
   noStore();
   const cookieStore = await cookies();
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
   const resolvedSearchParams = await searchParams;
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
+  const view = Array.isArray(resolvedSearchParams?.view) ? resolvedSearchParams?.view[0] || "" : resolvedSearchParams?.view || "";
+  const mode: RegistrationViewMode = view === "trial" ? "trial" : "active";
 
   if (!isAdminConfigured()) {
     return (
@@ -171,7 +181,12 @@ export default async function AdminStudentsPage({
     );
   }
 
-  const registrations = await getStudentRegistrations(searchQuery);
+  const registrations = await getStudentRegistrations(searchQuery, mode);
+  const isTrialView = mode === "trial";
+  const pagePath = isTrialView ? "/admin/students?view=trial" : "/admin/students";
+  const otherPath = isTrialView ? "/admin/students" : "/admin/students/trials";
+  const pageTitle = isTrialView ? "Trial class students" : "Current course students";
+  const emptyTitle = searchQuery ? "No matching registrations" : isTrialView ? "No trial students yet" : "No current students yet";
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -179,12 +194,15 @@ export default async function AdminStudentsPage({
         <div className="container-shell flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Student registrations</h1>
+            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">{pageTitle}</h1>
             <p className="mt-2 text-sm text-lead-gray">
-              {searchQuery ? `Showing ${registrations.length} result${registrations.length === 1 ? "" : "s"} for "${searchQuery}".` : `Showing latest ${registrations.length} registrations.`}
+              {searchQuery ? `Showing ${registrations.length} result${registrations.length === 1 ? "" : "s"} for "${searchQuery}".` : `Showing latest ${registrations.length} ${isTrialView ? "trial" : "current"} registrations.`}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Button asChild variant={isTrialView ? "primary" : "secondary"}>
+              <a href={otherPath}>{isTrialView ? "Current Students" : "Trial Students"}</a>
+            </Button>
             <Button asChild variant="secondary">
               <a href="/admin/attendance">Attendance</a>
             </Button>
@@ -201,7 +219,7 @@ export default async function AdminStudentsPage({
               <a href="/admin/reviews">Reviews</a>
             </Button>
             <Button asChild variant="secondary">
-              <a href="/admin/students">
+              <a href={pagePath}>
                 <RefreshCcw className="h-4 w-4" />
                 Refresh
               </a>
@@ -216,6 +234,7 @@ export default async function AdminStudentsPage({
       <section className="container-shell py-8">
         <Card className="mb-6 p-4">
           <form action="/admin/students" className="flex flex-col gap-3 md:flex-row">
+            {isTrialView ? <input type="hidden" name="view" value="trial" /> : null}
             <label className="relative flex-1">
               <span className="sr-only">Search registrations</span>
               <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
@@ -232,7 +251,7 @@ export default async function AdminStudentsPage({
             </Button>
             {searchQuery ? (
               <Button asChild variant="secondary" size="lg">
-                <a href="/admin/students">Clear</a>
+                <a href={pagePath}>Clear</a>
               </Button>
             ) : null}
           </form>
@@ -284,22 +303,26 @@ export default async function AdminStudentsPage({
                           Edit
                         </a>
                       </Button>
-                      <Button asChild variant="secondary" size="sm">
-                        <a href={`/admin/students/${registration.id}/parent-qr`}>
-                          <QrCode className="h-4 w-4" />
-                          Parent QR
-                        </a>
-                      </Button>
-                      <Button asChild variant="secondary" size="sm">
-                        <a href={`/admin/attendance?studentId=${encodeURIComponent(registration.studentId)}`}>
-                          Attendance
-                        </a>
-                      </Button>
-                      <Button asChild variant="secondary" size="sm">
-                        <a href={`/admin/payments?studentId=${encodeURIComponent(registration.studentId)}`}>
-                          Payments
-                        </a>
-                      </Button>
+                      {!isTrialView ? (
+                        <>
+                          <Button asChild variant="secondary" size="sm">
+                            <a href={`/admin/students/${registration.id}/parent-qr`}>
+                              <QrCode className="h-4 w-4" />
+                              Parent QR
+                            </a>
+                          </Button>
+                          <Button asChild variant="secondary" size="sm">
+                            <a href={`/admin/attendance?studentId=${encodeURIComponent(registration.studentId)}`}>
+                              Attendance
+                            </a>
+                          </Button>
+                          <Button asChild variant="secondary" size="sm">
+                            <a href={`/admin/payments?studentId=${encodeURIComponent(registration.studentId)}`}>
+                              Payments
+                            </a>
+                          </Button>
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
@@ -324,9 +347,9 @@ export default async function AdminStudentsPage({
           </div>
         ) : (
           <Card className="p-8 text-center">
-            <h2 className="font-heading text-2xl font-bold text-lead-navy">{searchQuery ? "No matching registrations" : "No registrations yet"}</h2>
+            <h2 className="font-heading text-2xl font-bold text-lead-navy">{emptyTitle}</h2>
             <p className="mt-3 text-lead-gray">
-              {searchQuery ? "Try a different student name, parent name, email, WhatsApp, course, or schedule." : "New student registration submissions will appear here."}
+              {searchQuery ? "Try a different student name, parent name, email, WhatsApp, course, or schedule." : isTrialView ? "Trial class registrations will appear here." : "Students appear here after they join a course and receive an STU ID."}
             </p>
           </Card>
         )}

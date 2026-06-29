@@ -20,6 +20,26 @@ export function isTrialCourse(courseJoined: string) {
   return courseJoined === "Trial Class";
 }
 
+export function getTrialStudentFilter() {
+  return {
+    $or: [
+      { courseJoined: "Trial Class" },
+      { studentIdType: "trial" },
+      { studentId: { $regex: "^TR", $options: "i" } }
+    ]
+  };
+}
+
+export function getActiveStudentFilter() {
+  return {
+    $and: [
+      { courseJoined: { $ne: "Trial Class" } },
+      { studentIdType: { $ne: "trial" } },
+      { studentId: { $not: { $regex: "^TR", $options: "i" } } }
+    ]
+  };
+}
+
 export function isCourseJoined(value: string): value is CourseJoined {
   return courseJoinedOptions.includes(value as CourseJoined);
 }
