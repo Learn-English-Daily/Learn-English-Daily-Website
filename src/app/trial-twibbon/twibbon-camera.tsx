@@ -5,7 +5,7 @@ import { Camera, Download, RefreshCcw, RotateCcw, ShieldCheck } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-const frameSrc = "/images/trial-twibbon-simple-frame.svg";
+const frameSrc = "/images/trial-twibbon-frame.png";
 const outputWidth = 1080;
 const outputHeight = 1080;
 
