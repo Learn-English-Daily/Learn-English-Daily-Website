@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Download, RefreshCcw, RotateCcw, ShieldCheck } from "lucide-react";
+import { Camera, Download, ImageUp, RefreshCcw, RotateCcw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-const frameSrc = "/images/trial-twibbon-frame.png";
+const defaultFrameSrc = "/images/trial-twibbon-frame.png";
 const outputWidth = 1080;
 const outputHeight = 1080;
 
@@ -37,14 +37,20 @@ function drawCoverImage(
 export function TwibbonCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const frameSrcRef = useRef(defaultFrameSrc);
   const [cameraReady, setCameraReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState("");
   const [error, setError] = useState("");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [frameSrc, setFrameSrc] = useState(defaultFrameSrc);
+  const [frameName, setFrameName] = useState("Default LEAD twibbon");
   const isMirrored = facingMode === "user";
 
   useEffect(() => {
-    return () => stopCamera();
+    return () => {
+      stopCamera();
+      if (frameSrcRef.current.startsWith("blob:")) URL.revokeObjectURL(frameSrcRef.current);
+    };
   }, []);
 
   async function startCamera(nextFacingMode = facingMode) {
@@ -124,6 +130,35 @@ export function TwibbonCamera() {
     void startCamera(nextFacingMode);
   }
 
+  function uploadFrame(file: File | undefined) {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please upload an image file for the twibbon frame.");
+      return;
+    }
+
+    setError("");
+    setCapturedImage("");
+    setFrameSrc((currentFrameSrc) => {
+      if (currentFrameSrc.startsWith("blob:")) URL.revokeObjectURL(currentFrameSrc);
+      const nextFrameSrc = URL.createObjectURL(file);
+      frameSrcRef.current = nextFrameSrc;
+      return nextFrameSrc;
+    });
+    setFrameName(file.name);
+  }
+
+  function resetFrame() {
+    setCapturedImage("");
+    setFrameSrc((currentFrameSrc) => {
+      if (currentFrameSrc.startsWith("blob:")) URL.revokeObjectURL(currentFrameSrc);
+      frameSrcRef.current = defaultFrameSrc;
+      return defaultFrameSrc;
+    });
+    setFrameName("Default LEAD twibbon");
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,560px)_1fr] lg:items-start">
       <Card className="overflow-hidden p-4 shadow-soft sm:p-5">
@@ -163,9 +198,30 @@ export function TwibbonCamera() {
           </p>
           <h2 className="mt-4 font-heading text-2xl font-extrabold text-lead-navy">Capture your trial class photo</h2>
           <p className="mt-3 leading-7 text-lead-gray">
-            Open the camera, use the large center space, then capture and download the final square twibbon image for Instagram.
+            Upload any twibbon frame, open the camera, then capture and download the final square image for Instagram.
             The photo is created inside your browser and is not uploaded.
           </p>
+
+          <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <label className="grid gap-2 text-sm font-bold text-lead-navy">
+              Upload twibbon frame
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                onChange={(event) => uploadFrame(event.target.files?.[0])}
+                className="focus-ring w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-semibold text-lead-gray file:mr-3 file:rounded-lg file:border-0 file:bg-lead-blue file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+              />
+            </label>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs font-semibold text-lead-gray">Current frame: {frameName}</p>
+              <Button type="button" variant="ghost" size="sm" onClick={resetFrame}>
+                Reset Default
+              </Button>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-lead-gray">
+              Best result: square PNG with transparent photo area.
+            </p>
+          </div>
 
           {error ? <p className="mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">{error}</p> : null}
 
@@ -182,7 +238,7 @@ export function TwibbonCamera() {
                 </Button>
                 <Button type="button" size="lg" className="sm:col-span-2" disabled={!cameraReady} onClick={capturePhoto}>
                   Capture Photo
-                  <Camera className="h-4 w-4" />
+                  <ImageUp className="h-4 w-4" />
                 </Button>
               </>
             ) : (
