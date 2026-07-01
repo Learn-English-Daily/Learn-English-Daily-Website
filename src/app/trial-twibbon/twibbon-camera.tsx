@@ -5,7 +5,7 @@ import { Camera, Download, RefreshCcw, RotateCcw, ShieldCheck } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-const frameSrc = "/images/trial-twibbon-frame.png";
+const frameSrc = "/images/trial-twibbon-simple-frame.svg";
 const outputWidth = 1080;
 const outputHeight = 1080;
 
@@ -144,7 +144,7 @@ export function TwibbonCamera() {
                   <div className="px-6">
                     <Camera className="mx-auto h-12 w-12 text-lead-yellow" />
                     <p className="mt-4 font-heading text-2xl font-extrabold">Camera Preview</p>
-                    <p className="mt-2 text-sm leading-6 text-blue-100">Tap Start Camera to place yourself inside the LEAD trial frame.</p>
+                    <p className="mt-2 text-sm leading-6 text-blue-100">Tap Start Camera and use the large center space for your photo.</p>
                   </div>
                 </div>
               ) : null}
@@ -163,7 +163,7 @@ export function TwibbonCamera() {
           </p>
           <h2 className="mt-4 font-heading text-2xl font-extrabold text-lead-navy">Capture your trial class photo</h2>
           <p className="mt-3 leading-7 text-lead-gray">
-            Open the camera, fit yourself inside the circle, then capture and download the final square twibbon image for Instagram.
+            Open the camera, use the large center space, then capture and download the final square twibbon image for Instagram.
             The photo is created inside your browser and is not uploaded.
           </p>
 
@@ -206,7 +206,7 @@ export function TwibbonCamera() {
           <h3 className="font-heading text-lg font-bold text-lead-navy">Tips</h3>
           <div className="mt-3 grid gap-2 text-sm leading-6 text-lead-gray">
             <p>Use good lighting so your face is clear.</p>
-            <p>Keep your face centered inside the circle.</p>
+            <p>Keep your face centered inside the large frame area.</p>
             <p>After downloading, share the picture as an Instagram post, class group photo, or social story.</p>
           </div>
         </Card>
