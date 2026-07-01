@@ -27,6 +27,7 @@ type StudentRegistrationNotification = {
   preferredTime: string;
   courseJoined: string;
   classType: string;
+  classMode: string;
   englishLevel: string;
   learningGoal: string;
   countryCity: string;
@@ -165,6 +166,7 @@ export async function notifyNewStudentRegistration(registration: StudentRegistra
       `Grade: ${registration.grade}`,
       `Course Joined: ${registration.courseJoined}`,
       `Class Type: ${registration.classType}`,
+      `Class Mode: ${registration.classMode}`,
       `English Level: ${registration.englishLevel}`,
       `Learning Goal: ${registration.learningGoal}`,
       `Preferred Schedule: ${registration.preferredSchedule}`,

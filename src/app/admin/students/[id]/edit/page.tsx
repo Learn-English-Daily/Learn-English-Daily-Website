@@ -13,6 +13,7 @@ import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/
 import { getMongoDb } from "@/lib/mongodb";
 import {
   classTypeOptions,
+  classModeOptions,
   courseJoinedOptions,
   englishLevelOptions,
   getStudentRegistrationCollectionName,
@@ -35,6 +36,7 @@ type StudentRegistrationDocument = {
   preferredTime?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   englishLevel?: string;
   learningGoal?: string;
   countryCity?: string;
@@ -58,6 +60,7 @@ type StudentRegistration = {
   preferredTime: string;
   courseJoined: string;
   classType: string;
+  classMode: string;
   englishLevel: string;
   learningGoal: string;
   countryCity: string;
@@ -91,6 +94,7 @@ async function getStudentRegistration(id: string): Promise<StudentRegistration |
     preferredTime: doc.preferredTime || "",
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
+    classMode: doc.classMode || "",
     englishLevel: doc.englishLevel || "",
     learningGoal: doc.learningGoal || "",
     countryCity: doc.countryCity || "",
@@ -241,6 +245,11 @@ export default async function EditStudentRegistrationPage({
             <Field label="Class Type">
               <select name="classType" required defaultValue={registration.classType} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
                 {classTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </Field>
+            <Field label="Class Mode">
+              <select name="classMode" required defaultValue={registration.classMode || "Online"} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
+                {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             </Field>
             <Field label="Current English Level">

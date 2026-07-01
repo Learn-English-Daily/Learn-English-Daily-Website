@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/content";
-import { classTypeOptions, courseJoinedOptions, englishLevelOptions, learningGoalOptions } from "@/lib/student-registration";
+import { classModeOptions, classTypeOptions, courseJoinedOptions, englishLevelOptions, learningGoalOptions } from "@/lib/student-registration";
 
 const copy = {
   en: {
@@ -25,6 +25,7 @@ const copy = {
       preferredTime: "Preferred Time",
       courseJoined: "Course Joined",
       classType: "Class Type",
+      classMode: "Class Mode",
       englishLevel: "Current English Level",
       learningGoal: "Learning Goal",
       countryCity: "Country/City"
@@ -56,6 +57,7 @@ const copy = {
       preferredTime: "Waktu yang Diinginkan",
       courseJoined: "Kursus yang Diikuti",
       classType: "Tipe Kelas",
+      classMode: "Mode Kelas",
       englishLevel: "Level Bahasa Inggris Saat Ini",
       learningGoal: "Tujuan Belajar",
       countryCity: "Negara/Kota"
@@ -96,6 +98,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
       preferredTime: String(formData.get("preferredTime") || ""),
       courseJoined: String(formData.get("courseJoined") || ""),
       classType: String(formData.get("classType") || ""),
+      classMode: String(formData.get("classMode") || ""),
       englishLevel: String(formData.get("englishLevel") || ""),
       learningGoal: String(formData.get("learningGoal") || ""),
       countryCity: String(formData.get("countryCity") || ""),
@@ -141,6 +144,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
       <div className="grid gap-4 md:grid-cols-2">
         <SelectField name="courseJoined" label={text.fields.courseJoined} options={courseJoinedOptions} choose={text.choose} requiredText={text.required} />
         <SelectField name="classType" label={text.fields.classType} options={classTypeOptions} choose={text.choose} requiredText={text.required} />
+        <SelectField name="classMode" label={text.fields.classMode} options={classModeOptions} choose={text.choose} requiredText={text.required} />
         <SelectField name="englishLevel" label={text.fields.englishLevel} options={englishLevelOptions} choose={text.choose} requiredText={text.required} />
         <SelectField name="learningGoal" label={text.fields.learningGoal} options={learningGoalOptions} choose={text.choose} requiredText={text.required} />
       </div>

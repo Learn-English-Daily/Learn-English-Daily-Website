@@ -6,6 +6,7 @@ import { generateParentAccessToken } from "@/lib/parent-access";
 import {
   getStudentIdCountersCollectionName,
   getStudentRegistrationCollectionName,
+  isClassMode,
   isClassType,
   isCourseJoined,
   isEnglishLevel,
@@ -26,6 +27,7 @@ type StudentRegistrationPayload = {
   preferredTime?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   englishLevel?: string;
   learningGoal?: string;
   countryCity?: string;
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
     preferredTime: clean(payload.preferredTime),
     courseJoined: clean(payload.courseJoined),
     classType: clean(payload.classType),
+    classMode: clean(payload.classMode),
     englishLevel: clean(payload.englishLevel),
     learningGoal: clean(payload.learningGoal),
     countryCity: clean(payload.countryCity),
@@ -114,6 +117,10 @@ export async function POST(request: Request) {
 
   if (!isClassType(registration.classType)) {
     return NextResponse.json({ ok: false, error: "Please choose a valid class type." }, { status: 400 });
+  }
+
+  if (!isClassMode(registration.classMode)) {
+    return NextResponse.json({ ok: false, error: "Please choose a valid class mode." }, { status: 400 });
   }
 
   if (!isEnglishLevel(registration.englishLevel)) {

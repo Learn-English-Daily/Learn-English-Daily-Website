@@ -32,6 +32,7 @@ type StudentRegistrationDocument = {
   preferredTime?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   englishLevel?: string;
   learningGoal?: string;
   countryCity?: string;
@@ -55,6 +56,7 @@ type StudentRegistration = {
   preferredTime: string;
   courseJoined: string;
   classType: string;
+  classMode: string;
   englishLevel: string;
   learningGoal: string;
   countryCity: string;
@@ -89,6 +91,7 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode): 
           "preferredTime",
           "courseJoined",
           "classType",
+          "classMode",
           "englishLevel",
           "learningGoal",
           "countryCity",
@@ -122,6 +125,7 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode): 
     preferredTime: doc.preferredTime || "",
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
+    classMode: doc.classMode || "",
     englishLevel: doc.englishLevel || "",
     learningGoal: doc.learningGoal || "",
     countryCity: doc.countryCity || "",
@@ -326,7 +330,7 @@ export default async function AdminStudentsPage({
                     </div>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
-                    {[registration.courseJoined, registration.classType, registration.englishLevel, registration.locale.toUpperCase()].map((item) => (
+                    {[registration.courseJoined, registration.classType, registration.classMode || "Mode not set", registration.englishLevel, registration.locale.toUpperCase()].map((item) => (
                       <span key={item} className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">
                         {item}
                       </span>
@@ -338,6 +342,7 @@ export default async function AdminStudentsPage({
                   <p><span className="font-bold text-lead-navy">Grade:</span> {registration.grade}</p>
                   <p><span className="font-bold text-lead-navy">Schedule:</span> {registration.preferredSchedule}</p>
                   <p><span className="font-bold text-lead-navy">Time:</span> {registration.preferredTime}</p>
+                  <p><span className="font-bold text-lead-navy">Mode:</span> {registration.classMode || "Not set"}</p>
                   <p><span className="font-bold text-lead-navy">Goal:</span> {registration.learningGoal}</p>
                   <p><span className="font-bold text-lead-navy">Country/City:</span> {registration.countryCity || "Not provided"}</p>
                   <p><span className="font-bold text-lead-navy">Submitted:</span> {formatDate(registration.createdAt)}</p>

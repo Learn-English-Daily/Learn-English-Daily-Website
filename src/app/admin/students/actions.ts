@@ -10,6 +10,7 @@ import { generateParentAccessToken } from "@/lib/parent-access";
 import {
   getStudentIdCountersCollectionName,
   getStudentRegistrationCollectionName,
+  isClassMode,
   isClassType,
   isCourseJoined,
   isEnglishLevel,
@@ -73,6 +74,7 @@ export async function updateStudentRegistration(formData: FormData) {
     preferredTime: clean(formData.get("preferredTime")),
     courseJoined: clean(formData.get("courseJoined")),
     classType: clean(formData.get("classType")),
+    classMode: clean(formData.get("classMode")),
     englishLevel: clean(formData.get("englishLevel")),
     learningGoal: clean(formData.get("learningGoal")),
     countryCity: clean(formData.get("countryCity")),
@@ -91,6 +93,7 @@ export async function updateStudentRegistration(formData: FormData) {
     !isReasonableShortText(registration.preferredTime) ||
     !isCourseJoined(registration.courseJoined) ||
     !isClassType(registration.classType) ||
+    !isClassMode(registration.classMode) ||
     !isEnglishLevel(registration.englishLevel) ||
     !isLearningGoal(registration.learningGoal) ||
     !["en", "id"].includes(registration.locale)
