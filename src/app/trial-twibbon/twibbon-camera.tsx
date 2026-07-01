@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Download, ImageUp, RefreshCcw, RotateCcw, ShieldCheck } from "lucide-react";
+import { Camera, Download, RefreshCcw, RotateCcw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-const defaultFrameSrc = "/images/trial-twibbon-frame.png";
+const frameSrc = "/images/trial-twibbon-frame.png";
 const outputWidth = 1080;
 const outputHeight = 1080;
 
@@ -37,20 +37,14 @@ function drawCoverImage(
 export function TwibbonCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const frameSrcRef = useRef(defaultFrameSrc);
   const [cameraReady, setCameraReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState("");
   const [error, setError] = useState("");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const [frameSrc, setFrameSrc] = useState(defaultFrameSrc);
-  const [frameName, setFrameName] = useState("Default LEAD twibbon");
   const isMirrored = facingMode === "user";
 
   useEffect(() => {
-    return () => {
-      stopCamera();
-      if (frameSrcRef.current.startsWith("blob:")) URL.revokeObjectURL(frameSrcRef.current);
-    };
+    return () => stopCamera();
   }, []);
 
   async function startCamera(nextFacingMode = facingMode) {
@@ -130,38 +124,9 @@ export function TwibbonCamera() {
     void startCamera(nextFacingMode);
   }
 
-  function uploadFrame(file: File | undefined) {
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setError("Please upload an image file for the twibbon frame.");
-      return;
-    }
-
-    setError("");
-    setCapturedImage("");
-    setFrameSrc((currentFrameSrc) => {
-      if (currentFrameSrc.startsWith("blob:")) URL.revokeObjectURL(currentFrameSrc);
-      const nextFrameSrc = URL.createObjectURL(file);
-      frameSrcRef.current = nextFrameSrc;
-      return nextFrameSrc;
-    });
-    setFrameName(file.name);
-  }
-
-  function resetFrame() {
-    setCapturedImage("");
-    setFrameSrc((currentFrameSrc) => {
-      if (currentFrameSrc.startsWith("blob:")) URL.revokeObjectURL(currentFrameSrc);
-      frameSrcRef.current = defaultFrameSrc;
-      return defaultFrameSrc;
-    });
-    setFrameName("Default LEAD twibbon");
-  }
-
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,560px)_1fr] lg:items-start">
-      <Card className="overflow-hidden p-4 shadow-soft sm:p-5">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,560px)_1fr] lg:items-start">
+      <Card className="overflow-hidden p-3 shadow-soft sm:p-5">
         <div className="relative mx-auto aspect-square max-h-[76vh] w-full max-w-[560px] overflow-hidden rounded-[28px] bg-lead-navy shadow-soft">
           {capturedImage ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -188,6 +153,40 @@ export function TwibbonCamera() {
             </>
           )}
         </div>
+
+        {error ? <p className="mt-3 rounded-lg bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">{error}</p> : null}
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {!capturedImage ? (
+            <>
+              <Button type="button" size="lg" className="h-12 text-base" onClick={() => void startCamera(facingMode)}>
+                <Camera className="h-5 w-5" />
+                {cameraReady ? "Restart" : "Start Camera"}
+              </Button>
+              <Button type="button" size="lg" variant="secondary" className="h-12 text-base" onClick={switchCamera}>
+                <RefreshCcw className="h-5 w-5" />
+                Switch
+              </Button>
+              <Button type="button" size="lg" className="h-14 text-lg sm:col-span-2" disabled={!cameraReady} onClick={capturePhoto}>
+                <Camera className="h-5 w-5" />
+                Capture Photo
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button asChild size="lg" className="h-14 text-lg">
+                <a href={capturedImage} download="lead-trial-twibbon.png">
+                  <Download className="h-5 w-5" />
+                  Download
+                </a>
+              </Button>
+              <Button type="button" size="lg" variant="secondary" className="h-14 text-lg" onClick={retakePhoto}>
+                <RotateCcw className="h-5 w-5" />
+                Retake
+              </Button>
+            </>
+          )}
+        </div>
       </Card>
 
       <div className="grid gap-4">
@@ -198,64 +197,9 @@ export function TwibbonCamera() {
           </p>
           <h2 className="mt-4 font-heading text-2xl font-extrabold text-lead-navy">Capture your trial class photo</h2>
           <p className="mt-3 leading-7 text-lead-gray">
-            Upload any twibbon frame, open the camera, then capture and download the final square image for Instagram.
+            Open the camera, keep your face centered inside the LEAD frame, then capture and download the final square image for Instagram.
             The photo is created inside your browser and is not uploaded.
           </p>
-
-          <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-            <label className="grid gap-2 text-sm font-bold text-lead-navy">
-              Upload twibbon frame
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                onChange={(event) => uploadFrame(event.target.files?.[0])}
-                className="focus-ring w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-semibold text-lead-gray file:mr-3 file:rounded-lg file:border-0 file:bg-lead-blue file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
-              />
-            </label>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs font-semibold text-lead-gray">Current frame: {frameName}</p>
-              <Button type="button" variant="ghost" size="sm" onClick={resetFrame}>
-                Reset Default
-              </Button>
-            </div>
-            <p className="mt-2 text-xs leading-5 text-lead-gray">
-              Best result: square PNG with transparent photo area.
-            </p>
-          </div>
-
-          {error ? <p className="mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">{error}</p> : null}
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {!capturedImage ? (
-              <>
-                <Button type="button" size="lg" onClick={() => void startCamera(facingMode)}>
-                  <Camera className="h-4 w-4" />
-                  {cameraReady ? "Restart Camera" : "Start Camera"}
-                </Button>
-                <Button type="button" size="lg" variant="secondary" onClick={switchCamera}>
-                  <RefreshCcw className="h-4 w-4" />
-                  Switch Camera
-                </Button>
-                <Button type="button" size="lg" className="sm:col-span-2" disabled={!cameraReady} onClick={capturePhoto}>
-                  Capture Photo
-                  <ImageUp className="h-4 w-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button asChild size="lg">
-                  <a href={capturedImage} download="lead-trial-twibbon.png">
-                    <Download className="h-4 w-4" />
-                    Download Photo
-                  </a>
-                </Button>
-                <Button type="button" size="lg" variant="secondary" onClick={retakePhoto}>
-                  <RotateCcw className="h-4 w-4" />
-                  Retake
-                </Button>
-              </>
-            )}
-          </div>
         </Card>
 
         <Card className="p-5">
