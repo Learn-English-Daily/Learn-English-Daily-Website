@@ -44,6 +44,25 @@ function loadImage(src: string) {
   });
 }
 
+function drawAdjustedImage(
+  context: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  imageWidth: number,
+  imageHeight: number,
+  transform: { zoom: number; x: number; y: number }
+) {
+  const imageRatio = imageWidth / imageHeight;
+  const canvasRatio = outputWidth / outputHeight;
+  const baseWidth = imageRatio > canvasRatio ? outputHeight * imageRatio : outputWidth;
+  const baseHeight = imageRatio > canvasRatio ? outputHeight : outputWidth / imageRatio;
+  const drawWidth = baseWidth * transform.zoom;
+  const drawHeight = baseHeight * transform.zoom;
+  const drawX = (outputWidth - drawWidth) / 2 + (transform.x / 100) * outputWidth;
+  const drawY = (outputHeight - drawHeight) / 2 + (transform.y / 100) * outputHeight;
+
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+}
+
 export function TwibbonCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -53,18 +72,23 @@ export function TwibbonCamera() {
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [error, setError] = useState("");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [galleryImage, setGalleryImage] = useState("");
+  const galleryImageRef = useRef("");
+  const [galleryTransform, setGalleryTransform] = useState({ zoom: 1.1, x: 0, y: 0 });
   const isMirrored = facingMode === "user";
 
   useEffect(() => {
     return () => {
       stopCamera();
       if (capturedImageRef.current.startsWith("blob:")) URL.revokeObjectURL(capturedImageRef.current);
+      if (galleryImageRef.current.startsWith("blob:")) URL.revokeObjectURL(galleryImageRef.current);
     };
   }, []);
 
   async function startCamera(nextFacingMode = facingMode) {
     setError("");
     clearCapturedImage();
+    clearGalleryImage();
     stopCamera();
 
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -134,21 +158,29 @@ export function TwibbonCamera() {
     stopCamera();
 
     const photoUrl = URL.createObjectURL(file);
+    clearGalleryImage();
+    galleryImageRef.current = photoUrl;
+    setGalleryImage(photoUrl);
+    setGalleryTransform({ zoom: 1.1, x: 0, y: 0 });
+  }
+
+  async function applyGalleryPhoto() {
+    if (!galleryImage) return;
+
     try {
-      const [photo, frame] = await Promise.all([loadImage(photoUrl), loadImage(frameSrc)]);
+      const [photo, frame] = await Promise.all([loadImage(galleryImage), loadImage(frameSrc)]);
       const canvas = document.createElement("canvas");
       canvas.width = outputWidth;
       canvas.height = outputHeight;
       const context = canvas.getContext("2d");
       if (!context) return;
 
-      drawCoverImage(context, photo, photo.naturalWidth, photo.naturalHeight, outputWidth, outputHeight, false);
+      drawAdjustedImage(context, photo, photo.naturalWidth, photo.naturalHeight, galleryTransform);
       context.drawImage(frame, 0, 0, outputWidth, outputHeight);
       await saveCanvasResult(canvas);
+      clearGalleryImage();
     } catch {
       setError("Unable to use this gallery image. Please try another photo.");
-    } finally {
-      URL.revokeObjectURL(photoUrl);
     }
   }
 
@@ -175,12 +207,21 @@ export function TwibbonCamera() {
     setCapturedBlob(null);
   }
 
+  function clearGalleryImage() {
+    setGalleryImage((currentImage) => {
+      if (currentImage.startsWith("blob:")) URL.revokeObjectURL(currentImage);
+      galleryImageRef.current = "";
+      return "";
+    });
+  }
+
   function retakePhoto() {
     clearCapturedImage();
+    clearGalleryImage();
     void startCamera(facingMode);
   }
 
-  function switchCamera() {
+function switchCamera() {
     const nextFacingMode = facingMode === "user" ? "environment" : "user";
     void startCamera(nextFacingMode);
   }
@@ -218,6 +259,20 @@ export function TwibbonCamera() {
           {capturedImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={capturedImage} alt="Captured LEAD trial twibbon" className="h-full w-full object-cover" />
+          ) : galleryImage ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={galleryImage}
+                alt="Selected gallery photo preview"
+                className="h-full w-full object-cover"
+                style={{
+                  transform: `translate(${galleryTransform.x}%, ${galleryTransform.y}%) scale(${galleryTransform.zoom})`
+                }}
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={frameSrc} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+            </>
           ) : (
             <>
               <video
@@ -244,7 +299,22 @@ export function TwibbonCamera() {
         {error ? <p className="mt-3 rounded-lg bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">{error}</p> : null}
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {!capturedImage ? (
+          {galleryImage && !capturedImage ? (
+            <>
+              <AdjustSlider label="Zoom" min={1} max={2.2} step={0.02} value={galleryTransform.zoom} onChange={(zoom) => setGalleryTransform((current) => ({ ...current, zoom }))} />
+              <AdjustSlider label="Move Left / Right" min={-35} max={35} step={1} value={galleryTransform.x} onChange={(x) => setGalleryTransform((current) => ({ ...current, x }))} />
+              <AdjustSlider label="Move Up / Down" min={-35} max={35} step={1} value={galleryTransform.y} onChange={(y) => setGalleryTransform((current) => ({ ...current, y }))} />
+              <Button type="button" size="lg" className="h-14 text-lg sm:col-span-2" onClick={() => void applyGalleryPhoto()}>
+                Apply Twibbon
+              </Button>
+              <Button type="button" size="lg" variant="secondary" className="h-12 text-base" onClick={() => setGalleryTransform({ zoom: 1.1, x: 0, y: 0 })}>
+                Reset Position
+              </Button>
+              <Button type="button" size="lg" variant="secondary" className="h-12 text-base" onClick={clearGalleryImage}>
+                Choose Another
+              </Button>
+            </>
+          ) : !capturedImage ? (
             <>
               <Button type="button" size="lg" className="h-12 text-base" onClick={() => void startCamera(facingMode)}>
                 <Camera className="h-5 w-5" />
@@ -320,5 +390,39 @@ export function TwibbonCamera() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function AdjustSlider({
+  label,
+  min,
+  max,
+  step,
+  value,
+  onChange
+}: {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="grid gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-bold text-lead-navy sm:col-span-2">
+      <span className="flex items-center justify-between gap-3">
+        {label}
+        <span className="text-xs text-lead-gray">{label === "Zoom" ? `${Math.round(value * 100)}%` : value}</span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-full accent-lead-blue"
+      />
+    </label>
   );
 }
