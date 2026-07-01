@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Download, RefreshCcw, RotateCcw, ShieldCheck } from "lucide-react";
+import { Camera, Download, ExternalLink, RefreshCcw, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -37,19 +37,24 @@ function drawCoverImage(
 export function TwibbonCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const capturedImageRef = useRef("");
   const [cameraReady, setCameraReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState("");
+  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [error, setError] = useState("");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const isMirrored = facingMode === "user";
 
   useEffect(() => {
-    return () => stopCamera();
+    return () => {
+      stopCamera();
+      if (capturedImageRef.current.startsWith("blob:")) URL.revokeObjectURL(capturedImageRef.current);
+    };
   }, []);
 
   async function startCamera(nextFacingMode = facingMode) {
     setError("");
-    setCapturedImage("");
+    clearCapturedImage();
     stopCamera();
 
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -110,18 +115,63 @@ export function TwibbonCamera() {
     });
 
     context.drawImage(frame, 0, 0, outputWidth, outputHeight);
-    setCapturedImage(canvas.toDataURL("image/png"));
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) {
+      setError("Unable to prepare the photo for download. Please try again.");
+      return;
+    }
+
+    clearCapturedImage();
+    const imageUrl = URL.createObjectURL(blob);
+    capturedImageRef.current = imageUrl;
+    setCapturedBlob(blob);
+    setCapturedImage(imageUrl);
     stopCamera();
   }
 
+  function clearCapturedImage() {
+    setCapturedImage((currentImage) => {
+      if (currentImage.startsWith("blob:")) URL.revokeObjectURL(currentImage);
+      capturedImageRef.current = "";
+      return "";
+    });
+    setCapturedBlob(null);
+  }
+
   function retakePhoto() {
-    setCapturedImage("");
+    clearCapturedImage();
     void startCamera(facingMode);
   }
 
   function switchCamera() {
     const nextFacingMode = facingMode === "user" ? "environment" : "user";
     void startCamera(nextFacingMode);
+  }
+
+  async function sharePhoto() {
+    if (!capturedBlob) return;
+
+    const file = new File([capturedBlob], "lead-trial-twibbon.png", { type: "image/png" });
+    const shareNavigator = navigator as Navigator & {
+      canShare?: (data: ShareData) => boolean;
+      share?: (data: ShareData) => Promise<void>;
+    };
+
+    if (!shareNavigator.share || !shareNavigator.canShare?.({ files: [file] })) {
+      setError("Sharing is not supported in this browser. Please use Download or Open Image.");
+      return;
+    }
+
+    try {
+      await shareNavigator.share({
+        title: "LEAD Trial Twibbon",
+        text: "My LEAD free trial class photo",
+        files: [file]
+      });
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === "AbortError") return;
+      setError("Unable to open sharing. Please use Download or Open Image.");
+    }
   }
 
   return (
@@ -178,6 +228,16 @@ export function TwibbonCamera() {
                 <a href={capturedImage} download="lead-trial-twibbon.png">
                   <Download className="h-5 w-5" />
                   Download
+                </a>
+              </Button>
+              <Button type="button" size="lg" className="h-14 text-lg" onClick={() => void sharePhoto()}>
+                <Send className="h-5 w-5" />
+                Share / Save
+              </Button>
+              <Button asChild size="lg" variant="secondary" className="h-14 text-lg">
+                <a href={capturedImage} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-5 w-5" />
+                  Open Image
                 </a>
               </Button>
               <Button type="button" size="lg" variant="secondary" className="h-14 text-lg" onClick={retakePhoto}>
