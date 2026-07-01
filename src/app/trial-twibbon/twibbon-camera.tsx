@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Download, ExternalLink, RefreshCcw, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { Camera, Download, ExternalLink, ImageUp, RefreshCcw, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -11,27 +11,37 @@ const outputHeight = 1080;
 
 function drawCoverImage(
   context: CanvasRenderingContext2D,
-  video: HTMLVideoElement,
+  image: CanvasImageSource,
+  imageWidth: number,
+  imageHeight: number,
   width: number,
   height: number,
   mirrored: boolean
 ) {
-  const videoWidth = video.videoWidth;
-  const videoHeight = video.videoHeight;
-  const videoRatio = videoWidth / videoHeight;
+  const videoRatio = imageWidth / imageHeight;
   const canvasRatio = width / height;
-  const sourceWidth = videoRatio > canvasRatio ? videoHeight * canvasRatio : videoWidth;
-  const sourceHeight = videoRatio > canvasRatio ? videoHeight : videoWidth / canvasRatio;
-  const sourceX = (videoWidth - sourceWidth) / 2;
-  const sourceY = (videoHeight - sourceHeight) / 2;
+  const sourceWidth = videoRatio > canvasRatio ? imageHeight * canvasRatio : imageWidth;
+  const sourceHeight = videoRatio > canvasRatio ? imageHeight : imageWidth / canvasRatio;
+  const sourceX = (imageWidth - sourceWidth) / 2;
+  const sourceY = (imageHeight - sourceHeight) / 2;
 
   context.save();
   if (mirrored) {
     context.translate(width, 0);
     context.scale(-1, 1);
   }
-  context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
   context.restore();
+}
+
+function loadImage(src: string) {
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.src = src;
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Unable to load image."));
+  });
 }
 
 export function TwibbonCamera() {
@@ -104,17 +114,45 @@ export function TwibbonCamera() {
     const context = canvas.getContext("2d");
     if (!context) return;
 
-    drawCoverImage(context, video, outputWidth, outputHeight, isMirrored);
+    drawCoverImage(context, video, video.videoWidth, video.videoHeight, outputWidth, outputHeight, isMirrored);
 
-    const frame = new Image();
-    frame.crossOrigin = "anonymous";
-    frame.src = frameSrc;
-    await new Promise<void>((resolve, reject) => {
-      frame.onload = () => resolve();
-      frame.onerror = () => reject(new Error("Unable to load twibbon frame."));
-    });
-
+    const frame = await loadImage(frameSrc);
     context.drawImage(frame, 0, 0, outputWidth, outputHeight);
+    await saveCanvasResult(canvas);
+    stopCamera();
+  }
+
+  async function useGalleryPhoto(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image from your gallery.");
+      return;
+    }
+
+    setError("");
+    clearCapturedImage();
+    stopCamera();
+
+    const photoUrl = URL.createObjectURL(file);
+    try {
+      const [photo, frame] = await Promise.all([loadImage(photoUrl), loadImage(frameSrc)]);
+      const canvas = document.createElement("canvas");
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
+      const context = canvas.getContext("2d");
+      if (!context) return;
+
+      drawCoverImage(context, photo, photo.naturalWidth, photo.naturalHeight, outputWidth, outputHeight, false);
+      context.drawImage(frame, 0, 0, outputWidth, outputHeight);
+      await saveCanvasResult(canvas);
+    } catch {
+      setError("Unable to use this gallery image. Please try another photo.");
+    } finally {
+      URL.revokeObjectURL(photoUrl);
+    }
+  }
+
+  async function saveCanvasResult(canvas: HTMLCanvasElement) {
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) {
       setError("Unable to prepare the photo for download. Please try again.");
@@ -126,7 +164,6 @@ export function TwibbonCamera() {
     capturedImageRef.current = imageUrl;
     setCapturedBlob(blob);
     setCapturedImage(imageUrl);
-    stopCamera();
   }
 
   function clearCapturedImage() {
@@ -217,6 +254,16 @@ export function TwibbonCamera() {
                 <RefreshCcw className="h-5 w-5" />
                 Switch
               </Button>
+              <label className="focus-ring inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-base font-bold text-lead-navy transition hover:-translate-y-0.5 hover:shadow-soft sm:col-span-2">
+                <ImageUp className="h-5 w-5" />
+                Choose from Gallery
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => void useGalleryPhoto(event.target.files?.[0])}
+                />
+              </label>
               <Button type="button" size="lg" className="h-14 text-lg sm:col-span-2" disabled={!cameraReady} onClick={capturePhoto}>
                 <Camera className="h-5 w-5" />
                 Capture Photo
@@ -257,7 +304,7 @@ export function TwibbonCamera() {
           </p>
           <h2 className="mt-4 font-heading text-2xl font-extrabold text-lead-navy">Capture your trial class photo</h2>
           <p className="mt-3 leading-7 text-lead-gray">
-            Open the camera, keep your face centered inside the LEAD frame, then capture and download the final square image for Instagram.
+            Open the camera or choose a photo from your gallery, then download the final square image for Instagram.
             The photo is created inside your browser and is not uploaded.
           </p>
         </Card>
@@ -266,6 +313,7 @@ export function TwibbonCamera() {
           <h3 className="font-heading text-lg font-bold text-lead-navy">Tips</h3>
           <div className="mt-3 grid gap-2 text-sm leading-6 text-lead-gray">
             <p>Use good lighting so your face is clear.</p>
+            <p>You can also choose an existing photo from your gallery.</p>
             <p>Keep your face centered inside the large frame area.</p>
             <p>After downloading, share the picture as an Instagram post, class group photo, or social story.</p>
           </div>
