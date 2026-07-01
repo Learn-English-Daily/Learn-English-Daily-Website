@@ -8,6 +8,9 @@ import { Card } from "@/components/ui/card";
 const frameSrc = "/images/trial-twibbon-frame.png";
 const outputWidth = 1080;
 const outputHeight = 1080;
+const defaultGalleryTransform = { zoom: 1.1, x: 0, y: 0 };
+const minGalleryZoom = 1;
+const maxGalleryZoom = 2.2;
 
 function drawCoverImage(
   context: CanvasRenderingContext2D,
@@ -63,8 +66,32 @@ function drawAdjustedImage(
   context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function clampGalleryTransform(transform: { zoom: number; x: number; y: number }) {
+  return {
+    zoom: clamp(transform.zoom, minGalleryZoom, maxGalleryZoom),
+    x: clamp(transform.x, -35, 35),
+    y: clamp(transform.y, -35, 35)
+  };
+}
+
+function getPointerDistance(first: { x: number; y: number }, second: { x: number; y: number }) {
+  return Math.hypot(second.x - first.x, second.y - first.y);
+}
+
+function getPointerCenter(first: { x: number; y: number }, second: { x: number; y: number }) {
+  return {
+    x: (first.x + second.x) / 2,
+    y: (first.y + second.y) / 2
+  };
+}
+
 export function TwibbonCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const capturedImageRef = useRef("");
   const [cameraReady, setCameraReady] = useState(false);
@@ -74,8 +101,19 @@ export function TwibbonCamera() {
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [galleryImage, setGalleryImage] = useState("");
   const galleryImageRef = useRef("");
-  const [galleryTransform, setGalleryTransform] = useState({ zoom: 1.1, x: 0, y: 0 });
+  const [galleryTransform, setGalleryTransform] = useState(defaultGalleryTransform);
+  const galleryTransformRef = useRef(defaultGalleryTransform);
+  const gestureRef = useRef({
+    pointers: new Map<number, { x: number; y: number }>(),
+    lastCenter: null as { x: number; y: number } | null,
+    startDistance: 0,
+    startZoom: defaultGalleryTransform.zoom
+  });
   const isMirrored = facingMode === "user";
+
+  useEffect(() => {
+    galleryTransformRef.current = galleryTransform;
+  }, [galleryTransform]);
 
   useEffect(() => {
     return () => {
@@ -161,7 +199,7 @@ export function TwibbonCamera() {
     clearGalleryImage();
     galleryImageRef.current = photoUrl;
     setGalleryImage(photoUrl);
-    setGalleryTransform({ zoom: 1.1, x: 0, y: 0 });
+    setGalleryTransform(defaultGalleryTransform);
   }
 
   async function applyGalleryPhoto() {
@@ -213,6 +251,8 @@ export function TwibbonCamera() {
       galleryImageRef.current = "";
       return "";
     });
+    gestureRef.current.pointers.clear();
+    gestureRef.current.lastCenter = null;
   }
 
   function retakePhoto() {
@@ -224,6 +264,96 @@ export function TwibbonCamera() {
 function switchCamera() {
     const nextFacingMode = facingMode === "user" ? "environment" : "user";
     void startCamera(nextFacingMode);
+  }
+
+  function updateGalleryTransform(nextTransform: { zoom: number; x: number; y: number }) {
+    const clampedTransform = clampGalleryTransform(nextTransform);
+    galleryTransformRef.current = clampedTransform;
+    setGalleryTransform(clampedTransform);
+  }
+
+  function handlePreviewPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!galleryImage || capturedImage) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const pointers = gestureRef.current.pointers;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointers.size === 1) {
+      gestureRef.current.lastCenter = { x: event.clientX, y: event.clientY };
+      return;
+    }
+
+    const [first, second] = Array.from(pointers.values()).slice(0, 2);
+    gestureRef.current.startDistance = getPointerDistance(first, second);
+    gestureRef.current.startZoom = galleryTransformRef.current.zoom;
+    gestureRef.current.lastCenter = getPointerCenter(first, second);
+  }
+
+  function handlePreviewPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!galleryImage || capturedImage) return;
+
+    const preview = previewRef.current;
+    const pointers = gestureRef.current.pointers;
+    if (!preview || !pointers.has(event.pointerId)) return;
+
+    event.preventDefault();
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    const rect = preview.getBoundingClientRect();
+    const currentTransform = galleryTransformRef.current;
+
+    if (pointers.size === 1) {
+      const currentPoint = pointers.get(event.pointerId);
+      const lastCenter = gestureRef.current.lastCenter;
+      if (!currentPoint || !lastCenter) return;
+
+      updateGalleryTransform({
+        ...currentTransform,
+        x: currentTransform.x + ((currentPoint.x - lastCenter.x) / rect.width) * 100,
+        y: currentTransform.y + ((currentPoint.y - lastCenter.y) / rect.height) * 100
+      });
+      gestureRef.current.lastCenter = currentPoint;
+      return;
+    }
+
+    const [first, second] = Array.from(pointers.values()).slice(0, 2);
+    const center = getPointerCenter(first, second);
+    const lastCenter = gestureRef.current.lastCenter ?? center;
+    const distance = getPointerDistance(first, second);
+    const zoomRatio = gestureRef.current.startDistance ? distance / gestureRef.current.startDistance : 1;
+
+    updateGalleryTransform({
+      zoom: gestureRef.current.startZoom * zoomRatio,
+      x: currentTransform.x + ((center.x - lastCenter.x) / rect.width) * 100,
+      y: currentTransform.y + ((center.y - lastCenter.y) / rect.height) * 100
+    });
+    gestureRef.current.lastCenter = center;
+  }
+
+  function handlePreviewPointerEnd(event: React.PointerEvent<HTMLDivElement>) {
+    if (!galleryImage || capturedImage) return;
+
+    const pointers = gestureRef.current.pointers;
+    pointers.delete(event.pointerId);
+
+    if (pointers.size === 1) {
+      const [remainingPointer] = Array.from(pointers.values());
+      gestureRef.current.lastCenter = remainingPointer;
+      gestureRef.current.startZoom = galleryTransformRef.current.zoom;
+      return;
+    }
+
+    if (pointers.size >= 2) {
+      const [first, second] = Array.from(pointers.values()).slice(0, 2);
+      gestureRef.current.startDistance = getPointerDistance(first, second);
+      gestureRef.current.startZoom = galleryTransformRef.current.zoom;
+      gestureRef.current.lastCenter = getPointerCenter(first, second);
+      return;
+    }
+
+    gestureRef.current.lastCenter = null;
   }
 
   async function sharePhoto() {
@@ -255,7 +385,17 @@ function switchCamera() {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,560px)_1fr] lg:items-start">
       <Card className="overflow-hidden p-3 shadow-soft sm:p-5">
-        <div className="relative mx-auto aspect-square max-h-[76vh] w-full max-w-[560px] overflow-hidden rounded-[28px] bg-lead-navy shadow-soft">
+        <div
+          ref={previewRef}
+          className={`relative mx-auto aspect-square max-h-[76vh] w-full max-w-[560px] overflow-hidden rounded-[28px] bg-lead-navy shadow-soft ${
+            galleryImage && !capturedImage ? "cursor-grab touch-none active:cursor-grabbing" : ""
+          }`}
+          onPointerDown={handlePreviewPointerDown}
+          onPointerMove={handlePreviewPointerMove}
+          onPointerUp={handlePreviewPointerEnd}
+          onPointerCancel={handlePreviewPointerEnd}
+          onPointerLeave={handlePreviewPointerEnd}
+        >
           {capturedImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={capturedImage} alt="Captured LEAD trial twibbon" className="h-full w-full object-cover" />
@@ -301,13 +441,16 @@ function switchCamera() {
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {galleryImage && !capturedImage ? (
             <>
-              <AdjustSlider label="Zoom" min={1} max={2.2} step={0.02} value={galleryTransform.zoom} onChange={(zoom) => setGalleryTransform((current) => ({ ...current, zoom }))} />
-              <AdjustSlider label="Move Left / Right" min={-35} max={35} step={1} value={galleryTransform.x} onChange={(x) => setGalleryTransform((current) => ({ ...current, x }))} />
-              <AdjustSlider label="Move Up / Down" min={-35} max={35} step={1} value={galleryTransform.y} onChange={(y) => setGalleryTransform((current) => ({ ...current, y }))} />
+              <p className="rounded-lg bg-blue-50 px-3 py-2 text-center text-sm font-semibold text-lead-blue sm:col-span-2">
+                Drag the photo to move it. Pinch with two fingers to zoom.
+              </p>
+              <AdjustSlider label="Zoom" min={minGalleryZoom} max={maxGalleryZoom} step={0.02} value={galleryTransform.zoom} onChange={(zoom) => updateGalleryTransform({ ...galleryTransformRef.current, zoom })} />
+              <AdjustSlider label="Move Left / Right" min={-35} max={35} step={1} value={galleryTransform.x} onChange={(x) => updateGalleryTransform({ ...galleryTransformRef.current, x })} />
+              <AdjustSlider label="Move Up / Down" min={-35} max={35} step={1} value={galleryTransform.y} onChange={(y) => updateGalleryTransform({ ...galleryTransformRef.current, y })} />
               <Button type="button" size="lg" className="h-14 text-lg sm:col-span-2" onClick={() => void applyGalleryPhoto()}>
                 Apply Twibbon
               </Button>
-              <Button type="button" size="lg" variant="secondary" className="h-12 text-base" onClick={() => setGalleryTransform({ zoom: 1.1, x: 0, y: 0 })}>
+              <Button type="button" size="lg" variant="secondary" className="h-12 text-base" onClick={() => updateGalleryTransform(defaultGalleryTransform)}>
                 Reset Position
               </Button>
               <Button type="button" size="lg" variant="secondary" className="h-12 text-base" onClick={clearGalleryImage}>
