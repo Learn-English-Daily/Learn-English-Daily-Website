@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 
 const frameSrc = "/images/trial-twibbon-frame.png";
 const outputWidth = 1080;
-const outputHeight = 1620;
+const outputHeight = 1080;
 
 function drawCoverImage(
   context: CanvasRenderingContext2D,
@@ -62,7 +62,7 @@ export function TwibbonCamera() {
         video: {
           facingMode: nextFacingMode,
           width: { ideal: 1080 },
-          height: { ideal: 1620 }
+          height: { ideal: 1080 }
         },
         audio: false
       });
@@ -125,9 +125,9 @@ export function TwibbonCamera() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,440px)_1fr] lg:items-start">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,560px)_1fr] lg:items-start">
       <Card className="overflow-hidden p-4 shadow-soft sm:p-5">
-        <div className="relative mx-auto aspect-[2/3] max-h-[76vh] w-full max-w-[408px] overflow-hidden rounded-[28px] bg-lead-navy shadow-soft">
+        <div className="relative mx-auto aspect-square max-h-[76vh] w-full max-w-[560px] overflow-hidden rounded-[28px] bg-lead-navy shadow-soft">
           {capturedImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={capturedImage} alt="Captured LEAD trial twibbon" className="h-full w-full object-cover" />
@@ -163,7 +163,7 @@ export function TwibbonCamera() {
           </p>
           <h2 className="mt-4 font-heading text-2xl font-extrabold text-lead-navy">Capture your trial class photo</h2>
           <p className="mt-3 leading-7 text-lead-gray">
-            Open the camera, fit your face inside the frame, then capture and download the final twibbon image.
+            Open the camera, fit yourself inside the circle, then capture and download the final square twibbon image for Instagram.
             The photo is created inside your browser and is not uploaded.
           </p>
 
@@ -206,8 +206,8 @@ export function TwibbonCamera() {
           <h3 className="font-heading text-lg font-bold text-lead-navy">Tips</h3>
           <div className="mt-3 grid gap-2 text-sm leading-6 text-lead-gray">
             <p>Use good lighting so your face is clear.</p>
-            <p>Hold your phone vertically for the best fit.</p>
-            <p>After downloading, share the picture in your class group or social story.</p>
+            <p>Keep your face centered inside the circle.</p>
+            <p>After downloading, share the picture as an Instagram post, class group photo, or social story.</p>
           </div>
         </Card>
       </div>

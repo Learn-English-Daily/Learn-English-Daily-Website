@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "LEAD Trial Class Twibbon | Learn English Daily",
-  description: "Capture your LEAD free trial class photo with the official trial twibbon frame."
+  description: "Capture a square Instagram-ready LEAD free trial class photo with the official trial twibbon frame."
 };
 
 export default function TrialTwibbonPage() {
@@ -30,7 +30,7 @@ export default function TrialTwibbonPage() {
             Create Your LEAD Trial Twibbon
           </h1>
           <p className="mt-4 max-w-2xl text-lg leading-8 text-lead-gray">
-            Take a picture with the official LEAD frame and celebrate joining your free trial class.
+            Take a square Instagram-ready picture with the official LEAD frame and celebrate joining your free trial class.
           </p>
         </div>
       </section>
