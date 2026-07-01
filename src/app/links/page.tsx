@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
-import { Facebook, Globe, Instagram, Mail, MessageCircle, Music2 } from "lucide-react";
+import { Camera, Facebook, Globe, Instagram, Mail, MessageCircle, Music2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 const links = [
@@ -9,6 +9,12 @@ const links = [
     value: "www.learn-english-daily.com",
     href: "https://www.learn-english-daily.com",
     icon: Globe
+  },
+  {
+    label: "Trial Twibbon Camera",
+    value: "Create your LEAD trial class photo",
+    href: "https://www.learn-english-daily.com/trial-twibbon",
+    icon: Camera
   },
   {
     label: "TikTok + Daily Live Stream",
