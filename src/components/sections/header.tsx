@@ -35,6 +35,7 @@ export function Header({ locale, content }: { locale: Locale; content: SiteConte
   };
 
   const navIds = ["home", "courses", "about", "teachers", "testimonials", "pricing", "faq", "contact"];
+  const reviewFormLabel = locale === "id" ? "Form Review" : "Review Form";
 
   return (
     <header
@@ -64,6 +65,12 @@ export function Header({ locale, content }: { locale: Locale; content: SiteConte
               {item}
             </Link>
           ))}
+          <Link
+            href={`/${locale}/review`}
+            className="focus-ring rounded-lg px-3 py-2 text-sm font-semibold text-lead-gray hover:bg-slate-100 hover:text-lead-blue"
+          >
+            {reviewFormLabel}
+          </Link>
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
@@ -109,6 +116,13 @@ export function Header({ locale, content }: { locale: Locale; content: SiteConte
                 {item}
               </Link>
             ))}
+            <Link
+              href={`/${locale}/review`}
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-3 py-3 font-semibold text-lead-gray hover:bg-slate-100 hover:text-lead-blue"
+            >
+              {reviewFormLabel}
+            </Link>
             <div className="flex items-center gap-2 px-3 pt-2">
               <Button asChild variant={locale === "en" ? "primary" : "secondary"} size="sm">
                 <a href={getLocalizedHref("en")} onClick={() => rememberLanguage("en")}>

@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = "https://www.learn-english-daily.com";
-  const paths = ["", "/courses", "/about", "/blog", "/contact", "/student-registration", "/privacy-policy", "/terms"];
+  const paths = ["", "/courses", "/about", "/blog", "/contact", "/review", "/student-registration", "/privacy-policy", "/terms"];
   const standalonePaths = ["/links", "/trial-twibbon"];
   return [
     ...["en", "id"].flatMap((locale) =>

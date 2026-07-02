@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CheckCircle2, Mail, MessageCircle, Star } from "lucide-react";
+import { CheckCircle2, Mail, MessageCircle } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -332,23 +332,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </Reveal>
           <div className="mt-10 flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 [scrollbar-width:thin]">
             <ApprovedReviews />
-            {sharedContent.testimonials.map((student, index) => (
-              <Card key={student.name} className="w-[min(86vw,360px)] flex-none snap-start p-6">
-                <div className="flex items-center gap-4">
-                  <Image src={student.photo} alt={student.name} width={72} height={72} className="h-14 w-14 rounded-full object-cover" />
-                  <div>
-                    <h3 className="font-heading font-bold text-lead-navy">{student.name}</h3>
-                    <p className="text-sm text-lead-gray">{student.country}</p>
-                  </div>
-                </div>
-                <div className="mt-5 flex text-lead-yellow" aria-label="5 star rating">
-                  {Array.from({ length: 5 }).map((_, star) => (
-                    <Star key={star} className="h-4 w-4 fill-current" />
-                  ))}
-                </div>
-                <p className="mt-4 leading-7 text-lead-gray">{copy.feedback[index]}</p>
-              </Card>
-            ))}
           </div>
           <div className="mt-12 grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
             <Reveal>
