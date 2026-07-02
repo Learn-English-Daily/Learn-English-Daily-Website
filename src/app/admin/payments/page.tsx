@@ -245,8 +245,8 @@ export default async function AdminPaymentsPage({
         </div>
       </header>
 
-      <section className="container-shell grid gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="grid gap-6">
+      <section className="container-shell grid items-start gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">
           <Card className="p-4">
             <form action="/admin/payments" className="flex flex-col gap-3 md:flex-row">
               <label className="relative flex-1">
@@ -266,7 +266,7 @@ export default async function AdminPaymentsPage({
             </form>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-5 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
             <h2 className="font-heading text-xl font-bold text-lead-navy">Select student</h2>
             <div className="mt-4 grid gap-3">
               {students.map((student) => (
