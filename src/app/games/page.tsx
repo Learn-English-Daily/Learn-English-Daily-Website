@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, KeyRound, Link2, Lock, Mic, Puzzle, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, KeyRound, Lock, Mic, Puzzle, Sparkles, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -12,6 +12,7 @@ type GameCard = {
   icon: typeof Mic;
   accent: string;
   available: boolean;
+  href?: string;
 };
 
 export const metadata: Metadata = {
@@ -22,19 +23,21 @@ export const metadata: Metadata = {
 const games: GameCard[] = [
   {
     title: "Speech Competition Game",
-    description: "Practice memorization, pronunciation, and confident delivery through teacher-generated class links.",
-    status: "Private Class Link",
+    description: "Practice memorization, pronunciation, and confident delivery with live microphone feedback.",
+    status: "Available",
     icon: Mic,
     accent: "border-blue-100 bg-blue-50 text-lead-blue",
-    available: false
+    available: true,
+    href: "/games/speech-competition"
   },
   {
     title: "LEAD Escape Room",
-    description: "Unlock five English rooms, collect password digits, and escape through a teacher-generated class link.",
-    status: "Private Class Link",
+    description: "Unlock five English rooms, collect password digits, and escape with English challenges.",
+    status: "Available",
     icon: KeyRound,
     accent: "border-yellow-100 bg-yellow-50 text-yellow-700",
-    available: false
+    available: true,
+    href: "/games/escape-room"
   },
   {
     title: "Pronunciation Challenge",
@@ -168,10 +171,19 @@ export default function GamesPage() {
                     </div>
                     <h3 className="mt-5 font-heading text-xl font-bold text-lead-navy">{game.title}</h3>
                     <p className="mt-3 flex-1 text-sm leading-7 text-lead-gray">{game.description}</p>
-                    <Button disabled variant="secondary" className="mt-6">
-                      {game.status === "Private Class Link" ? <Link2 className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                      {game.status === "Private Class Link" ? "Teacher Link Required" : "Coming Soon"}
-                    </Button>
+                    {game.available && game.href ? (
+                      <Button asChild className="mt-6">
+                        <Link href={game.href}>
+                          Play Now
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button disabled variant="secondary" className="mt-6">
+                        <Lock className="h-4 w-4" />
+                        Coming Soon
+                      </Button>
+                    )}
                   </div>
                 </Card>
               );
