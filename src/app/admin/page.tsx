@@ -1,7 +1,16 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarClock, Mail, MessageCircle, Search } from "lucide-react";
-import type { Filter, WithId } from "mongodb";
+import {
+  AlertCircle,
+  ArrowRight,
+  CalendarCheck,
+  CalendarClock,
+  CreditCard,
+  Inbox,
+  Star,
+  Users
+} from "lucide-react";
+import type { WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -14,6 +23,9 @@ import {
   type ClassSessionDocument
 } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
+import { formatRupiah, getStudentPaymentsCollectionName } from "@/lib/payments";
+import { getReviewCollectionName } from "@/lib/reviews";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName, getTrialStudentFilter } from "@/lib/student-registration";
 
 export const dynamic = "force-dynamic";
 
@@ -22,82 +34,62 @@ type LeadDocument = {
   email?: string;
   whatsapp?: string;
   goal?: string;
-  locale?: string;
-  source?: string;
   createdAt?: Date;
 };
 
-type Lead = {
-  id: string;
-  name: string;
-  email: string;
-  whatsapp: string;
-  goal: string;
-  locale: string;
-  source: string;
-  createdAt: string;
+type PaymentDocument = {
+  status?: string;
+  amountDue?: number;
+  studentName?: string;
+  meetingNumber?: number;
+  meetingDate?: string;
+  createdAt?: Date;
 };
 
-type SessionReminder = {
-  id: string;
-  studentId: string;
-  studentName: string;
-  meetingNumber: number;
-  scheduledAt: string;
+type ReviewDocument = {
+  status?: string;
+  name?: string;
+  rating?: number;
+  createdAt?: Date;
 };
 
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+type DashboardData = {
+  todaySessions: Array<{
+    id: string;
+    studentName: string;
+    meetingNumber: number;
+    scheduledAt: string;
+    status: string;
+  }>;
+  needsAttendance: number;
+  unpaidPayments: number;
+  unpaidAmount: number;
+  newInquiries: number;
+  pendingReviews: number;
+  currentStudents: number;
+  trialStudents: number;
+  latestInquiry: {
+    name: string;
+    goal: string;
+  } | null;
+  latestUnpaid: {
+    studentName: string;
+    meetingNumber: number;
+    amountDue: number;
+  } | null;
+};
+
+function getTodayJakarta() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
 }
 
-async function getLeads(query = ""): Promise<Lead[]> {
-  const db = await getMongoDb();
-  const collectionName = process.env.MONGODB_COLLECTION || "leads";
-  const search = query.trim();
-  const filter: Filter<LeadDocument> = search
-    ? {
-        $or: ["name", "email", "whatsapp", "goal", "locale", "source"].map((field) => ({
-          [field]: { $regex: escapeRegex(search), $options: "i" }
-        }))
-      }
-    : {};
-  const docs = (await db.collection<LeadDocument>(collectionName).find(filter).sort({ createdAt: -1 }).limit(100).toArray()) as WithId<LeadDocument>[];
-
-  return docs.map((doc) => ({
-    id: doc._id.toString(),
-    name: doc.name || "Unknown",
-    email: doc.email || "",
-    whatsapp: doc.whatsapp || "",
-    goal: doc.goal || "",
-    locale: doc.locale || "en",
-    source: doc.source || "website",
-    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
-  }));
-}
-
-async function getSessionReminders(): Promise<SessionReminder[]> {
-  const db = await getMongoDb();
-  const docs = (await db
-    .collection<ClassSessionDocument>(getClassSessionsCollectionName())
-    .find({ status: { $ne: "Completed" } })
-    .sort({ scheduledAt: 1 })
-    .limit(20)
-    .toArray()) as WithId<ClassSessionDocument>[];
-
-  return docs
-    .filter((doc) => getComputedClassSessionStatus({ status: doc.status, scheduledAt: doc.scheduledAt, endsAt: doc.endsAt }) === "Needs Attendance")
-    .slice(0, 5)
-    .map((doc) => ({
-      id: doc._id.toString(),
-      studentId: doc.studentId || "",
-      studentName: doc.studentName || "Unknown",
-      meetingNumber: doc.meetingNumber || 0,
-      scheduledAt: doc.scheduledAt || ""
-    }));
-}
-
-function formatDate(value: string) {
-  if (!value) return "Unknown";
+function formatDateTime(value: string) {
+  if (!value) return "Time not set";
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -105,16 +97,89 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-export default async function AdminPage({
-  searchParams
-}: {
-  searchParams?: Promise<{ q?: string | string[] }>;
-}) {
+async function getDashboardData(): Promise<DashboardData> {
+  const db = await getMongoDb();
+  const today = getTodayJakarta();
+  const leadsCollectionName = process.env.MONGODB_COLLECTION || "leads";
+
+  const [
+    sessionDocs,
+    unpaidPayments,
+    newInquiries,
+    pendingReviews,
+    currentStudents,
+    trialStudents,
+    latestInquiry,
+    latestUnpaid
+  ] = await Promise.all([
+    db
+      .collection<ClassSessionDocument>(getClassSessionsCollectionName())
+      .find({ status: { $ne: "Completed" } })
+      .sort({ scheduledAt: 1 })
+      .limit(200)
+      .toArray() as Promise<WithId<ClassSessionDocument>[]>,
+    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ status: "Unpaid" }).limit(1000).toArray(),
+    db.collection<LeadDocument>(leadsCollectionName).countDocuments(),
+    db.collection<ReviewDocument>(getReviewCollectionName()).countDocuments({ status: "pending" }),
+    db.collection(getStudentRegistrationCollectionName()).countDocuments(getActiveStudentFilter()),
+    db.collection(getStudentRegistrationCollectionName()).countDocuments(getTrialStudentFilter()),
+    db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next(),
+    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ status: "Unpaid" }).sort({ meetingDate: -1, createdAt: -1 }).limit(1).next()
+  ]);
+
+  const todaySessions = sessionDocs
+    .filter((doc) => doc.sessionDate === today)
+    .slice(0, 5)
+    .map((doc) => ({
+      id: doc._id.toString(),
+      studentName: doc.studentName || "Unknown",
+      meetingNumber: doc.meetingNumber || 0,
+      scheduledAt: doc.scheduledAt || "",
+      status: getComputedClassSessionStatus({
+        status: doc.status,
+        scheduledAt: doc.scheduledAt,
+        endsAt: doc.endsAt
+      })
+    }));
+
+  const needsAttendance = sessionDocs.filter(
+    (doc) =>
+      getComputedClassSessionStatus({
+        status: doc.status,
+        scheduledAt: doc.scheduledAt,
+        endsAt: doc.endsAt
+      }) === "Needs Attendance"
+  ).length;
+
+  return {
+    todaySessions,
+    needsAttendance,
+    unpaidPayments: unpaidPayments.length,
+    unpaidAmount: unpaidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0),
+    newInquiries,
+    pendingReviews,
+    currentStudents,
+    trialStudents,
+    latestInquiry: latestInquiry
+      ? {
+          name: latestInquiry.name || "Unknown",
+          goal: latestInquiry.goal || "No message"
+        }
+      : null,
+    latestUnpaid: latestUnpaid
+      ? {
+          studentName: latestUnpaid.studentName || "Unknown",
+          meetingNumber: latestUnpaid.meetingNumber || 0,
+          amountDue: latestUnpaid.amountDue || 0
+        }
+      : null
+  };
+}
+
+export default async function AdminDashboardPage() {
   noStore();
   const cookieStore = await cookies();
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
-  const resolvedSearchParams = await searchParams;
-  const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
 
   if (!isAdminConfigured()) {
     return (
@@ -136,140 +201,206 @@ export default async function AdminPage({
       <main className="grid min-h-screen place-items-center bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#fff7d6_100%)] px-4 py-10">
         <Card className="w-full max-w-md p-8 shadow-soft">
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">View student inquiries</h1>
-          <p className="mt-3 leading-7 text-lead-gray">Sign in to see contact form submissions from MongoDB.</p>
+          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Admin dashboard</h1>
+          <p className="mt-3 leading-7 text-lead-gray">Sign in to see today&apos;s classes, payments, inquiries, and reviews.</p>
           <AdminLoginForm />
         </Card>
       </main>
     );
   }
 
-  const [leads, sessionReminders] = await Promise.all([getLeads(searchQuery), getSessionReminders()]);
+  const data = await getDashboardData();
 
   return (
     <main className="min-h-screen bg-lead-soft">
       <AdminPageHeader
-        active="inquiries"
-        title="Student inquiries"
-        description={
-          searchQuery
-            ? `Showing ${leads.length} result${leads.length === 1 ? "" : "s"} for "${searchQuery}".`
-            : `Showing latest ${leads.length} form submissions.`
-        }
+        active="dashboard"
+        title="Admin dashboard"
+        description="Start here after login: see today's classes, follow-ups, payments, inquiries, and reviews in one place."
         logoutAction={logoutAdmin}
       />
 
-      <section className="container-shell py-8">
-        {sessionReminders.length ? (
-          <Card className="mb-6 border-rose-100 bg-rose-50 p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <section className="container-shell grid gap-6 py-8">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <DashboardKpi icon={CalendarClock} label="Today's classes" value={data.todaySessions.length} detail="Scheduled for today" href="/admin/sessions" />
+          <DashboardKpi icon={AlertCircle} label="Need attendance" value={data.needsAttendance} detail="Past classes not closed" href="/admin/sessions" tone="rose" />
+          <DashboardKpi icon={CreditCard} label="Unpaid payments" value={data.unpaidPayments} detail={formatRupiah(data.unpaidAmount)} href="/admin/payments" tone="yellow" />
+          <DashboardKpi icon={Star} label="Pending reviews" value={data.pendingReviews} detail="Waiting approval" href="/admin/reviews" tone="blue" />
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <Card className="p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.12em] text-rose-700">
-                  <CalendarClock className="h-4 w-4" />
-                  Attendance needed
-                </p>
-                <h2 className="mt-2 font-heading text-2xl font-bold text-lead-navy">
-                  {sessionReminders.length} class{sessionReminders.length === 1 ? "" : "es"} need attendance
-                </h2>
-                <div className="mt-3 grid gap-2 text-sm text-lead-gray">
-                  {sessionReminders.map((session) => (
-                    <p key={session.id}>
-                      <span className="font-bold text-lead-navy">{session.studentName}</span> / Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)}
-                    </p>
-                  ))}
-                </div>
+                <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Today&apos;s classes</h2>
+                <p className="mt-1 text-sm text-lead-gray">Quick view of sessions scheduled for today.</p>
               </div>
               <Button asChild>
-                <a href="/admin/sessions">Open Class Sessions</a>
+                <a href="/admin/sessions">
+                  Open Sessions
+                  <ArrowRight className="h-4 w-4" />
+                </a>
               </Button>
             </div>
+            <div className="mt-5 grid gap-3">
+              {data.todaySessions.map((session) => (
+                <a key={session.id} href="/admin/sessions" className="focus-ring rounded-lg border border-slate-200 bg-white p-4 transition hover:border-lead-blue hover:bg-blue-50">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">Meeting {session.meetingNumber}</span>
+                    <span className="font-heading font-bold text-lead-navy">{session.studentName}</span>
+                    <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">{session.status}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-lead-gray">{formatDateTime(session.scheduledAt)}</p>
+                </a>
+              ))}
+              {!data.todaySessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No classes scheduled for today.</p> : null}
+            </div>
           </Card>
-        ) : null}
 
-        <Card className="mb-6 p-4">
-          <form action="/admin" className="flex flex-col gap-3 md:flex-row">
-            <label className="relative flex-1">
-              <span className="sr-only">Search inquiries</span>
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
-              <input
-                name="q"
-                defaultValue={searchQuery}
-                placeholder="Search by name, email, WhatsApp, message, locale..."
-                className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy"
-              />
-            </label>
-            <Button type="submit" size="lg">
-              <Search className="h-4 w-4" />
-              Search
-            </Button>
-            {searchQuery ? (
-              <Button asChild variant="secondary" size="lg">
-                <a href="/admin">Clear</a>
-              </Button>
-            ) : null}
-          </form>
-        </Card>
-        {leads.length ? (
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[920px] border-collapse text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-[0.08em] text-lead-gray">
-                  <tr>
-                    <th className="px-5 py-4">Student</th>
-                    <th className="px-5 py-4">Contact</th>
-                    <th className="px-5 py-4">Goal / message</th>
-                    <th className="px-5 py-4">Locale</th>
-                    <th className="px-5 py-4">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {leads.map((lead) => (
-                    <tr key={lead.id} className="align-top">
-                      <td className="px-5 py-5">
-                        <p className="font-heading text-base font-bold text-lead-navy">{lead.name}</p>
-                        <p className="mt-1 text-xs text-lead-gray">{lead.source}</p>
-                      </td>
-                      <td className="px-5 py-5">
-                        <div className="grid gap-2">
-                          {lead.email ? (
-                            <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-2 font-semibold text-lead-blue hover:text-blue-700">
-                              <Mail className="h-4 w-4" />
-                              {lead.email}
-                            </a>
-                          ) : null}
-                          {lead.whatsapp ? (
-                            <a
-                              href={`https://wa.me/${lead.whatsapp.replace(/\D/g, "")}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 font-semibold text-emerald-600 hover:text-emerald-700"
-                            >
-                              <MessageCircle className="h-4 w-4" />
-                              {lead.whatsapp}
-                            </a>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="max-w-md px-5 py-5 leading-7 text-lead-gray">{lead.goal}</td>
-                      <td className="px-5 py-5">
-                        <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">{lead.locale}</span>
-                      </td>
-                      <td className="px-5 py-5 text-lead-gray">{formatDate(lead.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="grid gap-6">
+            <Card className="p-5">
+              <h2 className="font-heading text-xl font-extrabold text-lead-navy">Quick actions</h2>
+              <div className="mt-4 grid gap-3">
+                <QuickAction href="/admin/sessions" label="Schedule class" icon={CalendarClock} />
+                <QuickAction href="/admin/attendance" label="Mark attendance" icon={CalendarCheck} />
+                <QuickAction href="/admin/payments" label="Open payments" icon={CreditCard} />
+                <QuickAction href="/admin/students" label="View students" icon={Users} />
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <h2 className="font-heading text-xl font-extrabold text-lead-navy">Pipeline</h2>
+              <div className="mt-4 grid gap-3 text-sm">
+                <PipelineItem label="Current students" value={data.currentStudents} href="/admin/students" />
+                <PipelineItem label="Trial students" value={data.trialStudents} href="/admin/students/trials" />
+                <PipelineItem label="Total inquiries" value={data.newInquiries} href="/admin/inquiries" />
+              </div>
+            </Card>
           </div>
-        ) : (
-          <Card className="p-8 text-center">
-            <h2 className="font-heading text-2xl font-bold text-lead-navy">{searchQuery ? "No matching inquiries" : "No inquiries yet"}</h2>
-            <p className="mt-3 text-lead-gray">
-              {searchQuery ? "Try a different name, email, WhatsApp number, or message keyword." : "New contact form submissions will appear here."}
-            </p>
-          </Card>
-        )}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <InsightCard
+            icon={Inbox}
+            title="Latest inquiry"
+            href="/admin/inquiries"
+            action="Open inquiries"
+            empty="No inquiries yet."
+            lines={data.latestInquiry ? [data.latestInquiry.name, data.latestInquiry.goal] : []}
+          />
+          <InsightCard
+            icon={CreditCard}
+            title="Latest unpaid payment"
+            href="/admin/payments"
+            action="Open payments"
+            empty="No unpaid payments."
+            lines={
+              data.latestUnpaid
+                ? [data.latestUnpaid.studentName, `Meeting ${data.latestUnpaid.meetingNumber} / ${formatRupiah(data.latestUnpaid.amountDue)}`]
+                : []
+            }
+          />
+        </div>
       </section>
     </main>
+  );
+}
+
+function DashboardKpi({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  href,
+  tone = "navy"
+}: {
+  icon: typeof CalendarClock;
+  label: string;
+  value: number;
+  detail: string;
+  href: string;
+  tone?: "navy" | "rose" | "yellow" | "blue";
+}) {
+  const toneClassName =
+    tone === "rose"
+      ? "bg-rose-50 text-rose-700"
+      : tone === "yellow"
+        ? "bg-yellow-50 text-yellow-800"
+        : tone === "blue"
+          ? "bg-blue-50 text-lead-blue"
+          : "bg-slate-100 text-lead-navy";
+
+  return (
+    <a href={href} className="focus-ring rounded-2xl border border-white bg-white p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-blue-100">
+      <span className={`grid h-12 w-12 place-items-center rounded-xl ${toneClassName}`}>
+        <Icon className="h-6 w-6" />
+      </span>
+      <p className="mt-5 text-sm font-bold uppercase tracking-[0.12em] text-lead-gray">{label}</p>
+      <p className="mt-2 font-heading text-4xl font-extrabold text-lead-navy">{value}</p>
+      <p className="mt-1 text-sm font-semibold text-lead-gray">{detail}</p>
+    </a>
+  );
+}
+
+function QuickAction({ href, label, icon: Icon }: { href: string; label: string; icon: typeof CalendarClock }) {
+  return (
+    <a href={href} className="focus-ring flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 font-bold text-lead-navy transition hover:border-lead-blue hover:bg-blue-50">
+      <span className="inline-flex items-center gap-3">
+        <span className="grid h-9 w-9 place-items-center rounded-lg bg-blue-50 text-lead-blue">
+          <Icon className="h-5 w-5" />
+        </span>
+        {label}
+      </span>
+      <ArrowRight className="h-4 w-4 text-lead-gray" />
+    </a>
+  );
+}
+
+function PipelineItem({ label, value, href }: { label: string; value: number; href: string }) {
+  return (
+    <a href={href} className="focus-ring flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 font-semibold text-lead-gray transition hover:bg-blue-50 hover:text-lead-blue">
+      <span>{label}</span>
+      <span className="font-heading text-lg font-extrabold text-lead-navy">{value}</span>
+    </a>
+  );
+}
+
+function InsightCard({
+  icon: Icon,
+  title,
+  lines,
+  empty,
+  href,
+  action
+}: {
+  icon: typeof Inbox;
+  title: string;
+  lines: string[];
+  empty: string;
+  href: string;
+  action: string;
+}) {
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-lead-blue">
+            <Icon className="h-5 w-5" />
+          </span>
+          <h2 className="mt-4 font-heading text-xl font-extrabold text-lead-navy">{title}</h2>
+        </div>
+        <Button asChild variant="secondary" size="sm">
+          <a href={href}>{action}</a>
+        </Button>
+      </div>
+      {lines.length ? (
+        <div className="mt-4 rounded-lg bg-slate-50 p-4">
+          <p className="font-heading font-bold text-lead-navy">{lines[0]}</p>
+          <p className="mt-2 text-sm leading-6 text-lead-gray">{lines[1]}</p>
+        </div>
+      ) : (
+        <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">{empty}</p>
+      )}
+    </Card>
   );
 }

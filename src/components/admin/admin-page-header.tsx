@@ -2,13 +2,14 @@ import {
   CalendarCheck,
   CalendarClock,
   CreditCard,
+  Gauge,
   Inbox,
   MessageSquareText,
   Star,
   Users
 } from "lucide-react";
 
-type AdminPageKey = "inquiries" | "sessions" | "attendance" | "payments" | "students" | "reviews";
+type AdminPageKey = "dashboard" | "inquiries" | "sessions" | "attendance" | "payments" | "students" | "reviews";
 
 const adminNavItems: Array<{
   key: AdminPageKey;
@@ -17,7 +18,8 @@ const adminNavItems: Array<{
   helper: string;
   icon: typeof Inbox;
 }> = [
-  { key: "inquiries", label: "Inquiries", href: "/admin", helper: "New leads", icon: Inbox },
+  { key: "dashboard", label: "Dashboard", href: "/admin", helper: "Daily overview", icon: Gauge },
+  { key: "inquiries", label: "Inquiries", href: "/admin/inquiries", helper: "New leads", icon: Inbox },
   { key: "sessions", label: "Sessions", href: "/admin/sessions", helper: "Class schedule", icon: CalendarClock },
   { key: "attendance", label: "Attendance", href: "/admin/attendance", helper: "Meeting records", icon: CalendarCheck },
   { key: "payments", label: "Payments", href: "/admin/payments", helper: "Fees & receipts", icon: CreditCard },
@@ -61,7 +63,7 @@ export function AdminPageHeader({
           </form>
         </div>
 
-        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Admin navigation">
+        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7" aria-label="Admin navigation">
           {adminNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;
