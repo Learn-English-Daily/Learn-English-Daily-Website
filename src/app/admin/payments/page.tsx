@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { ExternalLink, ReceiptText, RefreshCcw, Search } from "lucide-react";
+import { ExternalLink, ReceiptText, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { updateStudentPaymentStatus } from "@/app/admin/payments/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 import {
@@ -219,31 +220,12 @@ export default async function AdminPaymentsPage({
 
   return (
     <main className="min-h-screen bg-lead-soft">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="container-shell flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Student payments</h1>
-            <p className="mt-2 text-sm text-lead-gray">Payment records are created automatically from Present or Late attendance.</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild variant="secondary"><a href="/admin/attendance">Attendance</a></Button>
-            <Button asChild variant="secondary"><a href="/admin/sessions">Class Sessions</a></Button>
-            <Button asChild variant="secondary"><a href="/admin/students">Registrations</a></Button>
-            <Button asChild variant="secondary"><a href="/admin/reviews">Reviews</a></Button>
-            <Button asChild variant="secondary"><a href="/admin">Inquiries</a></Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/payments">
-                <RefreshCcw className="h-4 w-4" />
-                Refresh
-              </a>
-            </Button>
-            <form action={logoutAdmin}>
-              <Button type="submit" variant="primary">Logout</Button>
-            </form>
-          </div>
-        </div>
-      </header>
+      <AdminPageHeader
+        active="payments"
+        title="Student payments"
+        description="Payment records are created automatically from Present or Late attendance."
+        logoutAction={logoutAdmin}
+      />
 
       <section className="container-shell grid items-start gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">

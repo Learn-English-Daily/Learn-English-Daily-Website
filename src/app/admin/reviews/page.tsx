@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { RefreshCcw, Search, Star } from "lucide-react";
+import { Search, Star } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { updateReviewStatus } from "@/app/admin/reviews/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 import { getReviewCollectionName, type ReviewDisplayOption, type ReviewRole, type ReviewStatus } from "@/lib/reviews";
@@ -139,43 +140,16 @@ export default async function AdminReviewsPage({
 
   return (
     <main className="min-h-screen bg-lead-soft">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="container-shell flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Student and parent reviews</h1>
-            <p className="mt-2 text-sm text-lead-gray">
-              {searchQuery ? `Showing ${reviews.length} result${reviews.length === 1 ? "" : "s"} for "${searchQuery}".` : `Showing latest ${reviews.length} review submissions.`}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild variant="secondary">
-              <a href="/admin/attendance">Attendance</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/sessions">Class Sessions</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/payments">Payments</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/students">Registrations</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin">Inquiries</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/reviews">
-                <RefreshCcw className="h-4 w-4" />
-                Refresh
-              </a>
-            </Button>
-            <form action={logoutAdmin}>
-              <Button type="submit" variant="primary">Logout</Button>
-            </form>
-          </div>
-        </div>
-      </header>
+      <AdminPageHeader
+        active="reviews"
+        title="Student and parent reviews"
+        description={
+          searchQuery
+            ? `Showing ${reviews.length} result${reviews.length === 1 ? "" : "s"} for "${searchQuery}".`
+            : `Showing latest ${reviews.length} review submissions.`
+        }
+        logoutAction={logoutAdmin}
+      />
 
       <section className="container-shell py-8">
         <Card className="mb-6 p-4">

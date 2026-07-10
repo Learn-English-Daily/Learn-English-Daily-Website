@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarCheck, RefreshCcw, Search } from "lucide-react";
+import { CalendarCheck, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
 import { saveStudentAttendance, updateStudentAttendance } from "@/app/admin/attendance/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
@@ -266,31 +267,12 @@ export default async function AdminAttendancePage({
 
   return (
     <main className="min-h-screen bg-lead-soft">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="container-shell flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Student attendance</h1>
-            <p className="mt-2 text-sm text-lead-gray">Mark attendance by meeting and review each student&apos;s class history.</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild variant="secondary"><a href="/admin/payments">Payments</a></Button>
-            <Button asChild variant="secondary"><a href="/admin/sessions">Class Sessions</a></Button>
-            <Button asChild variant="secondary"><a href="/admin/students">Registrations</a></Button>
-            <Button asChild variant="secondary"><a href="/admin/reviews">Reviews</a></Button>
-            <Button asChild variant="secondary"><a href="/admin">Inquiries</a></Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/attendance">
-                <RefreshCcw className="h-4 w-4" />
-                Refresh
-              </a>
-            </Button>
-            <form action={logoutAdmin}>
-              <Button type="submit" variant="primary">Logout</Button>
-            </form>
-          </div>
-        </div>
-      </header>
+      <AdminPageHeader
+        active="attendance"
+        title="Student attendance"
+        description="Mark attendance by meeting and review each student's class history."
+        logoutAction={logoutAdmin}
+      />
 
       <section className="container-shell grid items-start gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">

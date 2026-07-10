@@ -1,11 +1,12 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { MessageCircle, Pencil, QrCode, RefreshCcw, Search } from "lucide-react";
+import { MessageCircle, Pencil, QrCode, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 import {
@@ -194,48 +195,32 @@ export default async function AdminStudentsPage({
 
   return (
     <main className="min-h-screen bg-lead-soft">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="container-shell flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">{pageTitle}</h1>
-            <p className="mt-2 text-sm text-lead-gray">
-              {searchQuery ? `Showing ${registrations.length} result${registrations.length === 1 ? "" : "s"} for "${searchQuery}".` : `Showing latest ${registrations.length} ${isTrialView ? "trial" : "current"} registrations.`}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
+      <AdminPageHeader
+        active="students"
+        title={pageTitle}
+        description={
+          searchQuery
+            ? `Showing ${registrations.length} result${registrations.length === 1 ? "" : "s"} for "${searchQuery}".`
+            : `Showing latest ${registrations.length} ${isTrialView ? "trial" : "current"} registrations.`
+        }
+        logoutAction={logoutAdmin}
+      />
+
+      <section className="container-shell py-8">
+        <Card className="mb-6 border-blue-100 bg-white/90 p-4 shadow-soft">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="font-heading text-lg font-bold text-lead-navy">Student list view</h2>
+              <p className="mt-1 text-sm text-lead-gray">
+                {isTrialView ? "You are viewing trial class students." : "You are viewing current course students."}
+              </p>
+            </div>
             <Button asChild variant={isTrialView ? "primary" : "secondary"}>
               <a href={otherPath}>{isTrialView ? "Current Students" : "Trial Students"}</a>
             </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/attendance">Attendance</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/sessions">Class Sessions</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/payments">Payments</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin">Inquiries</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/reviews">Reviews</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href={pagePath}>
-                <RefreshCcw className="h-4 w-4" />
-                Refresh
-              </a>
-            </Button>
-            <form action={logoutAdmin}>
-              <Button type="submit" variant="primary">Logout</Button>
-            </form>
           </div>
-        </div>
-      </header>
+        </Card>
 
-      <section className="container-shell py-8">
         <Card className="mb-6 p-4">
           <form action="/admin/students" className="flex flex-col gap-3 md:flex-row">
             {isTrialView ? <input type="hidden" name="view" value="trial" /> : null}

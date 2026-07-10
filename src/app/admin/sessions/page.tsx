@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarClock, CalendarCheck, Gamepad2, Pencil, RefreshCcw, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarCheck, Gamepad2, Pencil, Trash2 } from "lucide-react";
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -15,6 +15,7 @@ import { GchatSessionMessage } from "@/app/admin/sessions/gchat-session-message"
 import { TemporaryMeetLink } from "@/app/admin/sessions/temporary-meet-link";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
@@ -308,30 +309,12 @@ export default async function AdminSessionsPage() {
 
   return (
     <main className="min-h-screen bg-lead-soft">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="container-shell flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Class sessions</h1>
-            <p className="mt-2 text-sm text-lead-gray">Schedule classes first, then close them by marking attendance.</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild variant="secondary"><a href="/admin/attendance">Attendance</a></Button>
-            <Button asChild variant="secondary"><a href="/admin/payments">Payments</a></Button>
-            <Button asChild variant="secondary"><a href="/admin/students">Registrations</a></Button>
-            <Button asChild variant="secondary"><a href="/admin">Inquiries</a></Button>
-            <Button asChild variant="secondary">
-              <a href="/admin/sessions">
-                <RefreshCcw className="h-4 w-4" />
-                Refresh
-              </a>
-            </Button>
-            <form action={logoutAdmin}>
-              <Button type="submit" variant="primary">Logout</Button>
-            </form>
-          </div>
-        </div>
-      </header>
+      <AdminPageHeader
+        active="sessions"
+        title="Class sessions"
+        description="Schedule classes first, then close them by marking attendance."
+        logoutAction={logoutAdmin}
+      />
 
       <section className="container-shell grid gap-6 py-8 2xl:grid-cols-[0.85fr_1.15fr]">
         <div className="grid gap-6 content-start">
