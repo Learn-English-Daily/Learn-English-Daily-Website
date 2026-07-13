@@ -35,6 +35,7 @@ type AttendanceDocument = {
   meetingNumber?: number;
   meetingDate?: string;
   status?: AttendanceStatus;
+  classMode?: string;
   notes?: string;
   teacherNames?: string[];
   createdAt?: Date;
@@ -50,6 +51,7 @@ type Attendance = {
   meetingNumber: number;
   meetingDate: string;
   status: AttendanceStatus;
+  classMode: string;
   notes: string;
   teacherNames: string[];
 };
@@ -100,6 +102,7 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
       meetingNumber: record.meetingNumber || 0,
       meetingDate: record.meetingDate || "",
       status: record.status || "Present",
+      classMode: record.classMode || "Online",
       notes: record.notes || "",
       teacherNames: record.teacherNames || []
     }))
@@ -185,9 +188,14 @@ export default async function ParentAttendancePortalPage({
                       <p className="text-sm font-bold uppercase tracking-[0.12em] text-lead-gray">Meeting {latestAttendance.meetingNumber}</p>
                       <p className="mt-2 font-heading text-2xl font-bold text-lead-navy">{formatDate(latestAttendance.meetingDate)}</p>
                     </div>
-                    <span className={`w-fit rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(latestAttendance.status)}`}>
-                      {latestAttendance.status}
-                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`w-fit rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(latestAttendance.status)}`}>
+                        {latestAttendance.status}
+                      </span>
+                      <span className="w-fit rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">
+                        {latestAttendance.classMode}
+                      </span>
+                    </div>
                   </div>
                   <p className="mt-3 text-sm text-lead-gray">
                     <span className="font-bold text-lead-navy">Teachers:</span> {latestAttendance.teacherNames.length ? latestAttendance.teacherNames.join(", ") : "Not assigned"}

@@ -31,6 +31,7 @@ type StudentDocument = {
   whatsapp?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   englishLevel?: string;
 };
 
@@ -42,6 +43,7 @@ type Student = {
   whatsapp: string;
   courseJoined: string;
   classType: string;
+  classMode: string;
   englishLevel: string;
 };
 
@@ -50,6 +52,7 @@ type PaymentDocument = {
   studentName?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   meetingNumber?: number;
   meetingDate?: string;
   amountDue?: number;
@@ -75,6 +78,7 @@ type Payment = {
   receiptUploadedToDrive: boolean;
   source: string;
   attendanceStatus: string;
+  classMode: string;
   createdAt: string;
 };
 
@@ -117,6 +121,7 @@ async function getStudents(query = ""): Promise<Student[]> {
     whatsapp: doc.whatsapp || "",
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
+    classMode: doc.classMode || "",
     englishLevel: doc.englishLevel || ""
   }));
 }
@@ -138,6 +143,7 @@ async function getSelectedStudent(studentId = "") {
     whatsapp: doc.whatsapp || "",
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
+    classMode: doc.classMode || "",
     englishLevel: doc.englishLevel || ""
   };
 }
@@ -165,6 +171,7 @@ async function getPayments(studentId = ""): Promise<Payment[]> {
     receiptUploadedToDrive: doc.receiptUploadedToDrive === true,
     source: doc.source || "",
     attendanceStatus: doc.attendanceStatus || "",
+    classMode: doc.classMode || "",
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
   }));
 }
@@ -263,7 +270,7 @@ export default async function AdminPaymentsPage({
                     <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{student.studentId || "No ID"}</span>
                     <span className="font-heading font-bold text-lead-navy">{student.studentName}</span>
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined} / {student.classType}</p>
+                  <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined} / {student.classType} / {student.classMode || "Mode not set"}</p>
                   <p className="mt-1 text-xs text-lead-gray">Parent: {student.parentName || "Not set"}</p>
                 </a>
               ))}
@@ -282,7 +289,7 @@ export default async function AdminPaymentsPage({
                       <h2 className="font-heading text-2xl font-bold text-lead-navy">{selectedStudent.studentName}</h2>
                       <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{selectedStudent.studentId}</span>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-lead-gray">{selectedStudent.courseJoined} / {selectedStudent.classType}</p>
+                    <p className="mt-2 text-sm font-semibold text-lead-gray">{selectedStudent.courseJoined} / {selectedStudent.classType} / {selectedStudent.classMode || "Mode not set"}</p>
                     <p className="mt-2 text-sm text-lead-gray">Mark attendance as Present or Late to generate a payment due for that meeting.</p>
                   </div>
                   <div className="grid gap-2 text-sm font-bold md:text-right">
@@ -314,6 +321,11 @@ export default async function AdminPaymentsPage({
                             {payment.attendanceStatus ? (
                               <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">
                                 {payment.attendanceStatus}
+                              </span>
+                            ) : null}
+                            {payment.classMode ? (
+                              <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">
+                                {payment.classMode}
                               </span>
                             ) : null}
                             {payment.receiptUploadedToDrive ? (

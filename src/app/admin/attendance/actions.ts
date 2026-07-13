@@ -16,6 +16,7 @@ import {
   getStudentPaymentsCollectionName,
   getSuggestedPerMeetingPrice
 } from "@/lib/payments";
+import { isClassMode } from "@/lib/student-registration";
 import {
   ensureDefaultTeachers,
   getTeachersCollectionName,
@@ -71,6 +72,7 @@ async function syncPaymentFromAttendance({
   studentName,
   courseJoined,
   classType,
+  classMode,
   meetingNumber,
   meetingDate,
   status
@@ -79,6 +81,7 @@ async function syncPaymentFromAttendance({
   studentName: string;
   courseJoined: string;
   classType: string;
+  classMode: string;
   meetingNumber: number;
   meetingDate: string;
   status: AttendanceStatus;
@@ -98,6 +101,7 @@ async function syncPaymentFromAttendance({
       {
         $set: {
           meetingDate,
+          classMode,
           attendanceStatus: status,
           updatedAt: new Date()
         }
@@ -122,6 +126,7 @@ async function syncPaymentFromAttendance({
         studentName,
         courseJoined,
         classType,
+        classMode,
         meetingNumber,
         meetingDate,
         amountDue,
@@ -149,12 +154,13 @@ export async function saveStudentAttendance(formData: FormData) {
   const studentName = clean(formData.get("studentName"));
   const courseJoined = clean(formData.get("courseJoined"));
   const classType = clean(formData.get("classType"));
+  const classMode = clean(formData.get("classMode"));
   const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
   const meetingDate = clean(formData.get("meetingDate"));
   const status = clean(formData.get("status")) as AttendanceStatus;
   const notes = clean(formData.get("notes"));
 
-  if (!studentId || !studentName || !courseJoined || !classType || !meetingNumber || !meetingDate || !isAttendanceStatus(status)) {
+  if (!studentId || !studentName || !courseJoined || !classType || !isClassMode(classMode) || !meetingNumber || !meetingDate || !isAttendanceStatus(status)) {
     throw new Error("Invalid attendance record");
   }
 
@@ -169,6 +175,7 @@ export async function saveStudentAttendance(formData: FormData) {
         studentName,
         courseJoined,
         classType,
+        classMode,
         meetingNumber,
         meetingDate,
         status,
@@ -188,6 +195,7 @@ export async function saveStudentAttendance(formData: FormData) {
     studentName,
     courseJoined,
     classType,
+    classMode,
     meetingNumber,
     meetingDate,
     status
@@ -208,10 +216,11 @@ export async function updateStudentAttendance(formData: FormData) {
 
   const id = clean(formData.get("id"));
   const meetingDate = clean(formData.get("meetingDate"));
+  const classMode = clean(formData.get("classMode"));
   const status = clean(formData.get("status")) as AttendanceStatus;
   const notes = clean(formData.get("notes"));
 
-  if (!ObjectId.isValid(id) || !meetingDate || !isAttendanceStatus(status)) {
+  if (!ObjectId.isValid(id) || !meetingDate || !isClassMode(classMode) || !isAttendanceStatus(status)) {
     throw new Error("Invalid attendance update");
   }
 
@@ -222,6 +231,7 @@ export async function updateStudentAttendance(formData: FormData) {
     studentName?: string;
     courseJoined?: string;
     classType?: string;
+    classMode?: string;
     meetingNumber?: number;
   }>(getStudentAttendanceCollectionName()).findOne({ _id: new ObjectId(id) });
 
@@ -240,6 +250,7 @@ export async function updateStudentAttendance(formData: FormData) {
     {
       $set: {
         meetingDate,
+        classMode,
         status,
         notes,
         teacherIds,
@@ -253,6 +264,7 @@ export async function updateStudentAttendance(formData: FormData) {
     studentName: existingAttendance.studentName,
     courseJoined: existingAttendance.courseJoined,
     classType: existingAttendance.classType,
+    classMode,
     meetingNumber: existingAttendance.meetingNumber,
     meetingDate,
     status

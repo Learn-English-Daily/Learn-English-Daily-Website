@@ -19,7 +19,7 @@ import {
   type GameSessionDocument
 } from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
-import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName, isClassMode } from "@/lib/student-registration";
 import {
   ensureDefaultTeachers,
   getTeachersCollectionName,
@@ -86,6 +86,7 @@ export async function createClassSession(formData: FormData) {
   const studentId = clean(formData.get("studentId"));
   const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
   const sessionDate = clean(formData.get("sessionDate"));
+  const selectedClassMode = clean(formData.get("classMode"));
   const { startTime, endTime } = resolveSessionTimes(formData);
 
   if (!studentId || !meetingNumber || !sessionDate || !startTime || !endTime) {
@@ -98,6 +99,7 @@ export async function createClassSession(formData: FormData) {
     studentName?: string;
     courseJoined?: string;
     classType?: string;
+    classMode?: string;
   }>(getStudentRegistrationCollectionName()).findOne({
     $and: [{ studentId }, getActiveStudentFilter()]
   });
@@ -107,6 +109,7 @@ export async function createClassSession(formData: FormData) {
   }
 
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
+  const classMode = isClassMode(selectedClassMode) ? selectedClassMode : isClassMode(student.classMode || "") ? student.classMode || "" : "Online";
   const now = new Date();
 
   await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
@@ -117,6 +120,7 @@ export async function createClassSession(formData: FormData) {
         studentName: student.studentName,
         courseJoined: student.courseJoined || "",
         classType: student.classType || "",
+        classMode,
         meetingNumber,
         sessionDate,
         sessionTime: startTime,
@@ -147,9 +151,10 @@ export async function updateClassSession(formData: FormData) {
   const id = clean(formData.get("id"));
   const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
   const sessionDate = clean(formData.get("sessionDate"));
+  const classMode = clean(formData.get("classMode"));
   const { startTime, endTime } = resolveSessionTimes(formData);
 
-  if (!ObjectId.isValid(id) || !meetingNumber || !sessionDate || !startTime || !endTime) {
+  if (!ObjectId.isValid(id) || !meetingNumber || !sessionDate || !startTime || !endTime || !isClassMode(classMode)) {
     throw new Error("Invalid class session update");
   }
 
@@ -162,6 +167,7 @@ export async function updateClassSession(formData: FormData) {
       $set: {
         meetingNumber,
         sessionDate,
+        classMode,
         sessionTime: startTime,
         startTime,
         endTime,

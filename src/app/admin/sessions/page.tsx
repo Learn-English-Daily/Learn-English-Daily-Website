@@ -33,7 +33,7 @@ import {
   type GameSessionDocument
 } from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
-import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { classModeOptions, getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
   ensureDefaultTeachers,
   getTeachersCollectionName,
@@ -48,6 +48,7 @@ type StudentDocument = {
   parentName?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
 };
 
 type Student = {
@@ -57,6 +58,7 @@ type Student = {
   parentName: string;
   courseJoined: string;
   classType: string;
+  classMode: string;
 };
 
 type Teacher = {
@@ -75,6 +77,7 @@ type ClassSession = {
   studentName: string;
   courseJoined: string;
   classType: string;
+  classMode: string;
   meetingNumber: number;
   sessionDate: string;
   sessionTime: string;
@@ -108,7 +111,8 @@ async function getStudents(): Promise<Student[]> {
     studentName: doc.studentName || "Unknown",
     parentName: doc.parentName || "",
     courseJoined: doc.courseJoined || "",
-    classType: doc.classType || ""
+    classType: doc.classType || "",
+    classMode: doc.classMode || "Online"
   }));
 }
 
@@ -170,6 +174,7 @@ async function getSessions(): Promise<ClassSession[]> {
       studentName: doc.studentName || "Unknown",
       courseJoined: doc.courseJoined || "",
       classType: doc.classType || "",
+      classMode: doc.classMode || "Online",
       meetingNumber,
       sessionDate: doc.sessionDate || "",
       sessionTime: doc.startTime || doc.sessionTime || "",
@@ -230,6 +235,7 @@ function attendanceHref(session: ClassSession) {
     meetingNumber: String(session.meetingNumber),
     meetingDate: session.sessionDate
   });
+  params.set("classMode", session.classMode);
 
   for (const teacherId of session.teacherIds) {
     params.append("teacherIds", teacherId);
@@ -347,6 +353,11 @@ export default async function AdminSessionsPage() {
                 <Field label="To Time">
                   <input name="endTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
+                <Field label="Class Mode">
+                  <select name="classMode" required defaultValue="Online" className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy">
+                    {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </Field>
               </div>
               <TeacherSelector teachers={teachers} />
               <Button type="submit" size="lg" className="w-full sm:w-fit">
@@ -383,7 +394,7 @@ export default async function AdminSessionsPage() {
                     <p className="mt-2 text-sm font-semibold text-lead-gray">
                       Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
                     </p>
-                    <p className="mt-1 text-sm text-lead-gray">{session.courseJoined} / {session.classType || "Class type not set"}</p>
+                    <p className="mt-1 text-sm text-lead-gray">{session.courseJoined} / {session.classType || "Class type not set"} / {session.classMode}</p>
                     <p className="mt-1 text-sm text-lead-gray">
                       <span className="font-bold text-lead-navy">Teachers:</span> {session.teacherNames.length ? session.teacherNames.join(", ") : "Not assigned"}
                     </p>
@@ -432,6 +443,11 @@ export default async function AdminSessionsPage() {
                         </Field>
                         <Field label="To Time">
                           <input name="endTime" type="time" required defaultValue={session.endTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+                        </Field>
+                        <Field label="Class Mode">
+                          <select name="classMode" required defaultValue={session.classMode} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy">
+                            {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
                         </Field>
                         <TeacherSelector teachers={teachers} selectedTeacherIds={session.teacherIds} compact />
                         <Button type="submit" size="sm" className="sm:col-span-2">Update Class Session</Button>

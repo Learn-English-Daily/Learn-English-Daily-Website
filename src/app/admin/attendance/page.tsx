@@ -17,7 +17,7 @@ import {
   type AttendanceStatus
 } from "@/lib/attendance";
 import { getMongoDb } from "@/lib/mongodb";
-import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { classModeOptions, getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
   ensureDefaultTeachers,
   getTeachersCollectionName,
@@ -33,6 +33,7 @@ type StudentDocument = {
   whatsapp?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   englishLevel?: string;
 };
 
@@ -44,6 +45,7 @@ type Student = {
   whatsapp: string;
   courseJoined: string;
   classType: string;
+  classMode: string;
   englishLevel: string;
 };
 
@@ -52,6 +54,7 @@ type AttendanceDocument = {
   studentName?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   meetingNumber?: number;
   meetingDate?: string;
   status?: AttendanceStatus;
@@ -66,6 +69,7 @@ type Attendance = {
   meetingNumber: number;
   meetingDate: string;
   status: AttendanceStatus;
+  classMode: string;
   notes: string;
   teacherIds: string[];
   teacherNames: string[];
@@ -116,6 +120,7 @@ async function getStudents(query = ""): Promise<Student[]> {
     whatsapp: doc.whatsapp || "",
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
+    classMode: doc.classMode || "Online",
     englishLevel: doc.englishLevel || ""
   }));
 }
@@ -137,6 +142,7 @@ async function getSelectedStudent(studentId = "") {
     whatsapp: doc.whatsapp || "",
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
+    classMode: doc.classMode || "Online",
     englishLevel: doc.englishLevel || ""
   };
 }
@@ -157,6 +163,7 @@ async function getAttendance(studentId = ""): Promise<Attendance[]> {
     meetingNumber: doc.meetingNumber || 0,
     meetingDate: doc.meetingDate || "",
     status: doc.status || "Present",
+    classMode: doc.classMode || "Online",
     notes: doc.notes || "",
     teacherIds: doc.teacherIds || [],
     teacherNames: doc.teacherNames || [],
@@ -206,6 +213,7 @@ export default async function AdminAttendancePage({
     studentId?: string | string[];
     meetingNumber?: string | string[];
     meetingDate?: string | string[];
+    classMode?: string | string[];
     teacherIds?: string | string[];
   }>;
 }) {
@@ -223,6 +231,9 @@ export default async function AdminAttendancePage({
   const prefillMeetingDate = Array.isArray(resolvedSearchParams?.meetingDate)
     ? resolvedSearchParams?.meetingDate[0] || ""
     : resolvedSearchParams?.meetingDate || "";
+  const prefillClassMode = Array.isArray(resolvedSearchParams?.classMode)
+    ? resolvedSearchParams?.classMode[0] || ""
+    : resolvedSearchParams?.classMode || "";
   const prefillTeacherIds = Array.isArray(resolvedSearchParams?.teacherIds)
     ? resolvedSearchParams?.teacherIds
     : resolvedSearchParams?.teacherIds
@@ -310,7 +321,7 @@ export default async function AdminAttendancePage({
                     <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{student.studentId || "No ID"}</span>
                     <span className="font-heading font-bold text-lead-navy">{student.studentName}</span>
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined} / {student.classType}</p>
+                  <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined} / {student.classType} / {student.classMode}</p>
                   <p className="mt-1 text-xs text-lead-gray">Parent: {student.parentName || "Not set"}</p>
                 </a>
               ))}
@@ -329,7 +340,7 @@ export default async function AdminAttendancePage({
                       <h2 className="font-heading text-2xl font-bold text-lead-navy">{selectedStudent.studentName}</h2>
                       <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{selectedStudent.studentId}</span>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-lead-gray">{selectedStudent.courseJoined} / {selectedStudent.classType}</p>
+                    <p className="mt-2 text-sm font-semibold text-lead-gray">{selectedStudent.courseJoined} / {selectedStudent.classType} / Default: {selectedStudent.classMode}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm font-bold md:text-right">
                     {attendanceStatuses.map((status) => (
@@ -364,6 +375,11 @@ export default async function AdminAttendancePage({
                       {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                     </select>
                   </Field>
+                  <Field label="Class Mode">
+                    <select name="classMode" defaultValue={prefillClassMode || selectedStudent.classMode || "Online"} required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
+                      {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </Field>
                   <TeacherSelector teachers={teachers} selectedTeacherIds={prefillTeacherIds} />
                   <label className="grid gap-2 text-sm font-semibold text-lead-navy md:col-span-2">
                     Journal Notes
@@ -386,6 +402,7 @@ export default async function AdminAttendancePage({
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="font-heading font-bold text-lead-navy">Meeting {record.meetingNumber}</h3>
                             <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>{record.status}</span>
+                            <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">{record.classMode}</span>
                           </div>
                           <p className="mt-2 text-sm text-lead-gray">{formatDate(record.meetingDate)}</p>
                           <p className="mt-1 text-sm text-lead-gray">
@@ -397,6 +414,9 @@ export default async function AdminAttendancePage({
                           <input name="meetingDate" type="date" defaultValue={record.meetingDate} required className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
                           <select name="status" defaultValue={record.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
                             {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                          </select>
+                          <select name="classMode" defaultValue={record.classMode} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
+                            {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                           </select>
                           <TeacherSelector teachers={teachers} selectedTeacherIds={record.teacherIds} compact />
                           <textarea name="notes" rows={5} defaultValue={record.notes} placeholder="Journal notes" className="focus-ring resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-lead-navy sm:col-span-2" />

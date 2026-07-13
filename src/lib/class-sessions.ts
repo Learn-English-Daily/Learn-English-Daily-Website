@@ -8,6 +8,7 @@ export type ClassSessionDocument = {
   studentName?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   meetingNumber?: number;
   sessionDate?: string;
   sessionTime?: string;
