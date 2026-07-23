@@ -65,7 +65,7 @@ export function AdminPageHeader({
           </form>
         </div>
 
-        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8" aria-label="Admin navigation">
+        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:flex xl:flex-nowrap" aria-label="Admin navigation">
           {adminNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;
@@ -75,22 +75,24 @@ export function AdminPageHeader({
                 key={item.key}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                className={`focus-ring group rounded-2xl border p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:shadow-soft ${
+                className={`focus-ring group rounded-2xl border p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:shadow-soft xl:flex xl:min-w-0 xl:flex-1 xl:items-center xl:gap-3 xl:p-3 ${
                   isActive
                     ? "border-lead-blue bg-lead-blue text-white"
                     : "border-white/80 bg-white/90 text-lead-navy hover:border-blue-100"
                 }`}
               >
                 <span
-                  className={`grid h-10 w-10 place-items-center rounded-xl ${
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl xl:h-9 xl:w-9 ${
                     isActive ? "bg-white/20 text-white" : "bg-blue-50 text-lead-blue group-hover:bg-blue-100"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
                 </span>
-                <span className="mt-3 block font-heading text-base font-extrabold">{item.label}</span>
-                <span className={`mt-1 block text-xs font-semibold ${isActive ? "text-blue-100" : "text-lead-gray"}`}>
-                  {item.helper}
+                <span className="min-w-0">
+                  <span className="mt-3 block truncate font-heading text-base font-extrabold xl:mt-0 xl:text-sm">{item.label}</span>
+                  <span className={`mt-1 block truncate text-xs font-semibold xl:text-[11px] ${isActive ? "text-blue-100" : "text-lead-gray"}`}>
+                    {item.helper}
+                  </span>
                 </span>
               </a>
             );
