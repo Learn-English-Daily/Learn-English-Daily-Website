@@ -1,6 +1,7 @@
 import {
   CalendarCheck,
   CalendarClock,
+  ClipboardCheck,
   CreditCard,
   Gauge,
   Inbox,
@@ -9,7 +10,7 @@ import {
   Users
 } from "lucide-react";
 
-type AdminPageKey = "dashboard" | "inquiries" | "sessions" | "attendance" | "payments" | "students" | "reviews";
+type AdminPageKey = "dashboard" | "inquiries" | "sessions" | "attendance" | "payments" | "students" | "batches" | "reviews";
 
 const adminNavItems: Array<{
   key: AdminPageKey;
@@ -24,6 +25,7 @@ const adminNavItems: Array<{
   { key: "attendance", label: "Attendance", href: "/admin/attendance", helper: "Meeting records", icon: CalendarCheck },
   { key: "payments", label: "Payments", href: "/admin/payments", helper: "Fees & receipts", icon: CreditCard },
   { key: "students", label: "Students", href: "/admin/students", helper: "Registrations", icon: Users },
+  { key: "batches", label: "Batches", href: "/admin/batches", helper: "Assessments", icon: ClipboardCheck },
   { key: "reviews", label: "Reviews", href: "/admin/reviews", helper: "Testimonials", icon: Star }
 ];
 
@@ -63,7 +65,7 @@ export function AdminPageHeader({
           </form>
         </div>
 
-        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7" aria-label="Admin navigation">
+        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8" aria-label="Admin navigation">
           {adminNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;

@@ -5,6 +5,7 @@ import type { WithId } from "mongodb";
 import { CalendarCheck, CircleHelp } from "lucide-react";
 import { TranslateJournalButton } from "@/components/parent/translate-journal-button";
 import { Card } from "@/components/ui/card";
+import { getMonthlyAssessmentsCollectionName, type AssessmentGrade } from "@/lib/assessments";
 import {
   getStudentAttendanceCollectionName,
   type AttendanceStatus
@@ -41,6 +42,25 @@ type AttendanceDocument = {
   createdAt?: Date;
 };
 
+type MonthlyAssessmentDocument = {
+  studentId?: string;
+  studentName?: string;
+  batchName?: string;
+  program?: string;
+  teacherName?: string;
+  month?: number;
+  year?: number;
+  attendance?: { attendancePercentage?: number; completedMeetings?: number; score?: number; grade?: AssessmentGrade; label?: string };
+  participation?: { totalStars?: number; averageStars?: number; score?: number; grade?: AssessmentGrade; label?: string };
+  communication?: { score?: number; grade?: AssessmentGrade; label?: string };
+  englishSkills?: { score?: number; grade?: AssessmentGrade; label?: string };
+  confidence?: { score?: number; grade?: AssessmentGrade; label?: string };
+  creativity?: { score?: number; grade?: AssessmentGrade; label?: string };
+  learningHabits?: { score?: number; grade?: AssessmentGrade; label?: string };
+  overall?: { score?: number; grade?: AssessmentGrade; label?: string };
+  teacherComments?: { en?: string; id?: string };
+};
+
 type Student = {
   studentName: string;
   courseJoined: string;
@@ -54,6 +74,26 @@ type Attendance = {
   classMode: string;
   notes: string;
   teacherNames: string[];
+};
+
+type MonthlyAssessment = {
+  batchName: string;
+  program: string;
+  teacherName: string;
+  month: number;
+  year: number;
+  attendancePercentage: number;
+  completedMeetings: number;
+  participationStars: number;
+  communicationGrade: AssessmentGrade | "";
+  englishSkillsGrade: AssessmentGrade | "";
+  confidenceGrade: AssessmentGrade | "";
+  creativityGrade: AssessmentGrade | "";
+  learningHabitsGrade: AssessmentGrade | "";
+  overallScore: number;
+  overallGrade: AssessmentGrade | "";
+  teacherCommentEn: string;
+  teacherCommentId: string;
 };
 
 function formatDate(value: string) {
@@ -75,10 +115,39 @@ function countStatus(attendance: Attendance[], status: AttendanceStatus) {
   return attendance.filter((record) => record.status === status).length;
 }
 
-async function getParentPortalData(token: string): Promise<{ student: Student; attendance: Attendance[] } | null> {
+function gradeClassName(grade: AssessmentGrade | "") {
+  if (grade === "A") return "bg-emerald-50 text-emerald-700";
+  if (grade === "B") return "bg-yellow-50 text-yellow-800";
+  if (grade === "C") return "bg-rose-50 text-rose-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function monthName(month: number, year: number) {
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function currentJakartaMonth() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit"
+  }).formatToParts(new Date());
+
+  return {
+    month: Number(parts.find((part) => part.type === "month")?.value || new Date().getMonth() + 1),
+    year: Number(parts.find((part) => part.type === "year")?.value || new Date().getFullYear())
+  };
+}
+
+async function getParentPortalData(token: string): Promise<{ student: Student; attendance: Attendance[]; assessment: MonthlyAssessment | null } | null> {
   if (!token || token.length < 20) return null;
 
   const db = await getMongoDb();
+  const currentPeriod = currentJakartaMonth();
   const studentDoc = (await db
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
     .findOne({ parentAccessToken: token })) as WithId<StudentDocument> | null;
@@ -91,6 +160,12 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
     .sort({ meetingNumber: 1, meetingDate: 1 })
     .limit(200)
     .toArray()) as WithId<AttendanceDocument>[];
+  const assessmentDoc = (await db
+    .collection<MonthlyAssessmentDocument>(getMonthlyAssessmentsCollectionName())
+    .find({ studentId: studentDoc.studentId, month: currentPeriod.month, year: currentPeriod.year })
+    .sort({ updatedAt: -1 })
+    .limit(1)
+    .next()) as WithId<MonthlyAssessmentDocument> | null;
 
   return {
     student: {
@@ -105,7 +180,28 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
       classMode: record.classMode || "Online",
       notes: record.notes || "",
       teacherNames: record.teacherNames || []
-    }))
+    })),
+    assessment: assessmentDoc
+      ? {
+          batchName: assessmentDoc.batchName || "",
+          program: assessmentDoc.program || "",
+          teacherName: assessmentDoc.teacherName || "",
+          month: assessmentDoc.month || currentPeriod.month,
+          year: assessmentDoc.year || currentPeriod.year,
+          attendancePercentage: assessmentDoc.attendance?.attendancePercentage || 0,
+          completedMeetings: assessmentDoc.attendance?.completedMeetings || 0,
+          participationStars: assessmentDoc.participation?.totalStars || 0,
+          communicationGrade: assessmentDoc.communication?.grade || "",
+          englishSkillsGrade: assessmentDoc.englishSkills?.grade || "",
+          confidenceGrade: assessmentDoc.confidence?.grade || "",
+          creativityGrade: assessmentDoc.creativity?.grade || "",
+          learningHabitsGrade: assessmentDoc.learningHabits?.grade || "",
+          overallScore: assessmentDoc.overall?.score || 0,
+          overallGrade: assessmentDoc.overall?.grade || "",
+          teacherCommentEn: assessmentDoc.teacherComments?.en || "",
+          teacherCommentId: assessmentDoc.teacherComments?.id || ""
+        }
+      : null
   };
 }
 
@@ -122,7 +218,7 @@ export default async function ParentAttendancePortalPage({
     notFound();
   }
 
-  const { student, attendance } = data;
+  const { student, attendance, assessment } = data;
   const latestAttendance = attendance[attendance.length - 1];
   const presentCount = countStatus(attendance, "Present");
   const lateCount = countStatus(attendance, "Late");
@@ -221,6 +317,66 @@ export default async function ParentAttendancePortalPage({
               <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance has been marked yet.</p>
             )}
         </Card>
+
+        <Card className="p-5">
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-lg bg-blue-50 text-lead-blue">
+              <CalendarCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-heading text-xl font-bold text-lead-navy">Monthly Assessment</h2>
+              <p className="text-sm text-lead-gray">Current month progress report.</p>
+            </div>
+          </div>
+
+          {assessment ? (
+            <div className="mt-5 grid gap-5">
+              <div className="rounded-lg bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-lead-gray">{monthName(assessment.month, assessment.year)}</p>
+                    <h3 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">{assessment.batchName || student.courseJoined}</h3>
+                    <p className="mt-1 text-sm text-lead-gray">{assessment.program || student.courseJoined} / Teacher: {assessment.teacherName || "Not assigned"}</p>
+                  </div>
+                  <span className={`w-fit rounded-lg px-4 py-2 text-sm font-extrabold uppercase ${gradeClassName(assessment.overallGrade)}`}>
+                    Overall Grade {assessment.overallGrade || "-"} / {assessment.overallScore}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <AssessmentStat label="Attendance" value={`${assessment.attendancePercentage}%`} helper={`${assessment.completedMeetings}/12 meetings completed`} />
+                <AssessmentStat label="Participation" value={`${assessment.participationStars}/60`} helper="Monthly stars earned" />
+                <AssessmentStat label="Confidence" value={assessment.confidenceGrade || "-"} helper="From participation score" />
+                <AssessmentStat label="Learning Habits" value={assessment.learningHabitsGrade || "-"} helper="Attendance, punctuality, homework, respect" />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <GradePill label="Communication" grade={assessment.communicationGrade} />
+                <GradePill label="English Skills" grade={assessment.englishSkillsGrade} />
+                <GradePill label="Creativity" grade={assessment.creativityGrade} />
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <h3 className="font-heading text-lg font-bold text-lead-navy">Teacher Comment</h3>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-lead-gray">{assessment.teacherCommentEn || "No comment added yet."}</p>
+                  {assessment.teacherCommentEn ? (
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                      <TranslateJournalButton text={assessment.teacherCommentEn} />
+                    </div>
+                  ) : null}
+                </div>
+                <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+                  <h3 className="font-heading text-lg font-bold text-lead-navy">Komentar Guru</h3>
+                  <p lang="id" className="mt-3 whitespace-pre-wrap text-sm leading-6 text-lead-gray">{assessment.teacherCommentId || "Belum ada komentar."}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No monthly assessment has been finalized yet.</p>
+          )}
+        </Card>
       </section>
     </main>
   );
@@ -261,4 +417,23 @@ function Summary({
 
 function meetingWord(count: number) {
   return count === 1 ? "meeting" : "meetings";
+}
+
+function AssessmentStat({ label, value, helper }: { label: string; value: string; helper: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-4">
+      <p className="font-heading text-2xl font-extrabold text-lead-blue">{value}</p>
+      <p className="mt-1 text-sm font-bold text-lead-navy">{label}</p>
+      <p className="mt-1 text-xs leading-5 text-lead-gray">{helper}</p>
+    </div>
+  );
+}
+
+function GradePill({ label, grade }: { label: string; grade: AssessmentGrade | "" }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <span className="text-sm font-bold text-lead-navy">{label}</span>
+      <span className={`rounded-full px-3 py-1 text-xs font-extrabold uppercase ${gradeClassName(grade)}`}>{grade || "-"}</span>
+    </div>
+  );
 }
