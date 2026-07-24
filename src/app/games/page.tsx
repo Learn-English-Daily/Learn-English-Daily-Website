@@ -1,9 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import { ArrowRight, KeyRound, Lock, Mic, Puzzle, Sparkles, Trophy } from "lucide-react";
+import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { GAMES_SESSION_COOKIE, isGamesPasswordConfigured, isValidGamesSession } from "@/lib/games-auth";
 
 type GameCard = {
   title: string;
@@ -19,6 +23,8 @@ export const metadata: Metadata = {
   title: "LEAD Games | Learn English Daily",
   description: "Practice English through fun interactive games from LEAD."
 };
+
+export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
   {
@@ -73,7 +79,15 @@ const games: GameCard[] = [
   }
 ];
 
-export default function GamesPage() {
+export default async function GamesPage() {
+  noStore();
+  const cookieStore = await cookies();
+  const isAuthenticated = isValidGamesSession(cookieStore.get(GAMES_SESSION_COOKIE)?.value);
+
+  if (!isGamesPasswordConfigured() || !isAuthenticated) {
+    return <GamesPasswordGate redirectTo="/games" />;
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-lead-soft">
       <section className="relative overflow-hidden bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
