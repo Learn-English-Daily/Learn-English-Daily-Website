@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
@@ -92,77 +91,13 @@ export default async function GamesPage() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-lead-soft">
-      <section className="relative overflow-hidden bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
-        <div className="absolute inset-0 play-grid opacity-70" aria-hidden="true" />
-        <div className="absolute -right-20 top-20 h-72 w-72 rounded-full bg-lead-yellow/30 blur-3xl" aria-hidden="true" />
-        <div className="absolute -left-24 bottom-8 h-80 w-80 rounded-full bg-lead-blue/15 blur-3xl" aria-hidden="true" />
-
-        <div className="container-shell relative z-10 grid min-h-[680px] items-center gap-12 py-16 lg:grid-cols-[1fr_0.9fr]">
-          <div>
-            <Link href="/en" className="focus-ring mb-6 inline-flex rounded-lg border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-lead-blue shadow-[0_8px_24px_rgba(37,99,235,0.08)]">
+      <section id="games" className="section-pad relative overflow-hidden bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
+        <div className="absolute inset-0 play-grid opacity-50" aria-hidden="true" />
+        <div className="container-shell relative z-10">
+          <div className="mx-auto max-w-3xl text-center">
+            <Link href="/en" className="focus-ring inline-flex rounded-lg border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-lead-blue shadow-[0_8px_24px_rgba(37,99,235,0.08)]">
               LEAD - Speak English with confidence
             </Link>
-            <h1 className="font-heading text-5xl font-extrabold tracking-tight text-lead-navy sm:text-6xl">
-              LEAD Games
-            </h1>
-            <p className="mt-6 text-2xl font-bold text-lead-blue">Learn English through fun interactive games.</p>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-lead-gray">
-              Practice speaking, pronunciation, vocabulary, and confidence through gamified learning.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button asChild variant="secondary" size="lg">
-                <Link href="#games">Explore Games</Link>
-              </Button>
-              <Button asChild size="lg">
-                <Link href="/en#contact">
-                  Join a Class
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="relative">
-            <Card className="relative overflow-hidden border-white bg-white/90 p-6 shadow-soft backdrop-blur">
-              <div className="flex items-center gap-4">
-                <div className="grid h-16 w-16 place-items-center rounded-[22px] bg-lead-blue text-white shadow-soft">
-                  <Image src="/images/brand-icon-cropped.png" alt="Wisey the owl" width={48} height={48} className="h-12 w-12 object-contain" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-lead-blue">Wisey&apos;s Game Hub</p>
-                  <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Choose your challenge</h2>
-                </div>
-              </div>
-              <div className="mt-6 grid gap-3">
-                {games.slice(0, 4).map((game, index) => {
-                  const Icon = game.icon;
-                  return (
-                    <div
-                      key={game.title}
-                      className="motion-safe:animate-[float_4s_ease-in-out_infinite] rounded-lg border border-slate-200 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
-                      style={{ animationDelay: `${index * 0.2}s` }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`grid h-11 w-11 place-items-center rounded-lg border ${game.accent}`}>
-                          <Icon className="h-5 w-5" />
-                        </span>
-                        <div>
-                          <p className="font-heading font-bold text-lead-navy">{game.title}</p>
-                          <p className="text-xs font-bold text-lead-blue">{game.status}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      <section id="games" className="section-pad bg-white">
-        <div className="container-shell">
-          <div className="mx-auto max-w-3xl text-center">
             <p className="font-bold uppercase tracking-[0.16em] text-lead-blue">Interactive practice</p>
             <h2 className="mt-4 font-heading text-3xl font-bold text-lead-navy sm:text-4xl">Pick a game and start speaking</h2>
             <p className="mt-4 text-lg leading-8 text-lead-gray">
