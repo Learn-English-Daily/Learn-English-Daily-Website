@@ -48,10 +48,11 @@ const games: GameCard[] = [
   {
     title: "Pronunciation Challenge",
     description: "Train tricky sounds and rhythm with bite-sized pronunciation rounds.",
-    status: "Coming Soon",
+    status: "Available",
     icon: Sparkles,
     accent: "border-yellow-100 bg-yellow-50 text-yellow-700",
-    available: false
+    available: true,
+    href: "/games/pronunciation-challenge"
   },
   {
     title: "Vocabulary Match",

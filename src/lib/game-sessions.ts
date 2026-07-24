@@ -1,4 +1,4 @@
-export type GameType = "games-hub" | "speech-competition" | "escape-room";
+export type GameType = "games-hub" | "speech-competition" | "escape-room" | "pronunciation-challenge";
 
 export type GameSessionDocument = {
   token?: string;
