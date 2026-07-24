@@ -95,11 +95,9 @@ export default async function GamesPage() {
         <div className="absolute inset-0 play-grid opacity-50" aria-hidden="true" />
         <div className="container-shell relative z-10">
           <div className="mx-auto max-w-3xl text-center">
-            <Link href="/en" className="focus-ring inline-flex rounded-lg border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-lead-blue shadow-[0_8px_24px_rgba(37,99,235,0.08)]">
-              LEAD - Speak English with confidence
-            </Link>
             <p className="font-bold uppercase tracking-[0.16em] text-lead-blue">Interactive practice</p>
-            <h2 className="mt-4 font-heading text-3xl font-bold text-lead-navy sm:text-4xl">Pick a game and start speaking</h2>
+            <h1 className="mt-4 font-heading text-5xl font-extrabold tracking-tight text-lead-navy sm:text-6xl">LEAD Games</h1>
+            <h2 className="mt-4 font-heading text-2xl font-bold text-lead-blue sm:text-3xl">Pick a game and start speaking</h2>
             <p className="mt-4 text-lg leading-8 text-lead-gray">
               Built for online tutoring, class warmups, homework, and confidence practice.
             </p>
