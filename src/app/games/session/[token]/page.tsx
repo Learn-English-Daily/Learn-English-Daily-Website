@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowRight, Clock, Gamepad2, KeyRound, LockKeyhole, Mic, Sparkles } from "lucide-react";
+import { ArrowRight, Clock, Gamepad2, KeyRound, LockKeyhole, Mic, Puzzle, Sparkles } from "lucide-react";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
 import { SpeechCompetitionGame } from "@/app/games/speech-competition/speech-competition-game";
+import { VocabularyMatchGame } from "@/app/games/vocabulary-match/vocabulary-match-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -74,16 +75,19 @@ export default async function GameSessionPage({
   const isEscapeRoom = activeGame === "escape-room";
   const isSpeechCompetition = activeGame === "speech-competition";
   const isPronunciationChallenge = activeGame === "pronunciation-challenge";
-  const shouldShowHub = gameSession?.gameType === "games-hub" && !isEscapeRoom && !isSpeechCompetition && !isPronunciationChallenge;
-  const gameTitle = shouldShowHub ? "LEAD Class Games" : isEscapeRoom ? "LEAD Escape Room" : isPronunciationChallenge ? "Pronunciation Challenge" : "Speech Competition Game";
+  const isVocabularyMatch = activeGame === "vocabulary-match";
+  const shouldShowHub = gameSession?.gameType === "games-hub" && !isEscapeRoom && !isSpeechCompetition && !isPronunciationChallenge && !isVocabularyMatch;
+  const gameTitle = shouldShowHub ? "LEAD Class Games" : isEscapeRoom ? "LEAD Escape Room" : isPronunciationChallenge ? "Pronunciation Challenge" : isVocabularyMatch ? "Vocabulary Match" : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
     : isEscapeRoom
     ? "Complete five English rooms, collect password digits, and escape before the class game window ends."
     : isPronunciationChallenge
     ? "Listen, repeat, and improve tricky English sounds before the class game window ends."
+    : isVocabularyMatch
+    ? "Match words with meanings before the class game window ends."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -142,6 +146,8 @@ export default async function GameSessionPage({
           <EscapeRoomGame />
         ) : isPronunciationChallenge ? (
           <PronunciationChallengeGame />
+        ) : isVocabularyMatch ? (
+          <VocabularyMatchGame />
         ) : (
           <SpeechCompetitionGame />
         )}
@@ -172,11 +178,18 @@ function GameHub({ token }: { token: string }) {
       href: `/games/session/${encodeURIComponent(token)}?game=pronunciation-challenge`,
       icon: Sparkles,
       accent: "border-violet-100 bg-violet-50 text-violet-700"
+    },
+    {
+      title: "Vocabulary Match",
+      description: "Match words with meanings before the timer runs out.",
+      href: `/games/session/${encodeURIComponent(token)}?game=vocabulary-match`,
+      icon: Puzzle,
+      accent: "border-emerald-100 bg-emerald-50 text-emerald-700"
     }
   ];
 
   return (
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
       {games.map((game) => {
         const Icon = game.icon;
         return (

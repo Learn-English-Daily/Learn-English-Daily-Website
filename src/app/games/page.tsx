@@ -57,10 +57,11 @@ const games: GameCard[] = [
   {
     title: "Vocabulary Match",
     description: "Match words, meanings, and examples before the timer runs out.",
-    status: "Coming Soon",
+    status: "Available",
     icon: Puzzle,
     accent: "border-emerald-100 bg-emerald-50 text-emerald-700",
-    available: false
+    available: true,
+    href: "/games/vocabulary-match"
   },
   {
     title: "Sentence Builder",
