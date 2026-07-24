@@ -4,7 +4,8 @@ export type GameType =
   | "escape-room"
   | "pronunciation-challenge"
   | "vocabulary-match"
-  | "sentence-builder";
+  | "sentence-builder"
+  | "tongue-twister-battle";
 
 export type GameSessionDocument = {
   token?: string;

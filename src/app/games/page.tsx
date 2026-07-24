@@ -74,10 +74,11 @@ const games: GameCard[] = [
   {
     title: "Tongue Twister Battle",
     description: "Race through fun tongue twisters and improve speaking control.",
-    status: "Coming Soon",
+    status: "Available",
     icon: Mic,
     accent: "border-rose-100 bg-rose-50 text-rose-700",
-    available: false
+    available: true,
+    href: "/games/tongue-twister-battle"
   }
 ];
 

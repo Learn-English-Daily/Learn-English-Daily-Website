@@ -6,6 +6,7 @@ import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
 import { SentenceBuilderGame } from "@/app/games/sentence-builder/sentence-builder-game";
 import { SpeechCompetitionGame } from "@/app/games/speech-competition/speech-competition-game";
+import { TongueTwisterBattleGame } from "@/app/games/tongue-twister-battle/tongue-twister-battle-game";
 import { VocabularyMatchGame } from "@/app/games/vocabulary-match/vocabulary-match-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -78,13 +79,15 @@ export default async function GameSessionPage({
   const isPronunciationChallenge = activeGame === "pronunciation-challenge";
   const isVocabularyMatch = activeGame === "vocabulary-match";
   const isSentenceBuilder = activeGame === "sentence-builder";
+  const isTongueTwisterBattle = activeGame === "tongue-twister-battle";
   const shouldShowHub =
     gameSession?.gameType === "games-hub" &&
     !isEscapeRoom &&
     !isSpeechCompetition &&
     !isPronunciationChallenge &&
     !isVocabularyMatch &&
-    !isSentenceBuilder;
+    !isSentenceBuilder &&
+    !isTongueTwisterBattle;
   const gameTitle = shouldShowHub
     ? "LEAD Class Games"
     : isEscapeRoom
@@ -95,7 +98,9 @@ export default async function GameSessionPage({
           ? "Vocabulary Match"
           : isSentenceBuilder
             ? "Sentence Builder"
-            : "Speech Competition Game";
+            : isTongueTwisterBattle
+              ? "Tongue Twister Battle"
+              : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
     : isEscapeRoom
@@ -106,6 +111,8 @@ export default async function GameSessionPage({
     ? "Match words with meanings before the class game window ends."
     : isSentenceBuilder
     ? "Build clear English sentences from shuffled word cards before the class game window ends."
+    : isTongueTwisterBattle
+    ? "Race through tongue twisters and improve speaking control before the class game window ends."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
   const GameIcon = shouldShowHub ? Gamepad2 : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
@@ -170,6 +177,8 @@ export default async function GameSessionPage({
           <VocabularyMatchGame />
         ) : isSentenceBuilder ? (
           <SentenceBuilderGame />
+        ) : isTongueTwisterBattle ? (
+          <TongueTwisterBattleGame />
         ) : (
           <SpeechCompetitionGame />
         )}
@@ -214,11 +223,18 @@ function GameHub({ token }: { token: string }) {
       href: `/games/session/${encodeURIComponent(token)}?game=sentence-builder`,
       icon: Puzzle,
       accent: "border-violet-100 bg-violet-50 text-violet-700"
+    },
+    {
+      title: "Tongue Twister Battle",
+      description: "Race the timer while speaking tricky phrases clearly.",
+      href: `/games/session/${encodeURIComponent(token)}?game=tongue-twister-battle`,
+      icon: Mic,
+      accent: "border-rose-100 bg-rose-50 text-rose-700"
     }
   ];
 
   return (
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
       {games.map((game) => {
         const Icon = game.icon;
         return (
