@@ -4,6 +4,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { ArrowRight, Clock, Gamepad2, KeyRound, LockKeyhole, Mic, Puzzle, Sparkles } from "lucide-react";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
+import { SentenceBuilderGame } from "@/app/games/sentence-builder/sentence-builder-game";
 import { SpeechCompetitionGame } from "@/app/games/speech-competition/speech-competition-game";
 import { VocabularyMatchGame } from "@/app/games/vocabulary-match/vocabulary-match-game";
 import { Button } from "@/components/ui/button";
@@ -76,8 +77,25 @@ export default async function GameSessionPage({
   const isSpeechCompetition = activeGame === "speech-competition";
   const isPronunciationChallenge = activeGame === "pronunciation-challenge";
   const isVocabularyMatch = activeGame === "vocabulary-match";
-  const shouldShowHub = gameSession?.gameType === "games-hub" && !isEscapeRoom && !isSpeechCompetition && !isPronunciationChallenge && !isVocabularyMatch;
-  const gameTitle = shouldShowHub ? "LEAD Class Games" : isEscapeRoom ? "LEAD Escape Room" : isPronunciationChallenge ? "Pronunciation Challenge" : isVocabularyMatch ? "Vocabulary Match" : "Speech Competition Game";
+  const isSentenceBuilder = activeGame === "sentence-builder";
+  const shouldShowHub =
+    gameSession?.gameType === "games-hub" &&
+    !isEscapeRoom &&
+    !isSpeechCompetition &&
+    !isPronunciationChallenge &&
+    !isVocabularyMatch &&
+    !isSentenceBuilder;
+  const gameTitle = shouldShowHub
+    ? "LEAD Class Games"
+    : isEscapeRoom
+      ? "LEAD Escape Room"
+      : isPronunciationChallenge
+        ? "Pronunciation Challenge"
+        : isVocabularyMatch
+          ? "Vocabulary Match"
+          : isSentenceBuilder
+            ? "Sentence Builder"
+            : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
     : isEscapeRoom
@@ -86,8 +104,10 @@ export default async function GameSessionPage({
     ? "Listen, repeat, and improve tricky English sounds before the class game window ends."
     : isVocabularyMatch
     ? "Match words with meanings before the class game window ends."
+    : isSentenceBuilder
+    ? "Build clear English sentences from shuffled word cards before the class game window ends."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -148,6 +168,8 @@ export default async function GameSessionPage({
           <PronunciationChallengeGame />
         ) : isVocabularyMatch ? (
           <VocabularyMatchGame />
+        ) : isSentenceBuilder ? (
+          <SentenceBuilderGame />
         ) : (
           <SpeechCompetitionGame />
         )}
@@ -185,11 +207,18 @@ function GameHub({ token }: { token: string }) {
       href: `/games/session/${encodeURIComponent(token)}?game=vocabulary-match`,
       icon: Puzzle,
       accent: "border-emerald-100 bg-emerald-50 text-emerald-700"
+    },
+    {
+      title: "Sentence Builder",
+      description: "Arrange shuffled words into clear English sentences.",
+      href: `/games/session/${encodeURIComponent(token)}?game=sentence-builder`,
+      icon: Puzzle,
+      accent: "border-violet-100 bg-violet-50 text-violet-700"
     }
   ];
 
   return (
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
       {games.map((game) => {
         const Icon = game.icon;
         return (

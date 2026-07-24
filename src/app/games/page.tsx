@@ -65,10 +65,11 @@ const games: GameCard[] = [
   {
     title: "Sentence Builder",
     description: "Build clear English sentences from word blocks and grammar clues.",
-    status: "Coming Soon",
+    status: "Available",
     icon: Trophy,
     accent: "border-violet-100 bg-violet-50 text-violet-700",
-    available: false
+    available: true,
+    href: "/games/sentence-builder"
   },
   {
     title: "Tongue Twister Battle",
