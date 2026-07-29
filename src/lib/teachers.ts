@@ -26,8 +26,8 @@ export async function ensureDefaultTeachers(db: Db) {
       updateOne: {
         filter: { _id: teacher.id },
         update: {
-          $set: { name: teacher.name, active: true },
-          $setOnInsert: { createdAt: now }
+          $set: { name: teacher.name },
+          $setOnInsert: { active: true, createdAt: now }
         },
         upsert: true
       }
