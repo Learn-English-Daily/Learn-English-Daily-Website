@@ -175,12 +175,31 @@ async function getBatchPageData() {
   await ensureDefaultTeachers(db);
   const { month, year } = currentJakartaMonth();
 
-  const [batchDocs, teacherDocs, studentDocs, assessmentDocs] = await Promise.all([
+  const [batchDocs, teacherDocs, studentDocs, currentAssessmentDocs, savedAssessmentDocs] = await Promise.all([
     db.collection<BatchDocument>(getBatchesCollectionName()).find({}).sort({ status: 1, startDate: -1 }).limit(100).toArray() as Promise<WithId<BatchDocument>[]>,
     db.collection<TeacherDocument>(getTeachersCollectionName()).find({ active: true }).sort({ name: 1 }).toArray(),
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getBasicGroupStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>,
-    db.collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName()).find({ month, year }).limit(2000).toArray() as Promise<WithId<AssessmentDocument>[]>
+    db.collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName()).find({ month, year }).limit(2000).toArray() as Promise<WithId<AssessmentDocument>[]>,
+    db.collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName()).find({}).sort({ year: -1, month: -1, updatedAt: -1 }).limit(5000).toArray() as Promise<WithId<AssessmentDocument>[]>
   ]);
+  const mapAssessment = (assessment: WithId<AssessmentDocument>): Assessment => ({
+    id: assessment._id.toString(),
+    studentId: assessment.studentId || "",
+    batchId: assessment.batchId || "",
+    batchName: assessment.batchName || "",
+    month: assessment.month || month,
+    year: assessment.year || year,
+    status: assessment.status || "Not started",
+    attendancePercentage: assessment.attendance?.attendancePercentage ?? null,
+    completedMeetings: assessment.attendance?.completedMeetings || 0,
+    participationStars: assessment.participation?.totalStars || 0,
+    overallScore: assessment.overall?.score ?? null,
+    overallGrade: normalizeGrade(assessment.overall?.grade),
+    meetings: assessment.meetings || [],
+    ratings: defaultRatingsFromAssessment(assessment),
+    teacherCommentEn: assessment.teacherComments?.en || "",
+    teacherCommentId: assessment.teacherComments?.id || ""
+  });
 
   return {
     month,
@@ -207,24 +226,8 @@ async function getBatchPageData() {
       classMode: student.classMode || "Online",
       activeBatchId: student.activeBatchId || ""
     })),
-    assessments: assessmentDocs.map((assessment) => ({
-      id: assessment._id.toString(),
-      studentId: assessment.studentId || "",
-      batchId: assessment.batchId || "",
-      batchName: assessment.batchName || "",
-      month: assessment.month || month,
-      year: assessment.year || year,
-      status: assessment.status || "Not started",
-      attendancePercentage: assessment.attendance?.attendancePercentage ?? null,
-      completedMeetings: assessment.attendance?.completedMeetings || 0,
-      participationStars: assessment.participation?.totalStars || 0,
-      overallScore: assessment.overall?.score ?? null,
-      overallGrade: normalizeGrade(assessment.overall?.grade),
-      meetings: assessment.meetings || [],
-      ratings: defaultRatingsFromAssessment(assessment),
-      teacherCommentEn: assessment.teacherComments?.en || "",
-      teacherCommentId: assessment.teacherComments?.id || ""
-    }))
+    assessments: currentAssessmentDocs.map(mapAssessment),
+    savedAssessments: savedAssessmentDocs.map(mapAssessment)
   };
 }
 
@@ -304,6 +307,7 @@ export default async function AdminBatchesPage({
   searchParams
 }: {
   searchParams?: Promise<{
+    assessmentId?: string | string[];
     assessmentBatchId?: string | string[];
     assessmentStudentId?: string | string[];
     assessmentMonth?: string | string[];
@@ -340,15 +344,22 @@ export default async function AdminBatchesPage({
     );
   }
 
-  const { batches, teachers, students, assessments, month, year } = await getBatchPageData();
+  const { batches, teachers, students, assessments, savedAssessments, month, year } = await getBatchPageData();
   const activeBatches = batches.filter((batch) => batch.status === "active");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
   const assessmentsByStudent = new Map<string, Assessment>(assessments.map((assessment) => [assessment.studentId, assessment]));
-  const selectedAssessmentStudentId = firstParam(resolvedSearchParams?.assessmentStudentId);
-  const selectedAssessmentBatchId = firstParam(resolvedSearchParams?.assessmentBatchId);
-  const selectedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, month);
-  const selectedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, year);
-  const selectedAssessment = assessments.find(
+  const studentsById = new Map<string, Student>(students.map((student) => [student.studentId, student]));
+  const selectedAssessmentId = firstParam(resolvedSearchParams?.assessmentId);
+  const assessmentFromSavedRecord = savedAssessments.find((assessment) => assessment.id === selectedAssessmentId);
+  const requestedAssessmentStudentId = firstParam(resolvedSearchParams?.assessmentStudentId);
+  const requestedAssessmentBatchId = firstParam(resolvedSearchParams?.assessmentBatchId);
+  const requestedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, month);
+  const requestedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, year);
+  const selectedAssessmentStudentId = assessmentFromSavedRecord?.studentId || requestedAssessmentStudentId;
+  const selectedAssessmentBatchId = assessmentFromSavedRecord?.batchId || requestedAssessmentBatchId || studentsById.get(selectedAssessmentStudentId)?.activeBatchId || "";
+  const selectedAssessmentMonth = assessmentFromSavedRecord?.month || requestedAssessmentMonth;
+  const selectedAssessmentYear = assessmentFromSavedRecord?.year || requestedAssessmentYear;
+  const selectedAssessment = assessmentFromSavedRecord || savedAssessments.find(
     (assessment) =>
       assessment.studentId === selectedAssessmentStudentId &&
       assessment.month === selectedAssessmentMonth &&
@@ -356,6 +367,9 @@ export default async function AdminBatchesPage({
   );
   const selectedAssessmentMeetings = defaultMeetingsFromAssessment(selectedAssessment);
   const selectedAssessmentRatings = selectedAssessment?.ratings;
+  const selectedAssessmentStudent = studentsById.get(selectedAssessmentStudentId);
+  const selectedAssessmentBatch = batches.find((batch) => batch.id === selectedAssessmentBatchId);
+  const isAssessmentReadyToEdit = Boolean(selectedAssessmentStudentId && selectedAssessmentBatchId);
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -524,37 +538,60 @@ export default async function AdminBatchesPage({
           </div>
 
           <Card id="monthly-assessment" className="h-fit scroll-mt-6 p-5">
-            <SectionTitle icon={ClipboardCheck} title="Monthly Assessment" description="Teachers enter attendance, stars, lateness, and monthly ratings. Scores calculate automatically." />
+            <SectionTitle icon={ClipboardCheck} title="Assessment Workspace" description="Choose a saved assessment or select a student/month once, then edit the marks below." />
             {selectedAssessment ? (
               <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm font-bold text-lead-blue">
-                Editing saved assessment for {selectedAssessment.studentId} / {monthName(selectedAssessment.month, selectedAssessment.year)}.
+                Loaded saved marks for {selectedAssessmentStudent?.studentName || selectedAssessment.studentId} / {monthName(selectedAssessment.month, selectedAssessment.year)}.
               </p>
             ) : selectedAssessmentStudentId ? (
               <p className="mt-4 rounded-lg bg-yellow-50 p-3 text-sm font-bold text-yellow-800">
                 No saved assessment found for the selected month yet. Saving will create it.
               </p>
             ) : null}
-            <form action="/admin/batches#monthly-assessment" className="mt-5 grid gap-3 rounded-xl border border-blue-100 bg-blue-50/40 p-4 sm:grid-cols-2">
-              <SelectField label="Batch" name="assessmentBatchId" defaultValue={selectedAssessmentBatchId || selectedAssessment?.batchId || ""} options={activeBatches.map((batch) => ({ label: batch.batchName, value: batch.id }))} />
-              <SelectField label="Student" name="assessmentStudentId" defaultValue={selectedAssessmentStudentId || selectedAssessment?.studentId || ""} options={students.filter((student) => student.activeBatchId).map((student) => ({ label: `${student.studentId} - ${student.studentName}`, value: student.studentId }))} />
-              <SelectField label="Month" name="assessmentMonth" defaultValue={String(selectedAssessmentMonth)} options={Array.from({ length: 12 }, (_, index) => ({ label: monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, ""), value: String(index + 1) }))} />
-              <Field label="Year" name="assessmentYear" type="number" defaultValue={selectedAssessmentYear} min={2020} max={2100} />
-              <Button type="submit" variant="secondary" className="sm:col-span-2">Load Saved Marks</Button>
-            </form>
-            <ActionFeedbackForm action={saveMonthlyAssessment} successMessage="Monthly assessment saved." className="mt-5 grid gap-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <SelectField label="Batch" name="batchId" defaultValue={selectedAssessmentBatchId || selectedAssessment?.batchId || ""} options={activeBatches.map((batch) => ({ label: batch.batchName, value: batch.id }))} required />
-                <SelectField label="Student" name="studentId" defaultValue={selectedAssessmentStudentId || selectedAssessment?.studentId || ""} options={students.filter((student) => student.activeBatchId).map((student) => ({ label: `${student.studentId} - ${student.studentName}`, value: student.studentId }))} required />
-                <SelectField label="Month" name="month" defaultValue={String(selectedAssessmentMonth)} options={Array.from({ length: 12 }, (_, index) => ({ label: monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, ""), value: String(index + 1) }))} required />
-                <Field label="Year" name="year" type="number" defaultValue={selectedAssessmentYear} min={2020} max={2100} required />
+            <form action="/admin/batches#monthly-assessment" className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
+              <div className="grid gap-3">
+                <SelectField
+                  label="Open Saved Assessment"
+                  name="assessmentId"
+                  defaultValue={selectedAssessment?.id || ""}
+                  options={savedAssessments.map((assessment) => ({
+                    label: `${studentsById.get(assessment.studentId)?.studentName || assessment.studentId} - ${monthName(assessment.month, assessment.year)} - ${assessment.batchName || "Batch"}`,
+                    value: assessment.id
+                  }))}
+                />
+                <div className="grid gap-3 border-t border-blue-100 pt-4 sm:grid-cols-2">
+                  <SelectField label="Batch" name="assessmentBatchId" defaultValue={selectedAssessmentBatchId} options={activeBatches.map((batch) => ({ label: batch.batchName, value: batch.id }))} />
+                  <SelectField label="Student" name="assessmentStudentId" defaultValue={selectedAssessmentStudentId} options={students.filter((student) => student.activeBatchId).map((student) => ({ label: `${student.studentId} - ${student.studentName}`, value: student.studentId }))} />
+                  <SelectField label="Month" name="assessmentMonth" defaultValue={String(selectedAssessmentMonth)} options={Array.from({ length: 12 }, (_, index) => ({ label: monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, ""), value: String(index + 1) }))} />
+                  <Field label="Year" name="assessmentYear" type="number" defaultValue={selectedAssessmentYear} min={2020} max={2100} />
+                </div>
+                <Button type="submit" variant="secondary">Load Assessment</Button>
               </div>
+            </form>
 
+            {isAssessmentReadyToEdit ? (
+            <ActionFeedbackForm action={saveMonthlyAssessment} successMessage="Monthly assessment saved." className="mt-5 grid gap-4">
+              <input type="hidden" name="batchId" value={selectedAssessmentBatchId} />
+              <input type="hidden" name="studentId" value={selectedAssessmentStudentId} />
+              <input type="hidden" name="month" value={selectedAssessmentMonth} />
+              <input type="hidden" name="year" value={selectedAssessmentYear} />
+              <div className="grid gap-3 rounded-2xl bg-lead-navy p-4 text-white sm:grid-cols-3">
+                <AssessmentContextStat label="Student" value={selectedAssessmentStudent?.studentName || selectedAssessmentStudentId} helper={selectedAssessmentStudentId} />
+                <AssessmentContextStat label="Batch" value={selectedAssessmentBatch?.batchName || selectedAssessment?.batchName || "Selected batch"} helper={selectedAssessmentBatch?.program || selectedAssessment?.batchName || ""} />
+                <AssessmentContextStat label="Period" value={monthName(selectedAssessmentMonth, selectedAssessmentYear)} helper={selectedAssessment ? "Editing saved marks" : "Creating new assessment"} />
+              </div>
               <div className="rounded-xl border border-slate-200">
                 <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
                   <h3 className="font-heading text-lg font-bold text-lead-navy">12 Meeting Tracker</h3>
                   <p className="text-xs text-lead-gray">Excused counts as completed for monthly assessment discipline.</p>
                 </div>
                 <div className="grid gap-3 p-4">
+                  <div className="hidden rounded-lg bg-slate-100 px-3 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-lead-gray sm:grid sm:grid-cols-[58px_minmax(0,1fr)_110px_110px]">
+                    <span>Meet</span>
+                    <span>Status</span>
+                    <span>Stars</span>
+                    <span>Late mins</span>
+                  </div>
                   {selectedAssessmentMeetings.map((meeting, index) => (
                     <MeetingRow key={index + 1} index={index + 1} meeting={meeting} />
                   ))}
@@ -606,6 +643,14 @@ export default async function AdminBatchesPage({
               </label>
               <Button type="submit" className="w-full">Save Monthly Assessment</Button>
             </ActionFeedbackForm>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                <h3 className="font-heading text-xl font-bold text-lead-navy">Select a student to start</h3>
+                <p className="mt-2 text-sm leading-6 text-lead-gray">
+                  Choose a saved assessment above, or select batch, student, month, and year, then click Load Assessment. The edit form will open here with saved marks when available.
+                </p>
+              </div>
+            )}
           </Card>
         </div>
       </section>
@@ -682,19 +727,28 @@ function MeetingRow({
   };
 }) {
   return (
-    <div className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[70px_1fr_90px_100px] sm:items-center">
-      <p className="font-heading text-sm font-extrabold text-lead-navy">M{index}</p>
-      <select name={`attendance_${index}`} defaultValue={meeting.attendance} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-navy">
-        {assessmentAttendanceStatuses.map((status) => (
-          <option key={status} value={status}>{status}</option>
-        ))}
-      </select>
-      <select name={`stars_${index}`} defaultValue={String(meeting.participationStars)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-navy">
-        {[0, 1, 2, 3, 4, 5].map((star) => (
-          <option key={star} value={star}>{star} stars</option>
-        ))}
-      </select>
-      <input name={`late_${index}`} type="number" min={0} max={240} defaultValue={meeting.minutesLate} aria-label={`Meeting ${index} minutes late`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-lead-navy" />
+    <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_8px_18px_rgba(15,23,42,0.04)] sm:grid-cols-[58px_minmax(0,1fr)_110px_110px] sm:items-center">
+      <p className="rounded-lg bg-blue-50 px-3 py-2 text-center font-heading text-sm font-extrabold text-lead-blue">M{index}</p>
+      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray sm:block">
+        <span className="sm:hidden">Status</span>
+        <select name={`attendance_${index}`} defaultValue={meeting.attendance} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-lead-navy">
+          {assessmentAttendanceStatuses.map((status) => (
+            <option key={status} value={status}>{status}</option>
+          ))}
+        </select>
+      </label>
+      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray sm:block">
+        <span className="sm:hidden">Stars</span>
+        <select name={`stars_${index}`} defaultValue={String(meeting.participationStars)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-lead-navy">
+          {[0, 1, 2, 3, 4, 5].map((star) => (
+            <option key={star} value={star}>{star} stars</option>
+          ))}
+        </select>
+      </label>
+      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray sm:block">
+        <span className="sm:hidden">Late mins</span>
+        <input name={`late_${index}`} type="number" min={0} max={240} defaultValue={meeting.minutesLate} aria-label={`Meeting ${index} minutes late`} placeholder="0" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold normal-case tracking-normal text-lead-navy" />
+      </label>
     </div>
   );
 }
@@ -723,6 +777,16 @@ function AssessmentGroup({
           </label>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AssessmentContextStat({ label, value, helper }: { label: string; value: string; helper: string }) {
+  return (
+    <div className="rounded-xl bg-white/10 p-3">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-100">{label}</p>
+      <p className="mt-1 font-heading text-lg font-extrabold text-white">{value}</p>
+      {helper ? <p className="mt-1 text-xs font-semibold text-blue-100">{helper}</p> : null}
     </div>
   );
 }
