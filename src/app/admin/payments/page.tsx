@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
-import { updateStudentPaymentStatus } from "@/app/admin/payments/actions";
+import { saveGroupStudentPayment, updateStudentPaymentStatus } from "@/app/admin/payments/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { getMonthlyAssessmentsCollectionName } from "@/lib/assessments";
 import { getMongoDb } from "@/lib/mongodb";
 import {
   formatRupiah,
@@ -62,6 +63,11 @@ type PaymentDocument = {
   notes?: string;
   receiptUploadedToDrive?: boolean;
   source?: string;
+  billingMonth?: number;
+  billingYear?: number;
+  completedMeetings?: number;
+  amountPerMeeting?: number;
+  batchName?: string;
   attendanceStatus?: string;
   createdAt?: Date;
 };
@@ -77,10 +83,36 @@ type Payment = {
   notes: string;
   receiptUploadedToDrive: boolean;
   source: string;
+  billingMonth: number;
+  billingYear: number;
+  completedMeetings: number;
+  amountPerMeeting: number;
+  batchName: string;
   attendanceStatus: string;
   classMode: string;
   createdAt: string;
 };
+
+type GroupAssessmentDocument = {
+  studentId?: string;
+  batchName?: string;
+  program?: string;
+  month?: number;
+  year?: number;
+  attendance?: {
+    completedMeetings?: number;
+    attendancePercentage?: number;
+  };
+};
+
+type GroupPaymentContext = {
+  batchName: string;
+  program: string;
+  month: number;
+  year: number;
+  completedMeetings: number;
+  attendancePercentage: number;
+} | null;
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -92,6 +124,31 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeZone: "Asia/Jakarta"
   }).format(new Date(value));
+}
+
+function monthName(month: number, year: number) {
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function monthInputValue(month: number, year: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function currentJakartaMonth() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit"
+  }).formatToParts(new Date());
+
+  return {
+    month: Number(parts.find((part) => part.type === "month")?.value || new Date().getMonth() + 1),
+    year: Number(parts.find((part) => part.type === "year")?.value || new Date().getFullYear())
+  };
 }
 
 async function getStudents(query = ""): Promise<Student[]> {
@@ -170,10 +227,44 @@ async function getPayments(studentId = ""): Promise<Payment[]> {
     notes: doc.notes || "",
     receiptUploadedToDrive: doc.receiptUploadedToDrive === true,
     source: doc.source || "",
+    billingMonth: doc.billingMonth || 0,
+    billingYear: doc.billingYear || 0,
+    completedMeetings: doc.completedMeetings || 0,
+    amountPerMeeting: doc.amountPerMeeting || 0,
+    batchName: doc.batchName || "",
     attendanceStatus: doc.attendanceStatus || "",
     classMode: doc.classMode || "",
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
   }));
+}
+
+async function getGroupPaymentContext(studentId = "", isGroupStudent = false): Promise<GroupPaymentContext> {
+  if (!studentId || !isGroupStudent) return null;
+
+  const db = await getMongoDb();
+  const currentPeriod = currentJakartaMonth();
+  const currentAssessment = (await db
+    .collection<GroupAssessmentDocument>(getMonthlyAssessmentsCollectionName())
+    .findOne({ studentId, month: currentPeriod.month, year: currentPeriod.year })) as WithId<GroupAssessmentDocument> | null;
+  const assessment =
+    currentAssessment ||
+    ((await db
+      .collection<GroupAssessmentDocument>(getMonthlyAssessmentsCollectionName())
+      .find({ studentId })
+      .sort({ year: -1, month: -1, updatedAt: -1 })
+      .limit(1)
+      .next()) as WithId<GroupAssessmentDocument> | null);
+
+  if (!assessment) return null;
+
+  return {
+    batchName: assessment.batchName || "",
+    program: assessment.program || "",
+    month: assessment.month || currentPeriod.month,
+    year: assessment.year || currentPeriod.year,
+    completedMeetings: assessment.attendance?.completedMeetings || 0,
+    attendancePercentage: assessment.attendance?.attendancePercentage || 0
+  };
 }
 
 function statusClassName(status: PaymentStatus) {
@@ -221,7 +312,11 @@ export default async function AdminPaymentsPage({
   }
 
   const [students, selectedStudent] = await Promise.all([getStudents(searchQuery), getSelectedStudent(selectedStudentId)]);
-  const payments = selectedStudent ? await getPayments(selectedStudent.studentId) : [];
+  const isGroupStudent = selectedStudent?.classType === "Basic Group";
+  const [payments, groupPaymentContext] = await Promise.all([
+    selectedStudent ? getPayments(selectedStudent.studentId) : [],
+    selectedStudent ? getGroupPaymentContext(selectedStudent.studentId, isGroupStudent) : null
+  ]);
   const totalPaid = payments.filter((payment) => payment.status === "Paid").reduce((sum, payment) => sum + payment.amountDue, 0);
   const totalUnpaid = payments.filter((payment) => payment.status === "Unpaid").reduce((sum, payment) => sum + payment.amountDue, 0);
 
@@ -230,7 +325,7 @@ export default async function AdminPaymentsPage({
       <AdminPageHeader
         active="payments"
         title="Student payments"
-        description="Payment records are created automatically from Present or Late attendance."
+        description="Review individual attendance payments and create flexible group payments from batch assessments."
         logoutAction={logoutAdmin}
       />
 
@@ -290,7 +385,11 @@ export default async function AdminPaymentsPage({
                       <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{selectedStudent.studentId}</span>
                     </div>
                     <p className="mt-2 text-sm font-semibold text-lead-gray">{selectedStudent.courseJoined} / {selectedStudent.classType} / {selectedStudent.classMode || "Mode not set"}</p>
-                    <p className="mt-2 text-sm text-lead-gray">Mark attendance as Present or Late to generate a payment due for that meeting.</p>
+                    <p className="mt-2 text-sm text-lead-gray">
+                      {isGroupStudent
+                        ? "Use the batch assessment attendance below to create this student's group payment."
+                        : "Mark attendance as Present or Late to generate a payment due for that meeting."}
+                    </p>
                   </div>
                   <div className="grid gap-2 text-sm font-bold md:text-right">
                     <p className="text-emerald-600">Paid: {formatRupiah(totalPaid)}</p>
@@ -307,6 +406,74 @@ export default async function AdminPaymentsPage({
                 </div>
               </Card>
 
+              {isGroupStudent ? (
+                <Card className="p-5">
+                  <h2 className="font-heading text-xl font-bold text-lead-navy">Create group payment</h2>
+                  <p className="mt-2 text-sm text-lead-gray">
+                    Pricing is open for now. Enter either a total amount, or a per-meeting amount and the system will multiply it by completed meetings from the batch assessment.
+                  </p>
+
+                  {groupPaymentContext ? (
+                    <>
+                      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                        <GroupPaymentStat label="Batch" value={groupPaymentContext.batchName || selectedStudent.courseJoined} helper={groupPaymentContext.program || selectedStudent.courseJoined} />
+                        <GroupPaymentStat label="Period" value={monthName(groupPaymentContext.month, groupPaymentContext.year)} helper="From monthly assessment" />
+                        <GroupPaymentStat label="Attendance" value={`${groupPaymentContext.completedMeetings}/12`} helper={`${groupPaymentContext.attendancePercentage}% completed`} />
+                      </div>
+
+                      <ActionFeedbackForm action={saveGroupStudentPayment} successMessage="Group payment saved successfully." className="mt-5 grid gap-4 md:grid-cols-2">
+                        <input type="hidden" name="studentId" value={selectedStudent.studentId} />
+                        <label className="grid gap-2 text-sm font-semibold text-lead-navy">
+                          Billing Month
+                          <input name="billingMonth" type="month" required defaultValue={monthInputValue(groupPaymentContext.month, groupPaymentContext.year)} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                        </label>
+                        <label className="grid gap-2 text-sm font-semibold text-lead-navy">
+                          Completed Meetings
+                          <input value={groupPaymentContext.completedMeetings} readOnly className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-lead-gray" />
+                        </label>
+                        <label className="grid gap-2 text-sm font-semibold text-lead-navy">
+                          Amount Per Meeting
+                          <input name="amountPerMeeting" type="number" min="0" placeholder="Optional" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                        </label>
+                        <label className="grid gap-2 text-sm font-semibold text-lead-navy">
+                          Total Amount Due
+                          <input name="totalAmountDue" type="number" min="0" placeholder="Required if per-meeting is empty" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                        </label>
+                        <select name="status" defaultValue="Unpaid" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
+                          {paymentStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                        </select>
+                        <input name="paidDate" type="date" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                        <select name="paymentMethod" defaultValue="" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
+                          <option value="">Payment method</option>
+                          {paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}
+                        </select>
+                        <input name="notes" placeholder="Notes, discount, package detail..." className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+                        <div className="flex flex-col gap-2 md:col-span-2 md:flex-row md:items-stretch">
+                          <label className="flex flex-1 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-lead-navy">
+                            <input type="checkbox" name="receiptUploadedToDrive" className="h-4 w-4 accent-lead-blue" />
+                            Payment receipt uploaded to Google Drive
+                          </label>
+                          <Button asChild type="button" variant="secondary" className="h-auto min-h-11">
+                            <a href={paymentReceiptsDriveUrl} target="_blank" rel="noreferrer">
+                              <ExternalLink className="h-4 w-4" />
+                              Open Google Drive
+                            </a>
+                          </Button>
+                        </div>
+                        <Button type="submit" size="lg" className="md:col-span-2">
+                          <ReceiptText className="h-4 w-4" />
+                          Save Group Payment
+                        </Button>
+                      </ActionFeedbackForm>
+                    </>
+                  ) : (
+                    <p className="mt-5 rounded-lg bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">
+                      No batch assessment found yet. Finalize this student's monthly assessment in Batches first, then create the group payment here.
+                    </p>
+                  )}
+                </Card>
+              ) : null}
+
               <Card className="p-5">
                 <h2 className="font-heading text-xl font-bold text-lead-navy">Payment history</h2>
                 <p className="mt-2 text-sm text-lead-gray">Update payment status, paid date, payment method, and notes here.</p>
@@ -316,7 +483,11 @@ export default async function AdminPaymentsPage({
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-heading font-bold text-lead-navy">Meeting {payment.meetingNumber}</h3>
+                            <h3 className="font-heading font-bold text-lead-navy">
+                              {payment.source === "batch-assessment" && payment.billingMonth && payment.billingYear
+                                ? `Group payment - ${monthName(payment.billingMonth, payment.billingYear)}`
+                                : `Meeting ${payment.meetingNumber}`}
+                            </h3>
                             <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(payment.status)}`}>{payment.status}</span>
                             {payment.attendanceStatus ? (
                               <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">
@@ -334,7 +505,11 @@ export default async function AdminPaymentsPage({
                               </span>
                             ) : null}
                           </div>
-                          <p className="mt-2 text-sm text-lead-gray">{formatDate(payment.meetingDate)} / {formatRupiah(payment.amountDue)}</p>
+                          <p className="mt-2 text-sm text-lead-gray">
+                            {payment.source === "batch-assessment"
+                              ? `${payment.batchName || "Batch"} / ${payment.completedMeetings || payment.meetingNumber}/12 meetings / ${formatRupiah(payment.amountDue)}`
+                              : `${formatDate(payment.meetingDate)} / ${formatRupiah(payment.amountDue)}`}
+                          </p>
                           <p className="mt-1 text-xs text-lead-gray">Paid date: {payment.paidDate ? formatDate(payment.paidDate) : "Not paid yet"} / Method: {payment.paymentMethod || "Not set"}</p>
                           {payment.notes ? <p className="mt-2 text-sm leading-6 text-lead-gray">{payment.notes}</p> : null}
                           {payment.status === "Unpaid" ? (
@@ -379,7 +554,13 @@ export default async function AdminPaymentsPage({
                       </div>
                     </div>
                   ))}
-                  {!payments.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No payment records yet. Mark attendance as Present or Late to generate one automatically.</p> : null}
+                  {!payments.length ? (
+                    <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">
+                      {isGroupStudent
+                        ? "No group payment records yet. Use the group payment form above after a batch assessment is finalized."
+                        : "No payment records yet. Mark attendance as Present or Late to generate one automatically."}
+                    </p>
+                  ) : null}
                 </div>
               </Card>
             </>
@@ -392,5 +573,15 @@ export default async function AdminPaymentsPage({
         </div>
       </section>
     </main>
+  );
+}
+
+function GroupPaymentStat({ label, value, helper }: { label: string; value: string; helper: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-lead-gray">{label}</p>
+      <p className="mt-2 font-heading text-xl font-extrabold text-lead-navy">{value}</p>
+      <p className="mt-1 text-xs leading-5 text-lead-gray">{helper}</p>
+    </div>
   );
 }
