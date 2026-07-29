@@ -219,6 +219,7 @@ export default async function ParentAttendancePortalPage({
   }
 
   const { student, attendance, assessment } = data;
+  const isGroupStudent = student.classType === "Basic Group";
   const latestAttendance = attendance[attendance.length - 1];
   const presentCount = countStatus(attendance, "Present");
   const lateCount = countStatus(attendance, "Late");
@@ -233,8 +234,8 @@ export default async function ParentAttendancePortalPage({
         <header className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Parent Portal</p>
-            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Attendance Report</h1>
-            <p className="mt-2 text-sm text-lead-gray">Read-only attendance view for parents.</p>
+            <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">{isGroupStudent ? "Progress Report" : "Attendance Report"}</h1>
+            <p className="mt-2 text-sm text-lead-gray">{isGroupStudent ? "Read-only monthly progress view for parents." : "Read-only attendance view for parents."}</p>
           </div>
         </header>
 
@@ -247,8 +248,9 @@ export default async function ParentAttendancePortalPage({
             </div>
           </div>
 
-          <div className="p-5">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          {!isGroupStudent ? (
+            <div className="p-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h3 className="font-heading text-xl font-bold text-lead-navy">Attendance to date</h3>
                 <p className="mt-1 text-sm text-lead-gray">Cumulative results for all recorded meetings.</p>
@@ -256,16 +258,18 @@ export default async function ParentAttendancePortalPage({
               <p className="text-sm font-semibold text-lead-gray">
                 Attendance rate: <span className="font-heading text-xl font-extrabold text-lead-blue">{attendanceRate === null ? "Not available" : `${attendanceRate}%`}</span>
               </p>
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-4">
+                <Summary label="Present" value={presentCount} total={countedMeetings} className="text-emerald-600" description={`Attended ${presentCount} ${meetingWord(presentCount)} on time.`} />
+                <Summary label="Late" value={lateCount} total={countedMeetings} className="text-yellow-700" description={`Attended ${lateCount} ${meetingWord(lateCount)} after the scheduled start time.`} />
+                <Summary label="Absent" value={absentCount} total={countedMeetings} className="text-rose-600" description={`Missed ${absentCount} scheduled ${meetingWord(absentCount)}.`} />
+                <Summary label="Cancelled" value={cancelledCount} total={attendance.length} className="text-slate-600" description={`${cancelledCount} ${meetingWord(cancelledCount)} cancelled and excluded from the attendance rate.`} />
+              </div>
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-4">
-              <Summary label="Present" value={presentCount} total={countedMeetings} className="text-emerald-600" description={`Attended ${presentCount} ${meetingWord(presentCount)} on time.`} />
-              <Summary label="Late" value={lateCount} total={countedMeetings} className="text-yellow-700" description={`Attended ${lateCount} ${meetingWord(lateCount)} after the scheduled start time.`} />
-              <Summary label="Absent" value={absentCount} total={countedMeetings} className="text-rose-600" description={`Missed ${absentCount} scheduled ${meetingWord(absentCount)}.`} />
-              <Summary label="Cancelled" value={cancelledCount} total={attendance.length} className="text-slate-600" description={`${cancelledCount} ${meetingWord(cancelledCount)} cancelled and excluded from the attendance rate.`} />
-            </div>
-          </div>
+          ) : null}
         </Card>
 
+        {!isGroupStudent ? (
         <Card className="p-5">
             <div className="flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-lg bg-blue-50 text-lead-blue">
@@ -317,6 +321,7 @@ export default async function ParentAttendancePortalPage({
               <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance has been marked yet.</p>
             )}
         </Card>
+        ) : null}
 
         <Card className="p-5">
           <div className="flex items-center gap-3">
