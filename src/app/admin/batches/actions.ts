@@ -289,6 +289,26 @@ export async function saveMonthlyAssessment(formData: FormData) {
       respect: numberInRange(formData.get("respect"), 1, 5, 3)
     }
   });
+  const ratings = {
+    communication: {
+      speaking: numberInRange(formData.get("speaking"), 1, 5, 3),
+      pronunciation: numberInRange(formData.get("pronunciation"), 1, 5, 3),
+      fluency: numberInRange(formData.get("fluency"), 1, 5, 3)
+    },
+    englishSkills: {
+      vocabulary: numberInRange(formData.get("vocabulary"), 1, 5, 3),
+      grammar: numberInRange(formData.get("grammar"), 1, 5, 3)
+    },
+    creativity: {
+      originalIdeas: numberInRange(formData.get("originalIdeas"), 1, 5, 3),
+      storytelling: numberInRange(formData.get("storytelling"), 1, 5, 3),
+      rolePlay: numberInRange(formData.get("rolePlay"), 1, 5, 3)
+    },
+    learningHabits: {
+      homework: numberInRange(formData.get("homework"), 1, 5, 3),
+      respect: numberInRange(formData.get("respect"), 1, 5, 3)
+    }
+  };
   const teacherCommentEn = clean(formData.get("teacherCommentEn")) || calculated.automaticComments.en;
   const teacherCommentId = clean(formData.get("teacherCommentId")) || calculated.automaticComments.id;
   const now = new Date();
@@ -312,6 +332,7 @@ export async function saveMonthlyAssessment(formData: FormData) {
         year,
         status: "finalized",
         ...calculated,
+        ratings,
         teacherComments: {
           en: teacherCommentEn,
           id: teacherCommentId

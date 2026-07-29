@@ -23,7 +23,9 @@ import {
   assessmentPrograms,
   getBatchesCollectionName,
   getMonthlyAssessmentsCollectionName,
-  type AssessmentGrade
+  type AssessmentAttendanceStatus,
+  type AssessmentGrade,
+  type MeetingAssessmentInput
 } from "@/lib/assessments";
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
@@ -60,9 +62,16 @@ type AssessmentDocument = {
   month?: number;
   year?: number;
   status?: string;
+  meetings?: MeetingAssessmentInput[];
   attendance?: { attendancePercentage?: number; completedMeetings?: number; grade?: AssessmentGrade };
   participation?: { totalStars?: number; grade?: AssessmentGrade };
+  communication?: { score?: number; grade?: AssessmentGrade };
+  englishSkills?: { score?: number; grade?: AssessmentGrade };
+  creativity?: { score?: number; grade?: AssessmentGrade };
+  learningHabits?: { score?: number; grade?: AssessmentGrade };
   overall?: { score?: number; grade?: AssessmentGrade };
+  ratings?: AssessmentRatings;
+  teacherComments?: { en?: string; id?: string };
   updatedAt?: Date;
 };
 
@@ -102,11 +111,36 @@ type Assessment = {
   participationStars: number;
   overallScore: number | null;
   overallGrade: AssessmentGrade | "";
+  meetings: MeetingAssessmentInput[];
+  ratings: AssessmentRatings;
+  teacherCommentEn: string;
+  teacherCommentId: string;
 };
 
 type Teacher = {
   id: string;
   name: string;
+};
+
+type AssessmentRatings = {
+  communication: {
+    speaking: number;
+    pronunciation: number;
+    fluency: number;
+  };
+  englishSkills: {
+    vocabulary: number;
+    grammar: number;
+  };
+  creativity: {
+    originalIdeas: number;
+    storytelling: number;
+    rolePlay: number;
+  };
+  learningHabits: {
+    homework: number;
+    respect: number;
+  };
 };
 
 function currentJakartaMonth() {
@@ -185,7 +219,11 @@ async function getBatchPageData() {
       completedMeetings: assessment.attendance?.completedMeetings || 0,
       participationStars: assessment.participation?.totalStars || 0,
       overallScore: assessment.overall?.score ?? null,
-      overallGrade: normalizeGrade(assessment.overall?.grade)
+      overallGrade: normalizeGrade(assessment.overall?.grade),
+      meetings: assessment.meetings || [],
+      ratings: defaultRatingsFromAssessment(assessment),
+      teacherCommentEn: assessment.teacherComments?.en || "",
+      teacherCommentId: assessment.teacherComments?.id || ""
     }))
   };
 }
@@ -209,10 +247,73 @@ function monthName(month: number, year: number) {
   }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
-export default async function AdminBatchesPage() {
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] || "" : value || "";
+}
+
+function numberParam(value: string | string[] | undefined, fallback: number) {
+  const parsed = Number(firstParam(value));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function starFromScore(score: number | undefined) {
+  if (!score) return 3;
+  return Math.max(1, Math.min(5, Math.round(score / 20)));
+}
+
+function defaultRatingsFromAssessment(assessment: AssessmentDocument): AssessmentRatings {
+  return {
+    communication: {
+      speaking: assessment.ratings?.communication?.speaking || starFromScore(assessment.communication?.score),
+      pronunciation: assessment.ratings?.communication?.pronunciation || starFromScore(assessment.communication?.score),
+      fluency: assessment.ratings?.communication?.fluency || starFromScore(assessment.communication?.score)
+    },
+    englishSkills: {
+      vocabulary: assessment.ratings?.englishSkills?.vocabulary || starFromScore(assessment.englishSkills?.score),
+      grammar: assessment.ratings?.englishSkills?.grammar || starFromScore(assessment.englishSkills?.score)
+    },
+    creativity: {
+      originalIdeas: assessment.ratings?.creativity?.originalIdeas || starFromScore(assessment.creativity?.score),
+      storytelling: assessment.ratings?.creativity?.storytelling || starFromScore(assessment.creativity?.score),
+      rolePlay: assessment.ratings?.creativity?.rolePlay || starFromScore(assessment.creativity?.score)
+    },
+    learningHabits: {
+      homework: assessment.ratings?.learningHabits?.homework || starFromScore(assessment.learningHabits?.score),
+      respect: assessment.ratings?.learningHabits?.respect || starFromScore(assessment.learningHabits?.score)
+    }
+  };
+}
+
+function defaultMeetingsFromAssessment(assessment?: Assessment) {
+  return Array.from({ length: 12 }, (_, index) => {
+    const meeting = assessment?.meetings[index];
+
+    return {
+      attendance: meeting?.attendance || "Present",
+      participationStars: meeting?.participationStars ?? 3,
+      minutesLate: meeting?.minutesLate ?? 0
+    };
+  }) as Array<{
+    attendance: AssessmentAttendanceStatus;
+    participationStars: number;
+    minutesLate: number;
+  }>;
+}
+
+export default async function AdminBatchesPage({
+  searchParams
+}: {
+  searchParams?: Promise<{
+    assessmentBatchId?: string | string[];
+    assessmentStudentId?: string | string[];
+    assessmentMonth?: string | string[];
+    assessmentYear?: string | string[];
+  }>;
+}) {
   noStore();
   const cookieStore = await cookies();
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const resolvedSearchParams = await searchParams;
 
   if (!isAdminConfigured()) {
     return (
@@ -243,6 +344,18 @@ export default async function AdminBatchesPage() {
   const activeBatches = batches.filter((batch) => batch.status === "active");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
   const assessmentsByStudent = new Map<string, Assessment>(assessments.map((assessment) => [assessment.studentId, assessment]));
+  const selectedAssessmentStudentId = firstParam(resolvedSearchParams?.assessmentStudentId);
+  const selectedAssessmentBatchId = firstParam(resolvedSearchParams?.assessmentBatchId);
+  const selectedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, month);
+  const selectedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, year);
+  const selectedAssessment = assessments.find(
+    (assessment) =>
+      assessment.studentId === selectedAssessmentStudentId &&
+      assessment.month === selectedAssessmentMonth &&
+      assessment.year === selectedAssessmentYear
+  );
+  const selectedAssessmentMeetings = defaultMeetingsFromAssessment(selectedAssessment);
+  const selectedAssessmentRatings = selectedAssessment?.ratings;
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -387,6 +500,12 @@ export default async function AdminBatchesPage() {
                                   <input type="hidden" name="studentId" value={student.studentId} />
                                   <button type="submit" className="text-xs font-bold text-rose-600 hover:text-rose-700">Remove</button>
                                 </ActionFeedbackForm>
+                                <a
+                                  href={`/admin/batches?assessmentBatchId=${encodeURIComponent(batch.id)}&assessmentStudentId=${encodeURIComponent(student.studentId)}&assessmentMonth=${month}&assessmentYear=${year}#monthly-assessment`}
+                                  className="mt-2 inline-flex text-xs font-bold text-lead-blue hover:text-blue-700"
+                                >
+                                  Assess/Edit
+                                </a>
                               </td>
                             </tr>
                           );
@@ -404,14 +523,30 @@ export default async function AdminBatchesPage() {
             })}
           </div>
 
-          <Card className="h-fit p-5">
+          <Card id="monthly-assessment" className="h-fit scroll-mt-6 p-5">
             <SectionTitle icon={ClipboardCheck} title="Monthly Assessment" description="Teachers enter attendance, stars, lateness, and monthly ratings. Scores calculate automatically." />
+            {selectedAssessment ? (
+              <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm font-bold text-lead-blue">
+                Editing saved assessment for {selectedAssessment.studentId} / {monthName(selectedAssessment.month, selectedAssessment.year)}.
+              </p>
+            ) : selectedAssessmentStudentId ? (
+              <p className="mt-4 rounded-lg bg-yellow-50 p-3 text-sm font-bold text-yellow-800">
+                No saved assessment found for the selected month yet. Saving will create it.
+              </p>
+            ) : null}
+            <form action="/admin/batches#monthly-assessment" className="mt-5 grid gap-3 rounded-xl border border-blue-100 bg-blue-50/40 p-4 sm:grid-cols-2">
+              <SelectField label="Batch" name="assessmentBatchId" defaultValue={selectedAssessmentBatchId || selectedAssessment?.batchId || ""} options={activeBatches.map((batch) => ({ label: batch.batchName, value: batch.id }))} />
+              <SelectField label="Student" name="assessmentStudentId" defaultValue={selectedAssessmentStudentId || selectedAssessment?.studentId || ""} options={students.filter((student) => student.activeBatchId).map((student) => ({ label: `${student.studentId} - ${student.studentName}`, value: student.studentId }))} />
+              <SelectField label="Month" name="assessmentMonth" defaultValue={String(selectedAssessmentMonth)} options={Array.from({ length: 12 }, (_, index) => ({ label: monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, ""), value: String(index + 1) }))} />
+              <Field label="Year" name="assessmentYear" type="number" defaultValue={selectedAssessmentYear} min={2020} max={2100} />
+              <Button type="submit" variant="secondary" className="sm:col-span-2">Load Saved Marks</Button>
+            </form>
             <ActionFeedbackForm action={saveMonthlyAssessment} successMessage="Monthly assessment saved." className="mt-5 grid gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <SelectField label="Batch" name="batchId" options={activeBatches.map((batch) => ({ label: batch.batchName, value: batch.id }))} required />
-                <SelectField label="Student" name="studentId" options={students.filter((student) => student.activeBatchId).map((student) => ({ label: `${student.studentId} - ${student.studentName}`, value: student.studentId }))} required />
-                <SelectField label="Month" name="month" defaultValue={String(month)} options={Array.from({ length: 12 }, (_, index) => ({ label: monthName(index + 1, year).replace(` ${year}`, ""), value: String(index + 1) }))} required />
-                <Field label="Year" name="year" type="number" defaultValue={year} min={2020} max={2100} required />
+                <SelectField label="Batch" name="batchId" defaultValue={selectedAssessmentBatchId || selectedAssessment?.batchId || ""} options={activeBatches.map((batch) => ({ label: batch.batchName, value: batch.id }))} required />
+                <SelectField label="Student" name="studentId" defaultValue={selectedAssessmentStudentId || selectedAssessment?.studentId || ""} options={students.filter((student) => student.activeBatchId).map((student) => ({ label: `${student.studentId} - ${student.studentName}`, value: student.studentId }))} required />
+                <SelectField label="Month" name="month" defaultValue={String(selectedAssessmentMonth)} options={Array.from({ length: 12 }, (_, index) => ({ label: monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, ""), value: String(index + 1) }))} required />
+                <Field label="Year" name="year" type="number" defaultValue={selectedAssessmentYear} min={2020} max={2100} required />
               </div>
 
               <div className="rounded-xl border border-slate-200">
@@ -420,8 +555,8 @@ export default async function AdminBatchesPage() {
                   <p className="text-xs text-lead-gray">Excused counts as completed for monthly assessment discipline.</p>
                 </div>
                 <div className="grid gap-3 p-4">
-                  {Array.from({ length: 12 }, (_, index) => (
-                    <MeetingRow key={index + 1} index={index + 1} />
+                  {selectedAssessmentMeetings.map((meeting, index) => (
+                    <MeetingRow key={index + 1} index={index + 1} meeting={meeting} />
                   ))}
                 </div>
               </div>
@@ -433,6 +568,7 @@ export default async function AdminBatchesPage() {
                   ["Pronunciation", "pronunciation"],
                   ["Fluency", "fluency"]
                 ]}
+                values={selectedAssessmentRatings?.communication}
               />
               <AssessmentGroup
                 title="English Skills"
@@ -440,6 +576,7 @@ export default async function AdminBatchesPage() {
                   ["Vocabulary", "vocabulary"],
                   ["Grammar", "grammar"]
                 ]}
+                values={selectedAssessmentRatings?.englishSkills}
               />
               <AssessmentGroup
                 title="Creativity"
@@ -448,6 +585,7 @@ export default async function AdminBatchesPage() {
                   ["Storytelling", "storytelling"],
                   ["Role-play", "rolePlay"]
                 ]}
+                values={selectedAssessmentRatings?.creativity}
               />
               <AssessmentGroup
                 title="Learning Habits"
@@ -455,15 +593,16 @@ export default async function AdminBatchesPage() {
                   ["Homework", "homework"],
                   ["Respect", "respect"]
                 ]}
+                values={selectedAssessmentRatings?.learningHabits}
               />
 
               <label className="grid gap-2 text-sm font-bold text-lead-navy">
                 Teacher Comment (English)
-                <textarea name="teacherCommentEn" rows={4} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-lead-navy outline-none transition focus:border-lead-blue focus:ring-4 focus:ring-blue-100" placeholder="Leave blank to use automatic comment." />
+                <textarea name="teacherCommentEn" rows={4} defaultValue={selectedAssessment?.teacherCommentEn || ""} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-lead-navy outline-none transition focus:border-lead-blue focus:ring-4 focus:ring-blue-100" placeholder="Leave blank to use automatic comment." />
               </label>
               <label className="grid gap-2 text-sm font-bold text-lead-navy">
                 Teacher Comment (Bahasa Indonesia)
-                <textarea name="teacherCommentId" rows={4} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-lead-navy outline-none transition focus:border-lead-blue focus:ring-4 focus:ring-blue-100" placeholder="Kosongkan untuk komentar otomatis." />
+                <textarea name="teacherCommentId" rows={4} defaultValue={selectedAssessment?.teacherCommentId || ""} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-lead-navy outline-none transition focus:border-lead-blue focus:ring-4 focus:ring-blue-100" placeholder="Kosongkan untuk komentar otomatis." />
               </label>
               <Button type="submit" className="w-full">Save Monthly Assessment</Button>
             </ActionFeedbackForm>
@@ -531,26 +670,44 @@ function SelectField({
   );
 }
 
-function MeetingRow({ index }: { index: number }) {
+function MeetingRow({
+  index,
+  meeting
+}: {
+  index: number;
+  meeting: {
+    attendance: AssessmentAttendanceStatus;
+    participationStars: number;
+    minutesLate: number;
+  };
+}) {
   return (
     <div className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[70px_1fr_90px_100px] sm:items-center">
       <p className="font-heading text-sm font-extrabold text-lead-navy">M{index}</p>
-      <select name={`attendance_${index}`} defaultValue="Present" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-navy">
+      <select name={`attendance_${index}`} defaultValue={meeting.attendance} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-navy">
         {assessmentAttendanceStatuses.map((status) => (
           <option key={status} value={status}>{status}</option>
         ))}
       </select>
-      <select name={`stars_${index}`} defaultValue="3" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-navy">
+      <select name={`stars_${index}`} defaultValue={String(meeting.participationStars)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-navy">
         {[0, 1, 2, 3, 4, 5].map((star) => (
           <option key={star} value={star}>{star} stars</option>
         ))}
       </select>
-      <input name={`late_${index}`} type="number" min={0} max={240} defaultValue={0} aria-label={`Meeting ${index} minutes late`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-lead-navy" />
+      <input name={`late_${index}`} type="number" min={0} max={240} defaultValue={meeting.minutesLate} aria-label={`Meeting ${index} minutes late`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-lead-navy" />
     </div>
   );
 }
 
-function AssessmentGroup({ title, items }: { title: string; items: Array<[string, string]> }) {
+function AssessmentGroup({
+  title,
+  items,
+  values
+}: {
+  title: string;
+  items: Array<[string, string]>;
+  values?: Record<string, number>;
+}) {
   return (
     <div className="rounded-xl border border-slate-200 p-4">
       <h3 className="font-heading text-lg font-bold text-lead-navy">{title}</h3>
@@ -558,7 +715,7 @@ function AssessmentGroup({ title, items }: { title: string; items: Array<[string
         {items.map(([label, name]) => (
           <label key={name} className="grid gap-2 text-sm font-bold text-lead-navy">
             {label}
-            <select name={name} defaultValue="3" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-navy">
+            <select name={name} defaultValue={String(values?.[name] || 3)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-lead-navy">
               {[1, 2, 3, 4, 5].map((star) => (
                 <option key={star} value={star}>{star} stars</option>
               ))}
