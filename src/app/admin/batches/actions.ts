@@ -58,6 +58,12 @@ async function resolveTeacher(teacherId: string) {
   return teacher;
 }
 
+function getBasicGroupStudentFilter() {
+  return {
+    $and: [getActiveStudentFilter(), { classType: "Basic Group" }]
+  };
+}
+
 function parseBatchFields(formData: FormData) {
   const batchName = clean(formData.get("batchName"));
   const program = clean(formData.get("program"));
@@ -165,7 +171,7 @@ export async function assignStudentToBatch(formData: FormData) {
   const updateResult = await db.collection(getStudentRegistrationCollectionName()).updateOne(
     {
       studentId,
-      ...getActiveStudentFilter()
+      ...getBasicGroupStudentFilter()
     },
     {
       $set: {
@@ -250,7 +256,7 @@ export async function saveMonthlyAssessment(formData: FormData) {
     db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId) }),
     db.collection(getStudentRegistrationCollectionName()).findOne({
       studentId,
-      ...getActiveStudentFilter()
+      ...getBasicGroupStudentFilter()
     })
   ]);
 

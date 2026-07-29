@@ -130,6 +130,12 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function getBasicGroupStudentFilter() {
+  return {
+    $and: [getActiveStudentFilter(), { classType: "Basic Group" }]
+  };
+}
+
 async function getBatchPageData() {
   const db = await getMongoDb();
   await ensureDefaultTeachers(db);
@@ -138,7 +144,7 @@ async function getBatchPageData() {
   const [batchDocs, teacherDocs, studentDocs, assessmentDocs] = await Promise.all([
     db.collection<BatchDocument>(getBatchesCollectionName()).find({}).sort({ status: 1, startDate: -1 }).limit(100).toArray() as Promise<WithId<BatchDocument>[]>,
     db.collection<TeacherDocument>(getTeachersCollectionName()).find({ active: true }).sort({ name: 1 }).toArray(),
-    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>,
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getBasicGroupStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>,
     db.collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName()).find({ month, year }).limit(2000).toArray() as Promise<WithId<AssessmentDocument>[]>
   ]);
 
