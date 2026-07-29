@@ -85,6 +85,15 @@ function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function getIndividualAttendanceStudentFilter(): Filter<StudentDocument> {
+  return {
+    $and: [
+      getActiveStudentFilter(),
+      { classType: { $ne: "Basic Group" } }
+    ]
+  };
+}
+
 function formatDate(value: string) {
   if (!value) return "Not set";
   return new Intl.DateTimeFormat("en", {
@@ -103,7 +112,7 @@ async function getStudents(query = ""): Promise<Student[]> {
         }))
       }
     : {};
-  const filter = search ? { $and: [getActiveStudentFilter(), searchFilter] } : getActiveStudentFilter();
+  const filter = search ? { $and: [getIndividualAttendanceStudentFilter(), searchFilter] } : getIndividualAttendanceStudentFilter();
 
   const docs = (await db
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
@@ -130,7 +139,7 @@ async function getSelectedStudent(studentId = "") {
 
   const db = await getMongoDb();
   const doc = await db.collection<StudentDocument>(getStudentRegistrationCollectionName()).findOne({
-    $and: [{ studentId }, getActiveStudentFilter()]
+    $and: [{ studentId }, getIndividualAttendanceStudentFilter()]
   });
   if (!doc) return null;
 
