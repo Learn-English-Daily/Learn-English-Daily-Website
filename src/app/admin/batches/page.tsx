@@ -586,12 +586,6 @@ export default async function AdminBatchesPage({
                   <p className="text-xs text-lead-gray">Excused counts as completed for monthly assessment discipline.</p>
                 </div>
                 <div className="grid gap-3 p-4">
-                  <div className="hidden rounded-lg bg-slate-100 px-3 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-lead-gray 2xl:grid 2xl:grid-cols-[58px_minmax(0,1fr)_110px_110px]">
-                    <span>Meet</span>
-                    <span>Status</span>
-                    <span>Stars</span>
-                    <span>Late mins</span>
-                  </div>
                   {selectedAssessmentMeetings.map((meeting, index) => (
                     <MeetingRow key={index + 1} index={index + 1} meeting={meeting} />
                   ))}
@@ -727,26 +721,26 @@ function MeetingRow({
   };
 }) {
   return (
-    <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_8px_18px_rgba(15,23,42,0.04)] 2xl:grid-cols-[58px_minmax(0,1fr)_110px_110px] 2xl:items-center">
-      <p className="rounded-lg bg-blue-50 px-3 py-2 text-center font-heading text-sm font-extrabold text-lead-blue">M{index}</p>
-      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray 2xl:block">
-        <span className="2xl:hidden">Status</span>
+    <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+      <p className="w-fit rounded-lg bg-blue-50 px-3 py-2 text-center font-heading text-sm font-extrabold text-lead-blue">M{index}</p>
+      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
+        <span>Status</span>
         <select name={`attendance_${index}`} defaultValue={meeting.attendance} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-lead-navy">
           {assessmentAttendanceStatuses.map((status) => (
             <option key={status} value={status}>{status}</option>
           ))}
         </select>
       </label>
-      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray 2xl:block">
-        <span className="2xl:hidden">Stars</span>
+      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
+        <span>Stars</span>
         <select name={`stars_${index}`} defaultValue={String(meeting.participationStars)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-lead-navy">
           {[0, 1, 2, 3, 4, 5].map((star) => (
             <option key={star} value={star}>{star} stars</option>
           ))}
         </select>
       </label>
-      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray 2xl:block">
-        <span className="2xl:hidden">Late mins</span>
+      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
+        <span>Late mins</span>
         <input name={`late_${index}`} type="number" min={0} max={240} defaultValue={meeting.minutesLate} aria-label={`Meeting ${index} minutes late`} placeholder="0" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold normal-case tracking-normal text-lead-navy" />
       </label>
     </div>
