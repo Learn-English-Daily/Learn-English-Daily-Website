@@ -58,7 +58,7 @@ import {
 } from "@/lib/finance";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
-import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getTeachersCollectionName, type TeacherDocument } from "@/lib/teachers";
 
 export const dynamic = "force-dynamic";
@@ -320,6 +320,10 @@ function branchFromMode(mode = "") {
   return mode === "Offline" ? "Offline Academy" : "Online Academy";
 }
 
+function normalizeFinanceName(value = "") {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function revenueAmount(income: NormalizedIncome) {
   if (income.status === "Refunded") return -income.amount;
   if (income.status === "Paid" || income.status === "Partial") return income.amount;
@@ -381,15 +385,24 @@ async function getFinanceData(searchParams: SearchParams) {
     db.collection<FundMovementDocument>(getFinanceFundMovementsCollectionName()).find({}).sort({ movementDate: -1 }).limit(10000).toArray() as Promise<WithId<FundMovementDocument>[]>,
     db.collection<ProfitDistributionDocument>(getFinanceProfitDistributionsCollectionName()).find({}).sort({ distributionDate: -1 }).limit(10000).toArray() as Promise<WithId<ProfitDistributionDocument>[]>,
     db.collection<BudgetDocument>(getFinanceBudgetsCollectionName()).find({}).sort({ year: -1 }).limit(1000).toArray() as Promise<WithId<BudgetDocument>[]>,
-    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({}).sort({ createdAt: -1 }).limit(50000).toArray() as Promise<WithId<StudentDocument>[]>,
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).sort({ createdAt: -1 }).limit(50000).toArray() as Promise<WithId<StudentDocument>[]>,
     db.collection<TeacherDocument>(getTeachersCollectionName()).find({ active: true }).sort({ name: 1 }).toArray()
   ]);
 
-  const existingIncome: NormalizedIncome[] = studentPayments.map((payment) => ({
+  const activeStudentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
+  const matchedStudentPayments = studentPayments.flatMap((payment) => {
+    const student = payment.studentId ? activeStudentsById.get(payment.studentId) : undefined;
+    if (!student) return [];
+    const paymentName = normalizeFinanceName(payment.studentName);
+    const registeredName = normalizeFinanceName(student.studentName);
+    if (paymentName && registeredName && paymentName !== registeredName) return [];
+    return [{ payment, student }];
+  });
+  const existingIncome: NormalizedIncome[] = matchedStudentPayments.map(({ payment, student }) => ({
     id: payment._id.toString(),
-    student: payment.studentName || payment.studentId || "Student",
-    course: payment.courseJoined || "",
-    branch: branchFromMode(payment.classMode),
+    student: student.studentName || payment.studentName || payment.studentId || "Student",
+    course: student.courseJoined || payment.courseJoined || "",
+    branch: branchFromMode(student.classMode || payment.classMode),
     teacher: "",
     paymentMethod: payment.paymentMethod || "",
     paymentDate: payment.status === "Paid" ? payment.paidDate || payment.meetingDate || "" : payment.meetingDate || "",

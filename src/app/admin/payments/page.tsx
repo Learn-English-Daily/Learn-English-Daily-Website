@@ -138,6 +138,10 @@ function monthInputValue(month: number, year: number) {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
+function normalizePaymentName(value = "") {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function currentJakartaMonth() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
@@ -205,10 +209,11 @@ async function getSelectedStudent(studentId = "") {
   };
 }
 
-async function getPayments(studentId = ""): Promise<Payment[]> {
+async function getPayments(studentId = "", studentName = ""): Promise<Payment[]> {
   if (!studentId) return [];
 
   const db = await getMongoDb();
+  const normalizedStudentName = normalizePaymentName(studentName);
   const docs = (await db
     .collection<PaymentDocument>(getStudentPaymentsCollectionName())
     .find({ studentId })
@@ -216,7 +221,10 @@ async function getPayments(studentId = ""): Promise<Payment[]> {
     .limit(200)
     .toArray()) as WithId<PaymentDocument>[];
 
-  return docs.map((doc) => ({
+  return docs.filter((doc) => {
+    const paymentName = normalizePaymentName(doc.studentName);
+    return !normalizedStudentName || !paymentName || paymentName === normalizedStudentName;
+  }).map((doc) => ({
     id: doc._id.toString(),
     meetingNumber: doc.meetingNumber || 0,
     meetingDate: doc.meetingDate || "",
@@ -314,7 +322,7 @@ export default async function AdminPaymentsPage({
   const [students, selectedStudent] = await Promise.all([getStudents(searchQuery), getSelectedStudent(selectedStudentId)]);
   const isGroupStudent = selectedStudent?.classType === "Basic Group";
   const [payments, groupPaymentContext] = await Promise.all([
-    selectedStudent ? getPayments(selectedStudent.studentId) : [],
+    selectedStudent ? getPayments(selectedStudent.studentId, selectedStudent.studentName) : [],
     selectedStudent ? getGroupPaymentContext(selectedStudent.studentId, isGroupStudent) : null
   ]);
   const totalPaid = payments.filter((payment) => payment.status === "Paid").reduce((sum, payment) => sum + payment.amountDue, 0);
