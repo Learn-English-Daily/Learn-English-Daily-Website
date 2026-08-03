@@ -9,7 +9,6 @@ export type TeacherDocument = {
 
 export const defaultTeachers = [
   { id: "eva-yulia", name: "Ms Eva Yulia" },
-  { id: "fiana-alsaban", name: "Ms Fiana Al'Saban" },
   { id: "adam", name: "Mr Adam" }
 ] as const;
 

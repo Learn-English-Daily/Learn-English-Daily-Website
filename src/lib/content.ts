@@ -94,11 +94,11 @@ export const sharedContent = {
       accent: "yellow"
     },
     {
-      name: "Ms. AlFiana Sa'ban ",
-      qualification: "BS, English Education",
-      experience: "1 years",
-      specialization: "Don't stop being yourself just because others don't get it",
-      initials: "AS",
+      name: "Mr. Adam",
+      qualification: "English Coach",
+      experience: "LEAD Teacher",
+      specialization: "Consistency turns small daily efforts into real progress.",
+      initials: "AD",
       accent: "green"
     }
   ]
