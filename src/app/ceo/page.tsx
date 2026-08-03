@@ -424,6 +424,9 @@ export default async function CeoDashboardPage({
             <Button asChild variant="secondary">
               <a href={`/ceo?period=${period}`}><RefreshCcw className="h-4 w-4" />Refresh</a>
             </Button>
+            <Button asChild variant="yellow">
+              <a href="/ceo/finance"><CircleDollarSign className="h-4 w-4" />Finance Center</a>
+            </Button>
             <form action={logoutCeo}><Button type="submit">Logout</Button></form>
           </div>
         </div>
