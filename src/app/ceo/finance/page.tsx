@@ -69,8 +69,10 @@ export const metadata: Metadata = {
 };
 
 type ReportPeriod = "month" | "quarter" | "year" | "all";
+type FinanceTab = "dashboard" | "expenses" | "income";
 
 type SearchParams = {
+  tab?: string | string[];
   period?: string | string[];
   month?: string | string[];
   year?: string | string[];
@@ -337,11 +339,21 @@ async function getFinanceData(searchParams: SearchParams) {
   const db = await getMongoDb();
   const requestedPeriod = firstParam(searchParams.period);
   const period: ReportPeriod = periodOptions.some((option) => option.value === requestedPeriod) ? (requestedPeriod as ReportPeriod) : "month";
+  const hasAppliedFilters = Boolean(
+    firstParam(searchParams.period) ||
+    firstParam(searchParams.month) ||
+    firstParam(searchParams.year) ||
+    firstParam(searchParams.course) ||
+    firstParam(searchParams.teacher) ||
+    firstParam(searchParams.branch) ||
+    firstParam(searchParams.status) ||
+    firstParam(searchParams.category)
+  );
   const today = jakartaDateKey(new Date());
   const [currentYear, currentMonth] = today.split("-").map(Number);
   const selectedMonth = Number(firstParam(searchParams.month)) || currentMonth;
   const selectedYear = Number(firstParam(searchParams.year)) || currentYear;
-  const range = getDateRange(period, selectedMonth, selectedYear);
+  const range = hasAppliedFilters ? getDateRange(period, selectedMonth, selectedYear) : { start: null, end: null, label: "Current finance position" };
   const selectedCourse = firstParam(searchParams.course);
   const selectedTeacher = firstParam(searchParams.teacher);
   const selectedBranchParam = firstParam(searchParams.branch);
@@ -435,9 +447,9 @@ async function getFinanceData(searchParams: SearchParams) {
   const operatingExpenses = expenseRows.reduce((sum, expense) => sum + expense.amount, 0);
   const totalExpenses = operatingExpenses + teacherExpenseTotal + founderAllowanceTotal;
   const netProfit = totalRevenue - totalExpenses;
-  const outstandingPayments =
-    allIncome.filter((income) => income.status === "Pending" || income.status === "Partial").reduce((sum, income) => sum + income.amount, 0) +
-    studentPayments.filter((payment) => payment.status === "Unpaid").reduce((sum, payment) => sum + (payment.amountDue || 0), 0);
+  const outstandingPayments = allIncome
+    .filter((income) => income.status === "Pending" || income.status === "Partial")
+    .reduce((sum, income) => sum + income.amount, 0);
   const fundBalance = (fundType: string) =>
     fundMovements
       .filter((movement) => movement.fundType === fundType)
@@ -544,7 +556,7 @@ async function getFinanceData(searchParams: SearchParams) {
   return {
     period,
     range,
-    filters: { selectedCourse, selectedTeacher, selectedBranch, selectedStatus, selectedCategory, selectedMonth, selectedYear },
+    filters: { selectedCourse, selectedTeacher, selectedBranch, selectedStatus, selectedCategory, selectedMonth, selectedYear, hasAppliedFilters },
     options: {
       courses: [...new Set([...allIncome.map((income) => income.course), ...students.map((student) => student.courseJoined || "")].filter(Boolean))],
       teachers: [...new Set([...teachers.map((teacher) => teacher.name), ...manualIncomeRows.map((income) => income.teacher)].filter(Boolean))]
@@ -601,6 +613,18 @@ export default async function FinanceManagementPage({
   }
 
   const data = await getFinanceData(resolvedSearchParams);
+  const requestedTab = firstParam(resolvedSearchParams.tab);
+  const activeTab: FinanceTab = requestedTab === "expenses" || requestedTab === "income" ? requestedTab : "dashboard";
+  const tabHref = (tab: FinanceTab) => {
+    const params = new URLSearchParams();
+    const filterKeys: Array<keyof SearchParams> = ["period", "month", "year", "course", "teacher", "branch", "status", "category"];
+    for (const key of filterKeys) {
+      const value = firstParam(resolvedSearchParams[key]);
+      if (value) params.set(key, value);
+    }
+    params.set("tab", tab);
+    return `/ceo/finance?${params.toString()}`;
+  };
   const today = jakartaDateKey(new Date());
   const summaryRows = [
     { metric: "Total Revenue", amount: data.kpis.totalRevenue },
@@ -654,153 +678,152 @@ export default async function FinanceManagementPage({
       </header>
 
       <div className="container-shell grid gap-6 py-8">
-        <Card className="p-4 print:hidden">
-          <form action="/ceo/finance" className="grid gap-3 lg:grid-cols-5">
-            <SelectField label="Report" name="period" defaultValue={data.period} options={periodOptions} />
-            <SelectField label="Month" name="month" defaultValue={String(data.filters.selectedMonth)} options={monthOptions} />
-            <Field label="Year" name="year" type="number" min={2020} max={2100} defaultValue={data.filters.selectedYear} />
-            <SelectField label="Course" name="course" defaultValue={data.filters.selectedCourse} options={["", ...data.options.courses].map((course) => ({ label: course || "All courses", value: course }))} />
-            <SelectField label="Teacher" name="teacher" defaultValue={data.filters.selectedTeacher} options={["", ...data.options.teachers].map((teacher) => ({ label: teacher || "All teachers", value: teacher }))} />
-            <SelectField label="Branch" name="branch" defaultValue={data.filters.selectedBranch} options={branchFilterOptions} />
-            <SelectField label="Income Status" name="status" defaultValue={data.filters.selectedStatus} options={["", ...financePaymentStatuses].map((status) => ({ label: status || "All statuses", value: status }))} />
-            <SelectField label="Expense Category" name="category" defaultValue={data.filters.selectedCategory} options={["", ...financeExpenseCategories].map((category) => ({ label: category || "All categories", value: category }))} />
-            <div className="flex items-end lg:col-span-2"><Button type="submit" className="w-full">Apply Filters</Button></div>
-          </form>
-        </Card>
+        <nav className="grid gap-3 rounded-2xl bg-white p-2 shadow-soft sm:grid-cols-3 print:hidden">
+          <FinanceTabLink href={tabHref("dashboard")} active={activeTab === "dashboard"} title="Dashboard" description="Overview and filters" />
+          <FinanceTabLink href={tabHref("expenses")} active={activeTab === "expenses"} title="Expenses" description="Cash out" />
+          <FinanceTabLink href={tabHref("income")} active={activeTab === "income"} title="Income" description="Student payments and other income" />
+        </nav>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Financial Dashboard</h2>
-            <p className="text-sm text-lead-gray">Report range: {data.range.label}</p>
-          </div>
-          <FinanceExportButtons incomeRows={incomeExportRows} expenseRows={expenseExportRows} summaryRows={summaryRows} />
-        </div>
+        {activeTab === "dashboard" ? (
+          <>
+            <Card className="p-4 print:hidden">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="font-heading text-xl font-bold text-lead-navy">Dashboard Filters</h2>
+                  <p className="text-sm text-lead-gray">
+                    {data.filters.hasAppliedFilters ? `Showing filtered details for ${data.range.label}.` : "No filter applied. Showing the current overall finance position."}
+                  </p>
+                </div>
+                {data.filters.hasAppliedFilters ? <Button asChild variant="secondary" size="sm"><a href="/ceo/finance?tab=dashboard">Clear Filters</a></Button> : null}
+              </div>
+              <form action="/ceo/finance" className="grid gap-3 lg:grid-cols-5">
+                <input type="hidden" name="tab" value="dashboard" />
+                <SelectField label="Report" name="period" defaultValue={data.period} options={periodOptions} />
+                <SelectField label="Month" name="month" defaultValue={String(data.filters.selectedMonth)} options={monthOptions} />
+                <Field label="Year" name="year" type="number" min={2020} max={2100} defaultValue={data.filters.selectedYear} />
+                <SelectField label="Course" name="course" defaultValue={data.filters.selectedCourse} options={["", ...data.options.courses].map((course) => ({ label: course || "All courses", value: course }))} />
+                <SelectField label="Teacher" name="teacher" defaultValue={data.filters.selectedTeacher} options={["", ...data.options.teachers].map((teacher) => ({ label: teacher || "All teachers", value: teacher }))} />
+                <SelectField label="Branch" name="branch" defaultValue={data.filters.selectedBranch} options={branchFilterOptions} />
+                <SelectField label="Income Status" name="status" defaultValue={data.filters.selectedStatus} options={["", ...financePaymentStatuses].map((status) => ({ label: status || "All statuses", value: status }))} />
+                <SelectField label="Expense Category" name="category" defaultValue={data.filters.selectedCategory} options={["", ...financeExpenseCategories].map((category) => ({ label: category || "All categories", value: category }))} />
+                <div className="flex items-end lg:col-span-2"><Button type="submit" className="w-full">Apply Filters</Button></div>
+              </form>
+            </Card>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Kpi icon={CircleDollarSign} label="Total Revenue" value={formatFinanceCurrency(data.kpis.totalRevenue)} tone="good" />
-          <Kpi icon={ReceiptText} label="Total Expenses" value={formatFinanceCurrency(data.kpis.totalExpenses)} tone="danger" />
-          <Kpi icon={TrendingUp} label="Net Profit" value={formatFinanceCurrency(data.kpis.netProfit)} tone={data.kpis.netProfit >= 0 ? "good" : "danger"} />
-          <Kpi icon={WalletCards} label="Outstanding Payments" value={formatFinanceCurrency(data.kpis.outstandingPayments)} tone="warn" />
-          <Kpi icon={Banknote} label="Cash Available" value={formatFinanceCurrency(data.kpis.cashAvailable)} tone={data.kpis.cashAvailable >= 0 ? "good" : "danger"} />
-          <Kpi icon={ShieldAlert} label="Emergency Fund" value={formatFinanceCurrency(data.kpis.emergencyFund)} tone="warn" />
-          <Kpi icon={PiggyBank} label="Business Growth Fund" value={formatFinanceCurrency(data.kpis.growthFund)} tone="blue" />
-          <Kpi icon={Landmark} label="LEAD Retained Profit" value={formatFinanceCurrency(data.kpis.leadRetainedProfit)} tone="blue" />
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-3">
-          <ChartCard title="Revenue by Month" icon={BarChart3} rows={data.charts.incomeByMonth} />
-          <ChartCard title="Expenses by Month" icon={BarChart3} rows={data.charts.expenseByMonth} />
-          <ChartCard title="Profit Trend" icon={LineChart} rows={data.charts.profitByMonth} allowNegative />
-          <ChartCard title="Student Growth" icon={GraduationCap} rows={data.charts.studentGrowthByMonth} />
-          <ChartCard title="Course Revenue" icon={BriefcaseBusiness} rows={data.charts.revenueByCourse} />
-          <ChartCard title="Revenue Split" icon={Building2} rows={data.charts.revenueByBranch} />
-          <ChartCard title="Expense Categories" icon={ReceiptText} rows={data.charts.expenseByCategory} />
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-2 print:hidden">
-          <EntryCard title="Record Income" action={recordFinanceIncome} successMessage="Income recorded.">
-            <Field label="Student" name="student" required />
-            <Field label="Course" name="course" placeholder="Foundation English" required />
-            <SelectField label="Online / Offline" name="branch" options={financeBranches} required />
-            <Field label="Teacher" name="teacher" />
-            <SelectField label="Payment Method" name="paymentMethod" options={financePaymentMethods} required />
-            <Field label="Payment Date" name="paymentDate" type="date" defaultValue={today} required />
-            <Field label="Amount" name="amount" type="number" min={0} required />
-            <SelectField label="Currency" name="currency" options={financeCurrencies} defaultValue="IDR" />
-            <Field label="Invoice Number" name="invoiceNumber" />
-            <Field label="Discount" name="discount" type="number" min={0} />
-            <SelectField label="Status" name="status" options={financePaymentStatuses} defaultValue="Paid" required />
-            <Field label="Notes" name="notes" />
-          </EntryCard>
-
-          <EntryCard title="Record Expense" action={recordFinanceExpense} successMessage="Expense recorded.">
-            <Field label="Date" name="expenseDate" type="date" defaultValue={today} required />
-            <SelectField label="Category" name="category" options={financeExpenseCategories} required />
-            <Field label="Description" name="description" required />
-            <Field label="Amount" name="amount" type="number" min={0} required />
-            <Field label="Receipt URL" name="receiptUrl" placeholder="Google Drive / receipt link" />
-            <Field label="Paid By" name="paidBy" />
-            <Field label="Approved By" name="approvedBy" />
-            <SelectField label="Payment Method" name="paymentMethod" options={financePaymentMethods} required />
-            <SelectField label="Branch" name="branch" options={financeBranches} required />
-          </EntryCard>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-2 print:hidden">
-          <EntryCard title="Teacher Payment" action={recordTeacherPayment} successMessage="Teacher payment recorded.">
-            <Field label="Teacher" name="teacher" required />
-            <Field label="Period" name="period" type="month" required />
-            <Field label="Classes Taught" name="classesTaught" type="number" min={0} />
-            <Field label="Students" name="students" type="number" min={0} />
-            <Field label="Salary" name="salary" type="number" min={0} />
-            <Field label="Bonuses" name="bonuses" type="number" min={0} />
-            <Field label="Adjustments" name="adjustments" type="number" min={0} />
-            <SelectField label="Status" name="status" options={financePaymentStatuses} defaultValue="Pending" />
-          </EntryCard>
-
-          <EntryCard title="Founder Allowance" action={recordFounderAllowance} successMessage="Founder allowance recorded.">
-            <Field label="Founder Name" name="founderName" required />
-            <Field label="Role" name="role" required />
-            <Field label="Period" name="period" type="month" required />
-            <Field label="Allowance" name="allowance" type="number" min={0} required />
-            <SelectField label="Status" name="status" options={founderAllowanceStatuses} defaultValue="Pending" />
-          </EntryCard>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-3 print:hidden">
-          <EntryCard title="Fund Movement" action={recordFundMovement} successMessage="Fund movement saved.">
-            <SelectField label="Fund" name="fundType" options={fundTypes} required />
-            <SelectField label="Movement" name="movementType" options={fundMovementTypes} required />
-            <Field label="Date" name="movementDate" type="date" defaultValue={today} required />
-            <Field label="Amount" name="amount" type="number" min={0} required />
-            <Field label="Reason" name="reason" />
-          </EntryCard>
-
-          <EntryCard title="Profit Distribution Approval" action={recordProfitDistribution} successMessage="Profit distribution recorded.">
-            <Field label="Period" name="period" type="month" required />
-            <Field label="Monthly Net Profit" name="monthlyNetProfit" type="number" min={0} />
-            <Field label="Business Retained Profit" name="retainedProfit" type="number" min={0} />
-            <Field label="Distribution Amount" name="distributionAmount" type="number" min={0} />
-            <Field label="Founder Share" name="founderShare" />
-            <Field label="Distribution Date" name="distributionDate" type="date" defaultValue={today} required />
-            <SelectField label="Approval Status" name="approvalStatus" options={profitDistributionStatuses} defaultValue="Pending Approval" />
-          </EntryCard>
-
-          <EntryCard title="Annual Budget" action={recordAnnualBudget} successMessage="Budget saved.">
-            <Field label="Year" name="year" type="number" min={2020} max={2100} defaultValue={new Date().getFullYear()} required />
-            <SelectField label="Category" name="category" options={financeBudgetCategories} required />
-            <Field label="Budget Amount" name="budgetAmount" type="number" min={0} required />
-          </EntryCard>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-2">
-          <ReportTable title="Student-wise Payments" rows={data.rows.studentPaymentsByStudent.slice(0, 50).map((student) => [student.student, student.course || "-", student.branch || "-", String(student.payments), formatFinanceCurrency(student.paidAmount)])} headings={["Student", "Course", "Branch", "Payments", "Paid Amount"]} />
-          <ReportTable title="Student-wise Dues" rows={data.rows.studentDuesByStudent.slice(0, 50).map((student) => [student.student, student.course || "-", student.branch || "-", String(student.payments), formatFinanceCurrency(student.amount)])} headings={["Student", "Course", "Branch", "Payments", "Total Due"]} />
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-2">
-          <ReportTable title="Income Management" rows={data.rows.income.slice(0, 25).map((income) => [income.paymentDate, income.student, income.course, income.branch, income.status, formatFinanceCurrency(income.amount)])} headings={["Date", "Student", "Course", "Branch", "Status", "Amount"]} />
-          <ReportTable title="Expense Management" rows={data.rows.expenses.slice(0, 25).map((expense) => [expense.expenseDate, expense.category, expense.description, expense.branch, expense.paymentMethod, formatFinanceCurrency(expense.amount)])} headings={["Date", "Category", "Description", "Branch", "Method", "Amount"]} />
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-2">
-          <ReportTable title="Course Profitability" rows={data.rows.courseProfitability.map((course) => [course.course, formatFinanceCurrency(course.revenue), formatFinanceCurrency(course.teacherCost), formatFinanceCurrency(course.marketingCost), formatFinanceCurrency(course.platformCost), formatFinanceCurrency(course.materialsCost), formatFinanceCurrency(course.profit), `${course.margin}%`])} headings={["Course", "Revenue", "Teacher", "Marketing", "Platform", "Materials", "Profit", "Margin"]} />
-          <ReportTable title="Budget Performance" rows={data.rows.budgetRows.map((budget) => [String(budget.year), budget.category, formatFinanceCurrency(budget.budgetAmount), formatFinanceCurrency(budget.actual), formatFinanceCurrency(budget.difference), formatFinanceCurrency(budget.remaining)])} headings={["Year", "Category", "Budget", "Actual", "Difference", "Remaining"]} />
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-2">
-          <ReportTable title="Profit Distribution" rows={data.rows.profitDistributions.slice(0, 20).map((distribution) => [distribution.period || "", formatFinanceCurrency(distribution.monthlyNetProfit || 0), formatFinanceCurrency(distribution.retainedProfit || 0), formatFinanceCurrency(distribution.distributionAmount || 0), distribution.founderShare || "", distribution.approvalStatus || ""])} headings={["Period", "Net Profit", "Retained", "Distribution", "Founder Share", "Status"]} />
-          <Card className="p-5">
-            <h2 className="font-heading text-xl font-bold text-lead-navy">Notifications</h2>
-            <div className="mt-4 grid gap-3">
-              {data.rows.notifications.map((notification) => (
-                <p key={notification} className="rounded-lg bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">{notification}</p>
-              ))}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Financial Dashboard</h2>
+                <p className="text-sm text-lead-gray">Report range: {data.range.label}</p>
+              </div>
+              <FinanceExportButtons incomeRows={incomeExportRows} expenseRows={expenseExportRows} summaryRows={summaryRows} />
             </div>
-          </Card>
-        </section>
+
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Kpi icon={CircleDollarSign} label="Total Revenue" value={formatFinanceCurrency(data.kpis.totalRevenue)} tone="good" />
+              <Kpi icon={ReceiptText} label="Total Expenses" value={formatFinanceCurrency(data.kpis.totalExpenses)} tone="danger" />
+              <Kpi icon={TrendingUp} label="Net Profit" value={formatFinanceCurrency(data.kpis.netProfit)} tone={data.kpis.netProfit >= 0 ? "good" : "danger"} />
+              <Kpi icon={WalletCards} label="Outstanding Payments" value={formatFinanceCurrency(data.kpis.outstandingPayments)} tone="warn" />
+              <Kpi icon={Banknote} label="Cash Available" value={formatFinanceCurrency(data.kpis.cashAvailable)} tone={data.kpis.cashAvailable >= 0 ? "good" : "danger"} />
+              <Kpi icon={ShieldAlert} label="Emergency Fund" value={formatFinanceCurrency(data.kpis.emergencyFund)} tone="warn" />
+              <Kpi icon={PiggyBank} label="Business Growth Fund" value={formatFinanceCurrency(data.kpis.growthFund)} tone="blue" />
+              <Kpi icon={Landmark} label="LEAD Retained Profit" value={formatFinanceCurrency(data.kpis.leadRetainedProfit)} tone="blue" />
+            </section>
+
+            <section className="grid gap-6 xl:grid-cols-3">
+              <ChartCard title="Revenue by Month" icon={BarChart3} rows={data.charts.incomeByMonth} />
+              <ChartCard title="Expenses by Month" icon={BarChart3} rows={data.charts.expenseByMonth} />
+              <ChartCard title="Profit Trend" icon={LineChart} rows={data.charts.profitByMonth} allowNegative />
+              <ChartCard title="Course Revenue" icon={BriefcaseBusiness} rows={data.charts.revenueByCourse} />
+              <ChartCard title="Revenue Split" icon={Building2} rows={data.charts.revenueByBranch} />
+              <ChartCard title="Expense Categories" icon={ReceiptText} rows={data.charts.expenseByCategory} />
+            </section>
+
+            <section className="grid gap-6 xl:grid-cols-2">
+              <ReportTable title="Student-wise Payments" rows={data.rows.studentPaymentsByStudent.slice(0, 50).map((student) => [student.student, student.course || "-", student.branch || "-", String(student.payments), formatFinanceCurrency(student.paidAmount)])} headings={["Student", "Course", "Branch", "Payments", "Paid Amount"]} />
+              <ReportTable title="Student-wise Dues" rows={data.rows.studentDuesByStudent.slice(0, 50).map((student) => [student.student, student.course || "-", student.branch || "-", String(student.payments), formatFinanceCurrency(student.amount)])} headings={["Student", "Course", "Branch", "Payments", "Total Due"]} />
+            </section>
+
+            <section className="grid gap-6 xl:grid-cols-2">
+              <ReportTable title="Course Profitability" rows={data.rows.courseProfitability.map((course) => [course.course, formatFinanceCurrency(course.revenue), formatFinanceCurrency(course.teacherCost), formatFinanceCurrency(course.marketingCost), formatFinanceCurrency(course.platformCost), formatFinanceCurrency(course.materialsCost), formatFinanceCurrency(course.profit), `${course.margin}%`])} headings={["Course", "Revenue", "Teacher", "Marketing", "Platform", "Materials", "Profit", "Margin"]} />
+              <Card className="p-5">
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Notifications</h2>
+                <div className="mt-4 grid gap-3">
+                  {data.rows.notifications.map((notification) => (
+                    <p key={notification} className="rounded-lg bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">{notification}</p>
+                  ))}
+                </div>
+              </Card>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "expenses" ? (
+          <>
+            <div>
+              <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Expenses</h2>
+              <p className="text-sm text-lead-gray">Simple cash-out entry for anything LEAD spends.</p>
+            </div>
+            <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+              <EntryCard title="Cash Out" action={recordFinanceExpense} successMessage="Expense recorded.">
+                <Field label="Date" name="expenseDate" type="date" defaultValue={today} required />
+                <SelectField label="Category" name="category" options={financeExpenseCategories} required />
+                <Field label="Description" name="description" required />
+                <Field label="Amount" name="amount" type="number" min={0} required />
+                <SelectField label="Payment Method" name="paymentMethod" options={financePaymentMethods} required />
+                <SelectField label="Branch" name="branch" options={financeBranches} required />
+                <Field label="Paid By" name="paidBy" />
+                <Field label="Receipt URL" name="receiptUrl" placeholder="Google Drive / receipt link" />
+              </EntryCard>
+              <ReportTable title="Recent Expenses" rows={data.rows.expenses.slice(0, 40).map((expense) => [expense.expenseDate, expense.category, expense.description, expense.branch, expense.paymentMethod, formatFinanceCurrency(expense.amount)])} headings={["Date", "Category", "Description", "Branch", "Method", "Amount"]} />
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "income" ? (
+          <>
+            <div>
+              <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Income</h2>
+              <p className="text-sm text-lead-gray">Student payments are calculated automatically. Use the form only for other income.</p>
+            </div>
+            <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+              <EntryCard title="Other Income" action={recordFinanceIncome} successMessage="Income recorded.">
+                <Field label="Student / Source" name="student" placeholder="Workshop, event, material sale..." required />
+                <Field label="Course / Income Type" name="course" placeholder="Other income" required />
+                <SelectField label="Online / Offline" name="branch" options={financeBranches} required />
+                <SelectField label="Payment Method" name="paymentMethod" options={financePaymentMethods} required />
+                <Field label="Payment Date" name="paymentDate" type="date" defaultValue={today} required />
+                <Field label="Amount" name="amount" type="number" min={0} required />
+                <SelectField label="Currency" name="currency" options={financeCurrencies} defaultValue="IDR" />
+                <SelectField label="Status" name="status" options={financePaymentStatuses} defaultValue="Paid" required />
+                <Field label="Invoice Number" name="invoiceNumber" />
+                <Field label="Notes" name="notes" />
+              </EntryCard>
+              <ReportTable title="Income Records" rows={data.rows.income.slice(0, 40).map((income) => [income.paymentDate, income.student, income.course, income.branch, income.status, formatFinanceCurrency(income.amount), income.source])} headings={["Date", "Student / Source", "Course", "Branch", "Status", "Amount", "Source"]} />
+            </section>
+            <section className="grid gap-6 xl:grid-cols-2">
+              <ReportTable title="Student-wise Payments" rows={data.rows.studentPaymentsByStudent.slice(0, 50).map((student) => [student.student, student.course || "-", student.branch || "-", String(student.payments), formatFinanceCurrency(student.paidAmount)])} headings={["Student", "Course", "Branch", "Payments", "Paid Amount"]} />
+              <ReportTable title="Student-wise Dues" rows={data.rows.studentDuesByStudent.slice(0, 50).map((student) => [student.student, student.course || "-", student.branch || "-", String(student.payments), formatFinanceCurrency(student.amount)])} headings={["Student", "Course", "Branch", "Payments", "Total Due"]} />
+            </section>
+          </>
+        ) : null}
       </div>
     </main>
+  );
+}
+
+function FinanceTabLink({ href, active, title, description }: { href: string; active: boolean; title: string; description: string }) {
+  return (
+    <a
+      href={href}
+      className={`rounded-xl px-4 py-3 transition ${
+        active
+          ? "bg-lead-blue text-white shadow-soft"
+          : "bg-slate-50 text-lead-navy hover:bg-blue-50 hover:text-lead-blue"
+      }`}
+    >
+      <span className="block font-heading text-lg font-extrabold">{title}</span>
+      <span className={`mt-1 block text-xs font-semibold ${active ? "text-blue-50" : "text-lead-gray"}`}>{description}</span>
+    </a>
   );
 }
 
