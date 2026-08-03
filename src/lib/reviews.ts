@@ -80,7 +80,7 @@ function getPublicName(doc: ReviewDocument) {
   return name;
 }
 
-export async function getApprovedReviews(limit = 6): Promise<PublicReview[]> {
+export async function getApprovedReviews(limit = 12): Promise<PublicReview[]> {
   noStore();
 
   try {
