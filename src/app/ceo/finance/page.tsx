@@ -68,12 +68,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false }
 };
 
-type ReportPeriod = "month" | "quarter" | "year" | "custom" | "all";
+type ReportPeriod = "month" | "quarter" | "year" | "all";
 
 type SearchParams = {
   period?: string | string[];
-  start?: string | string[];
-  end?: string | string[];
+  month?: string | string[];
+  year?: string | string[];
   course?: string | string[];
   teacher?: string | string[];
   branch?: string | string[];
@@ -222,9 +222,13 @@ const periodOptions: Array<{ value: ReportPeriod; label: string }> = [
   { value: "month", label: "Monthly" },
   { value: "quarter", label: "Quarterly" },
   { value: "year", label: "Yearly" },
-  { value: "custom", label: "Custom" },
   { value: "all", label: "All time" }
 ];
+
+const monthOptions = Array.from({ length: 12 }, (_, index) => ({
+  value: String(index + 1),
+  label: new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(2026, index, 1)))
+}));
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || "" : value || "";
@@ -248,19 +252,13 @@ function monthStart(year: number, month: number) {
   return `${year}-${String(month).padStart(2, "0")}-01`;
 }
 
-function getDateRange(period: ReportPeriod, customStart = "", customEnd = ""): DateRange {
+function getDateRange(period: ReportPeriod, selectedMonth: number, selectedYear: number): DateRange {
   const today = jakartaDateKey(new Date());
-  const [year, month] = today.split("-").map(Number);
+  const [currentYear, currentMonth] = today.split("-").map(Number);
+  const year = Number.isInteger(selectedYear) ? selectedYear : currentYear;
+  const month = Number.isInteger(selectedMonth) && selectedMonth >= 1 && selectedMonth <= 12 ? selectedMonth : currentMonth;
 
   if (period === "all") return { start: null, end: null, label: "All time" };
-
-  if (period === "custom") {
-    return {
-      start: customStart || null,
-      end: customEnd ? nextDay(customEnd) : null,
-      label: customStart || customEnd ? `${customStart || "Start"} to ${customEnd || "Today"}` : "Custom range"
-    };
-  }
 
   if (period === "quarter") {
     const quarterStartMonth = Math.floor((month - 1) / 3) * 3 + 1;
@@ -277,13 +275,13 @@ function getDateRange(period: ReportPeriod, customStart = "", customEnd = ""): D
   }
 
   const next = addMonths(year, month - 1, 1);
-  return { start: monthStart(year, month), end: monthStart(next.year, next.month), label: "This month" };
-}
-
-function nextDay(dateValue: string) {
-  const date = new Date(`${dateValue}T00:00:00+07:00`);
-  date.setDate(date.getDate() + 1);
-  return jakartaDateKey(date);
+  return {
+    start: monthStart(year, month),
+    end: monthStart(next.year, next.month),
+    label: monthOptions.find((option) => option.value === String(month))?.label
+      ? `${monthOptions.find((option) => option.value === String(month))?.label} ${year}`
+      : `${year}-${String(month).padStart(2, "0")}`
+  };
 }
 
 function inRange(value: string, range: DateRange) {
@@ -325,7 +323,11 @@ async function getFinanceData(searchParams: SearchParams) {
   const db = await getMongoDb();
   const requestedPeriod = firstParam(searchParams.period);
   const period: ReportPeriod = periodOptions.some((option) => option.value === requestedPeriod) ? (requestedPeriod as ReportPeriod) : "month";
-  const range = getDateRange(period, firstParam(searchParams.start), firstParam(searchParams.end));
+  const today = jakartaDateKey(new Date());
+  const [currentYear, currentMonth] = today.split("-").map(Number);
+  const selectedMonth = Number(firstParam(searchParams.month)) || currentMonth;
+  const selectedYear = Number(firstParam(searchParams.year)) || currentYear;
+  const range = getDateRange(period, selectedMonth, selectedYear);
   const selectedCourse = firstParam(searchParams.course);
   const selectedTeacher = firstParam(searchParams.teacher);
   const selectedBranch = firstParam(searchParams.branch);
@@ -489,7 +491,7 @@ async function getFinanceData(searchParams: SearchParams) {
   return {
     period,
     range,
-    filters: { selectedCourse, selectedTeacher, selectedBranch, selectedStatus, selectedCategory },
+    filters: { selectedCourse, selectedTeacher, selectedBranch, selectedStatus, selectedCategory, selectedMonth, selectedYear },
     options: {
       courses: [...new Set([...allIncome.map((income) => income.course), ...students.map((student) => student.courseJoined || "")].filter(Boolean))],
       teachers: [...new Set([...teachers.map((teacher) => teacher.name), ...manualIncomeRows.map((income) => income.teacher)].filter(Boolean))]
@@ -602,8 +604,8 @@ export default async function FinanceManagementPage({
         <Card className="p-4 print:hidden">
           <form action="/ceo/finance" className="grid gap-3 lg:grid-cols-5">
             <SelectField label="Report" name="period" defaultValue={data.period} options={periodOptions} />
-            <Field label="Start" name="start" type="date" defaultValue={firstParam(resolvedSearchParams.start)} />
-            <Field label="End" name="end" type="date" defaultValue={firstParam(resolvedSearchParams.end)} />
+            <SelectField label="Month" name="month" defaultValue={String(data.filters.selectedMonth)} options={monthOptions} />
+            <Field label="Year" name="year" type="number" min={2020} max={2100} defaultValue={data.filters.selectedYear} />
             <SelectField label="Course" name="course" defaultValue={data.filters.selectedCourse} options={["", ...data.options.courses].map((course) => ({ label: course || "All courses", value: course }))} />
             <SelectField label="Teacher" name="teacher" defaultValue={data.filters.selectedTeacher} options={["", ...data.options.teachers].map((teacher) => ({ label: teacher || "All teachers", value: teacher }))} />
             <SelectField label="Branch" name="branch" defaultValue={data.filters.selectedBranch} options={["", ...financeBranches].map((branch) => ({ label: branch || "All branches", value: branch }))} />
