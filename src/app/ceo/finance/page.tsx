@@ -229,6 +229,12 @@ const monthOptions = Array.from({ length: 12 }, (_, index) => ({
   value: String(index + 1),
   label: new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(2026, index, 1)))
 }));
+const branchFilterOptions = [
+  { label: "Combined LEAD", value: "" },
+  ...financeBranches
+    .filter((branch) => branch !== "Combined LEAD")
+    .map((branch) => ({ label: branch, value: branch }))
+];
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || "" : value || "";
@@ -330,7 +336,8 @@ async function getFinanceData(searchParams: SearchParams) {
   const range = getDateRange(period, selectedMonth, selectedYear);
   const selectedCourse = firstParam(searchParams.course);
   const selectedTeacher = firstParam(searchParams.teacher);
-  const selectedBranch = firstParam(searchParams.branch);
+  const selectedBranchParam = firstParam(searchParams.branch);
+  const selectedBranch = selectedBranchParam === "Combined LEAD" ? "" : selectedBranchParam;
   const selectedStatus = firstParam(searchParams.status);
   const selectedCategory = firstParam(searchParams.category);
 
@@ -439,6 +446,25 @@ async function getFinanceData(searchParams: SearchParams) {
   const expenseByMonth = groupSum(expenseRows, (expense) => monthKey(expense.expenseDate), (expense) => expense.amount).sort((a, b) => a.name.localeCompare(b.name));
   const revenueByCourse = groupSum(allIncome, (income) => income.course || "Not assigned", revenueAmount);
   const revenueByBranch = groupSum(allIncome, (income) => income.branch || "Combined LEAD", revenueAmount);
+  const studentPaymentsByStudent = [...allIncome
+    .filter((income) => revenueAmount(income) !== 0)
+    .reduce((map, income) => {
+      const key = income.student || "Unknown student";
+      const current = map.get(key) || {
+        student: key,
+        course: income.course || "",
+        branch: income.branch || "",
+        paidAmount: 0,
+        payments: 0
+      };
+      current.paidAmount += revenueAmount(income);
+      current.payments += 1;
+      if (!current.course && income.course) current.course = income.course;
+      if (!current.branch && income.branch) current.branch = income.branch;
+      map.set(key, current);
+      return map;
+    }, new Map<string, { student: string; course: string; branch: string; paidAmount: number; payments: number }>())
+    .values()].sort((a, b) => b.paidAmount - a.paidAmount);
   const expenseByCategory = groupSum(expenseRows, (expense) => expense.category, (expense) => expense.amount);
   const studentGrowthByMonth = groupSum(
     students.filter((student) => student.createdAt && inRange(jakartaDateKey(new Date(student.createdAt)), range)),
@@ -498,7 +524,7 @@ async function getFinanceData(searchParams: SearchParams) {
     },
     kpis: { totalRevenue, totalExpenses, netProfit, outstandingPayments, cashAvailable, emergencyFund, growthFund, leadRetainedProfit, studentGrowth },
     charts: { incomeByMonth, expenseByMonth, profitByMonth, studentGrowthByMonth, revenueByCourse, revenueByBranch, expenseByCategory },
-    rows: { income: allIncome, expenses: expenseRows, teacherPayments, founderAllowances, fundMovements, profitDistributions, budgetRows, courseProfitability, notifications }
+    rows: { income: allIncome, expenses: expenseRows, studentPaymentsByStudent, teacherPayments, founderAllowances, fundMovements, profitDistributions, budgetRows, courseProfitability, notifications }
   };
 }
 
@@ -608,7 +634,7 @@ export default async function FinanceManagementPage({
             <Field label="Year" name="year" type="number" min={2020} max={2100} defaultValue={data.filters.selectedYear} />
             <SelectField label="Course" name="course" defaultValue={data.filters.selectedCourse} options={["", ...data.options.courses].map((course) => ({ label: course || "All courses", value: course }))} />
             <SelectField label="Teacher" name="teacher" defaultValue={data.filters.selectedTeacher} options={["", ...data.options.teachers].map((teacher) => ({ label: teacher || "All teachers", value: teacher }))} />
-            <SelectField label="Branch" name="branch" defaultValue={data.filters.selectedBranch} options={["", ...financeBranches].map((branch) => ({ label: branch || "All branches", value: branch }))} />
+            <SelectField label="Branch" name="branch" defaultValue={data.filters.selectedBranch} options={branchFilterOptions} />
             <SelectField label="Income Status" name="status" defaultValue={data.filters.selectedStatus} options={["", ...financePaymentStatuses].map((status) => ({ label: status || "All statuses", value: status }))} />
             <SelectField label="Expense Category" name="category" defaultValue={data.filters.selectedCategory} options={["", ...financeExpenseCategories].map((category) => ({ label: category || "All categories", value: category }))} />
             <div className="flex items-end lg:col-span-2"><Button type="submit" className="w-full">Apply Filters</Button></div>
@@ -721,12 +747,16 @@ export default async function FinanceManagementPage({
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2">
+          <ReportTable title="Student-wise Payments" rows={data.rows.studentPaymentsByStudent.slice(0, 50).map((student) => [student.student, student.course || "-", student.branch || "-", String(student.payments), formatFinanceCurrency(student.paidAmount)])} headings={["Student", "Course", "Branch", "Payments", "Paid Amount"]} />
           <ReportTable title="Income Management" rows={data.rows.income.slice(0, 25).map((income) => [income.paymentDate, income.student, income.course, income.branch, income.status, formatFinanceCurrency(income.amount)])} headings={["Date", "Student", "Course", "Branch", "Status", "Amount"]} />
-          <ReportTable title="Expense Management" rows={data.rows.expenses.slice(0, 25).map((expense) => [expense.expenseDate, expense.category, expense.description, expense.branch, expense.paymentMethod, formatFinanceCurrency(expense.amount)])} headings={["Date", "Category", "Description", "Branch", "Method", "Amount"]} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2">
+          <ReportTable title="Expense Management" rows={data.rows.expenses.slice(0, 25).map((expense) => [expense.expenseDate, expense.category, expense.description, expense.branch, expense.paymentMethod, formatFinanceCurrency(expense.amount)])} headings={["Date", "Category", "Description", "Branch", "Method", "Amount"]} />
           <ReportTable title="Course Profitability" rows={data.rows.courseProfitability.map((course) => [course.course, formatFinanceCurrency(course.revenue), formatFinanceCurrency(course.teacherCost), formatFinanceCurrency(course.marketingCost), formatFinanceCurrency(course.platformCost), formatFinanceCurrency(course.materialsCost), formatFinanceCurrency(course.profit), `${course.margin}%`])} headings={["Course", "Revenue", "Teacher", "Marketing", "Platform", "Materials", "Profit", "Margin"]} />
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-2">
           <ReportTable title="Budget Performance" rows={data.rows.budgetRows.map((budget) => [String(budget.year), budget.category, formatFinanceCurrency(budget.budgetAmount), formatFinanceCurrency(budget.actual), formatFinanceCurrency(budget.difference), formatFinanceCurrency(budget.remaining)])} headings={["Year", "Category", "Budget", "Actual", "Difference", "Remaining"]} />
         </section>
 
