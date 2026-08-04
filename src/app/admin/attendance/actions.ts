@@ -204,7 +204,7 @@ export async function saveStudentAttendance(formData: FormData) {
     throw new Error("This month is closed. Finalized records cannot be changed.");
   }
 
-  const attendanceResult = await db.collection(getStudentAttendanceCollectionName()).updateOne(
+  await db.collection(getStudentAttendanceCollectionName()).updateOne(
     {
       $or: [
         { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
@@ -248,8 +248,7 @@ export async function saveStudentAttendance(formData: FormData) {
   await markClassSessionCompletedByAttendance({
     studentId,
     meetingNumber,
-    meetingDate,
-    attendanceId: attendanceResult.upsertedId?.toString()
+    meetingDate
   });
 
   revalidatePath("/admin/attendance");
@@ -328,8 +327,7 @@ export async function updateStudentAttendance(formData: FormData) {
   await markClassSessionCompletedByAttendance({
     studentId: existingAttendance.studentId,
     meetingNumber: existingAttendance.meetingNumber,
-    meetingDate,
-    attendanceId: id
+    meetingDate
   });
 
   revalidatePath("/admin/attendance");

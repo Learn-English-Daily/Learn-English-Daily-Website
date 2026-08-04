@@ -210,31 +210,21 @@ export async function updateClassSession(formData: FormData) {
 export async function markClassSessionCompletedByAttendance({
   studentId,
   meetingNumber,
-  meetingDate,
-  attendanceId
+  meetingDate
 }: {
   studentId: string;
   meetingNumber: number;
   meetingDate: string;
-  attendanceId?: string;
 }) {
   const db = await getMongoDb();
   const period = getBillingPeriodFromDate(meetingDate);
 
-  await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
+  await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).deleteMany(
     {
       $or: [
         { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
         { studentId, meetingNumber, sessionDate: meetingDate }
       ]
-    },
-    {
-      $set: {
-        status: "Completed",
-        attendanceId,
-        completedAt: new Date(),
-        updatedAt: new Date()
-      }
     }
   );
 

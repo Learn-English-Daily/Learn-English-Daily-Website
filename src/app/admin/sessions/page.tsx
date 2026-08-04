@@ -19,6 +19,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { getRecordBillingPeriod } from "@/lib/billing-periods";
 import {
   getClassSessionsCollectionName,
   getComputedClassSessionStatus,
@@ -69,6 +70,9 @@ type Teacher = {
 type AttendanceDocument = {
   studentId?: string;
   meetingNumber?: number;
+  meetingDate?: string;
+  billingMonth?: number;
+  billingYear?: number;
 };
 
 type ClassSession = {
@@ -140,7 +144,7 @@ async function getSessions(): Promise<ClassSession[]> {
     db
       .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
       .find({})
-      .project({ studentId: 1, meetingNumber: 1 })
+      .project({ studentId: 1, meetingNumber: 1, meetingDate: 1, billingMonth: 1, billingYear: 1 })
       .limit(20000)
       .toArray(),
     db
@@ -150,7 +154,12 @@ async function getSessions(): Promise<ClassSession[]> {
       .limit(500)
       .toArray()
   ]);
-  const attendanceKeys = new Set(attendanceDocs.map((doc) => `${doc.studentId || ""}:${doc.meetingNumber || 0}`));
+  const attendanceKeys = new Set(
+    attendanceDocs.map((doc) => {
+      const period = getRecordBillingPeriod(doc);
+      return `${doc.studentId || ""}:${doc.meetingNumber || 0}:${period.billingPeriod}`;
+    })
+  );
   const gameSessionsByClassId = new Map(
     gameSessionDocs
       .filter((doc) => doc.classSessionId && doc.token && !isGameSessionExpired(doc.expiresAt))
@@ -163,12 +172,18 @@ async function getSessions(): Promise<ClassSession[]> {
       ])
   );
 
-  return sessionDocs.map((doc) => {
+  return sessionDocs.flatMap((doc) => {
     const studentId = doc.studentId || "";
     const meetingNumber = doc.meetingNumber || 0;
     const classSessionId = doc._id.toString();
+    const period = getRecordBillingPeriod(doc);
+    const attendanceKey = `${studentId}:${meetingNumber}:${period.billingPeriod}`;
 
-    return {
+    if (doc.status === "Completed" || attendanceKeys.has(attendanceKey)) {
+      return [];
+    }
+
+    return [{
       id: classSessionId,
       studentId,
       studentName: doc.studentName || "Unknown",
@@ -188,17 +203,17 @@ async function getSessions(): Promise<ClassSession[]> {
         status: doc.status,
         scheduledAt: doc.scheduledAt,
         endsAt: doc.endsAt,
-        hasAttendance: attendanceKeys.has(`${studentId}:${meetingNumber}`)
+        hasAttendance: attendanceKeys.has(attendanceKey)
       }),
       gameLink: gameSessionsByClassId.get(classSessionId) || null
-    };
+    }];
   });
 }
 
 function formatTimeRange(startValue: string, endValue: string) {
   if (!startValue && !endValue) return "Time not set";
-  if (!endValue) return formatTime(startValue);
-  return `${formatTime(startValue)} - ${formatTime(endValue)}`;
+  if (!endValue) return `${formatTime(startValue)} WIB`;
+  return `${formatTime(startValue)} - ${formatTime(endValue)} WIB`;
 }
 
 function formatDate(value: string) {
@@ -217,10 +232,14 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
-function getTomorrowDate() {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().slice(0, 10);
+function getIndonesiaDateInput(daysFromToday = 0) {
+  const jakartaDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+  jakartaDate.setDate(jakartaDate.getDate() + daysFromToday);
+  return [
+    jakartaDate.getFullYear(),
+    String(jakartaDate.getMonth() + 1).padStart(2, "0"),
+    String(jakartaDate.getDate()).padStart(2, "0")
+  ].join("-");
 }
 
 function statusClassName(status: ComputedClassSessionStatus) {
@@ -310,7 +329,7 @@ export default async function AdminSessionsPage() {
 
   const [students, teachers, sessions] = await Promise.all([getStudents(), getTeachers(), getSessions()]);
   const needsAttendance = sessions.filter((session) => session.status === "Needs Attendance");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getIndonesiaDateInput();
   const todaysSessions = sessions.filter((session) => session.sessionDate === today);
 
   return (
@@ -327,7 +346,7 @@ export default async function AdminSessionsPage() {
           <Card className="p-5">
             <h2 className="font-heading text-xl font-bold text-lead-navy">Schedule class</h2>
             <p className="mt-2 text-sm leading-6 text-lead-gray">
-              This creates a reminder record. The Google Meet link is handled only on session cards, not saved in the database.
+              This creates a reminder record using Indonesia time (WIB / UTC+7). The Google Meet link is handled only on session cards, not saved in the database.
             </p>
             <ActionFeedbackForm action={createClassSession} successMessage="Class session saved successfully." className="mt-5 grid gap-4">
               <Field label="Student">
@@ -344,13 +363,13 @@ export default async function AdminSessionsPage() {
                 <Field label="Meeting Number">
                   <input name="meetingNumber" type="number" min="1" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
-                <Field label="Class Date">
-                  <input name="sessionDate" type="date" required defaultValue={getTomorrowDate()} className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
+                <Field label="Class Date (Indonesia)">
+                  <input name="sessionDate" type="date" required defaultValue={getIndonesiaDateInput(1)} className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
-                <Field label="From Time">
+                <Field label="From Time (WIB)">
                   <input name="startTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
-                <Field label="To Time">
+                <Field label="To Time (WIB)">
                   <input name="endTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
                 </Field>
                 <Field label="Class Mode">
@@ -377,7 +396,7 @@ export default async function AdminSessionsPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="font-heading text-xl font-bold text-lead-navy">Session queue</h2>
-              <p className="mt-2 text-sm text-lead-gray">Latest scheduled classes first. Past sessions without attendance are highlighted.</p>
+              <p className="mt-2 text-sm text-lead-gray">Latest scheduled classes first. Times are Indonesia WIB. Sessions disappear after attendance is marked.</p>
             </div>
           </div>
 
@@ -435,13 +454,13 @@ export default async function AdminSessionsPage() {
                         <Field label="Meeting Number">
                           <input name="meetingNumber" type="number" min="1" required defaultValue={session.meetingNumber} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
                         </Field>
-                        <Field label="Class Date">
+                        <Field label="Class Date (Indonesia)">
                           <input name="sessionDate" type="date" required defaultValue={session.sessionDate} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
                         </Field>
-                        <Field label="From Time">
+                        <Field label="From Time (WIB)">
                           <input name="startTime" type="time" required defaultValue={session.startTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
                         </Field>
-                        <Field label="To Time">
+                        <Field label="To Time (WIB)">
                           <input name="endTime" type="time" required defaultValue={session.endTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
                         </Field>
                         <Field label="Class Mode">
