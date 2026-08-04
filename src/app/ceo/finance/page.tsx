@@ -324,6 +324,35 @@ function normalizeFinanceName(value = "") {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function nameEditDistance(left: string, right: string) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let diagonal = previous[0];
+    previous[0] = leftIndex;
+
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const beforeUpdate = previous[rightIndex];
+      previous[rightIndex] = Math.min(
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + 1,
+        diagonal + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1)
+      );
+      diagonal = beforeUpdate;
+    }
+  }
+
+  return previous[right.length];
+}
+
+function isLikelySameFinanceName(paymentName: string, registeredName: string) {
+  if (!paymentName || !registeredName || paymentName === registeredName) return true;
+  if (paymentName.includes(registeredName) || registeredName.includes(paymentName)) return true;
+
+  const maxDistance = Math.max(2, Math.ceil(Math.max(paymentName.length, registeredName.length) * 0.16));
+  return nameEditDistance(paymentName, registeredName) <= maxDistance;
+}
+
 function revenueAmount(income: NormalizedIncome) {
   if (income.status === "Refunded") return -income.amount;
   if (income.status === "Paid" || income.status === "Partial") return income.amount;
@@ -395,7 +424,7 @@ async function getFinanceData(searchParams: SearchParams) {
     if (!student) return [];
     const paymentName = normalizeFinanceName(payment.studentName);
     const registeredName = normalizeFinanceName(student.studentName);
-    if (paymentName && registeredName && paymentName !== registeredName) return [];
+    if (!isLikelySameFinanceName(paymentName, registeredName)) return [];
     return [{ payment, student }];
   });
   const existingIncome: NormalizedIncome[] = matchedStudentPayments.map(({ payment, student }) => ({

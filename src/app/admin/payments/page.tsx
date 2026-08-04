@@ -142,6 +142,35 @@ function normalizePaymentName(value = "") {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function nameEditDistance(left: string, right: string) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let diagonal = previous[0];
+    previous[0] = leftIndex;
+
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const beforeUpdate = previous[rightIndex];
+      previous[rightIndex] = Math.min(
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + 1,
+        diagonal + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1)
+      );
+      diagonal = beforeUpdate;
+    }
+  }
+
+  return previous[right.length];
+}
+
+function isLikelySamePaymentName(paymentName: string, studentName: string) {
+  if (!paymentName || !studentName || paymentName === studentName) return true;
+  if (paymentName.includes(studentName) || studentName.includes(paymentName)) return true;
+
+  const maxDistance = Math.max(2, Math.ceil(Math.max(paymentName.length, studentName.length) * 0.16));
+  return nameEditDistance(paymentName, studentName) <= maxDistance;
+}
+
 function currentJakartaMonth() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
@@ -223,7 +252,7 @@ async function getPayments(studentId = "", studentName = ""): Promise<Payment[]>
 
   return docs.filter((doc) => {
     const paymentName = normalizePaymentName(doc.studentName);
-    return !normalizedStudentName || !paymentName || paymentName === normalizedStudentName;
+    return isLikelySamePaymentName(paymentName, normalizedStudentName);
   }).map((doc) => ({
     id: doc._id.toString(),
     meetingNumber: doc.meetingNumber || 0,
