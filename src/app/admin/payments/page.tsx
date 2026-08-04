@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
-import { saveGroupStudentPayment, updateStudentPaymentStatus } from "@/app/admin/payments/actions";
+import { closeMonthlyBalance, saveGroupStudentPayment, updateStudentPaymentStatus } from "@/app/admin/payments/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMonthlyAssessmentsCollectionName } from "@/lib/assessments";
+import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
 import { getMongoDb } from "@/lib/mongodb";
 import {
   formatRupiah,
@@ -56,6 +57,9 @@ type PaymentDocument = {
   classMode?: string;
   meetingNumber?: number;
   meetingDate?: string;
+  billingMonth?: number;
+  billingYear?: number;
+  billingPeriod?: string;
   amountDue?: number;
   status?: PaymentStatus;
   paidDate?: string;
@@ -63,8 +67,6 @@ type PaymentDocument = {
   notes?: string;
   receiptUploadedToDrive?: boolean;
   source?: string;
-  billingMonth?: number;
-  billingYear?: number;
   completedMeetings?: number;
   amountPerMeeting?: number;
   batchName?: string;
@@ -76,6 +78,7 @@ type Payment = {
   id: string;
   meetingNumber: number;
   meetingDate: string;
+  billingPeriod: string;
   amountDue: number;
   status: PaymentStatus;
   paidDate: string;
@@ -238,7 +241,7 @@ async function getSelectedStudent(studentId = "") {
   };
 }
 
-async function getPayments(studentId = "", studentName = ""): Promise<Payment[]> {
+async function getPayments(studentId = "", studentName = "", showArchived = false, closedPeriodKeys = new Set<string>()): Promise<Payment[]> {
   if (!studentId) return [];
 
   const db = await getMongoDb();
@@ -252,11 +255,14 @@ async function getPayments(studentId = "", studentName = ""): Promise<Payment[]>
 
   return docs.filter((doc) => {
     const paymentName = normalizePaymentName(doc.studentName);
-    return isLikelySamePaymentName(paymentName, normalizedStudentName);
+    const period = getRecordBillingPeriod(doc);
+    const isClosed = period.billingPeriod ? closedPeriodKeys.has(period.billingPeriod) : false;
+    return isLikelySamePaymentName(paymentName, normalizedStudentName) && (showArchived ? isClosed : !isClosed);
   }).map((doc) => ({
     id: doc._id.toString(),
     meetingNumber: doc.meetingNumber || 0,
     meetingDate: doc.meetingDate || "",
+    billingPeriod: getRecordBillingPeriod(doc).billingPeriod,
     amountDue: doc.amountDue || 0,
     status: doc.status || "Unpaid",
     paidDate: doc.paidDate || "",
@@ -311,7 +317,7 @@ function statusClassName(status: PaymentStatus) {
 export default async function AdminPaymentsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ q?: string | string[]; studentId?: string | string[] }>;
+  searchParams?: Promise<{ q?: string | string[]; studentId?: string | string[]; view?: string | string[] }>;
 }) {
   noStore();
   const cookieStore = await cookies();
@@ -319,6 +325,8 @@ export default async function AdminPaymentsPage({
   const resolvedSearchParams = await searchParams;
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
   const selectedStudentId = Array.isArray(resolvedSearchParams?.studentId) ? resolvedSearchParams?.studentId[0] || "" : resolvedSearchParams?.studentId || "";
+  const viewMode = Array.isArray(resolvedSearchParams?.view) ? resolvedSearchParams?.view[0] || "" : resolvedSearchParams?.view || "";
+  const showArchived = viewMode === "history";
 
   if (!isAdminConfigured()) {
     return (
@@ -349,9 +357,10 @@ export default async function AdminPaymentsPage({
   }
 
   const [students, selectedStudent] = await Promise.all([getStudents(searchQuery), getSelectedStudent(selectedStudentId)]);
+  const closedPeriodKeys = await getClosedBillingPeriodKeys(await getMongoDb());
   const isGroupStudent = selectedStudent?.classType === "Basic Group";
   const [payments, groupPaymentContext] = await Promise.all([
-    selectedStudent ? getPayments(selectedStudent.studentId, selectedStudent.studentName) : [],
+    selectedStudent ? getPayments(selectedStudent.studentId, selectedStudent.studentName, showArchived, closedPeriodKeys) : [],
     selectedStudent ? getGroupPaymentContext(selectedStudent.studentId, isGroupStudent) : null
   ]);
   const totalPaid = payments.filter((payment) => payment.status === "Paid").reduce((sum, payment) => sum + payment.amountDue, 0);
@@ -368,8 +377,19 @@ export default async function AdminPaymentsPage({
 
       <section className="container-shell grid items-start gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">
+          <Card className="p-5">
+            <h2 className="font-heading text-xl font-bold text-lead-navy">Monthly close</h2>
+            <p className="mt-2 text-sm leading-6 text-lead-gray">Close a finished month to hide its payments and attendance from the active view.</p>
+            <ActionFeedbackForm action={closeMonthlyBalance} successMessage="Month closed successfully." className="mt-4 grid gap-3">
+              <input name="billingMonth" type="month" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+              <input name="notes" placeholder="Optional closing note" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+              <Button type="submit">Close Month</Button>
+            </ActionFeedbackForm>
+          </Card>
+
           <Card className="p-4">
             <form action="/admin/payments" className="flex flex-col gap-3 md:flex-row">
+              <input type="hidden" name="view" value={showArchived ? "history" : "active"} />
               <label className="relative flex-1">
                 <span className="sr-only">Search students</span>
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
@@ -385,6 +405,14 @@ export default async function AdminPaymentsPage({
                 Search
               </Button>
             </form>
+            <div className="mt-3 flex gap-2">
+              <Button asChild size="sm" variant={showArchived ? "secondary" : "primary"}>
+                <a href={`/admin/payments${selectedStudentId ? `?studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Active Payments</a>
+              </Button>
+              <Button asChild size="sm" variant={showArchived ? "primary" : "secondary"}>
+                <a href={`/admin/payments?view=history${selectedStudentId ? `&studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Archived History</a>
+              </Button>
+            </div>
           </Card>
 
           <Card className="p-5 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
@@ -393,7 +421,7 @@ export default async function AdminPaymentsPage({
               {students.map((student) => (
                 <a
                   key={student.id}
-                  href={`/admin/payments?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
+                  href={`/admin/payments?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}${showArchived ? "&view=history" : ""}`}
                   className={`focus-ring rounded-lg border p-4 transition hover:border-lead-blue hover:bg-blue-50 ${
                     selectedStudent?.studentId === student.studentId ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white"
                   }`}
@@ -431,7 +459,7 @@ export default async function AdminPaymentsPage({
                   <div className="grid gap-2 text-sm font-bold md:text-right">
                     <p className="text-emerald-600">Paid: {formatRupiah(totalPaid)}</p>
                     <p className="text-yellow-700">Unpaid: {formatRupiah(totalUnpaid)}</p>
-                    {totalUnpaid > 0 ? (
+                    {totalUnpaid > 0 && !showArchived ? (
                       <Button asChild variant="secondary" size="sm">
                         <a href={`/admin/payments/student/${encodeURIComponent(selectedStudent.studentId)}/request`} target="_blank" rel="noreferrer">
                           <ReceiptText className="h-4 w-4" />
@@ -443,7 +471,7 @@ export default async function AdminPaymentsPage({
                 </div>
               </Card>
 
-              {isGroupStudent ? (
+              {isGroupStudent && !showArchived ? (
                 <Card className="p-5">
                   <h2 className="font-heading text-xl font-bold text-lead-navy">Create group payment</h2>
                   <p className="mt-2 text-sm text-lead-gray">
@@ -512,8 +540,10 @@ export default async function AdminPaymentsPage({
               ) : null}
 
               <Card className="p-5">
-                <h2 className="font-heading text-xl font-bold text-lead-navy">Payment history</h2>
-                <p className="mt-2 text-sm text-lead-gray">Update payment status, paid date, payment method, and notes here.</p>
+                <h2 className="font-heading text-xl font-bold text-lead-navy">{showArchived ? "Archived payment history" : "Payment history"}</h2>
+                <p className="mt-2 text-sm text-lead-gray">
+                  {showArchived ? "Closed month payments are shown read-only." : "Update payment status, paid date, payment method, and notes here."}
+                </p>
                 <div className="mt-5 grid gap-4">
                   {payments.map((payment) => (
                     <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -549,7 +579,7 @@ export default async function AdminPaymentsPage({
                           </p>
                           <p className="mt-1 text-xs text-lead-gray">Paid date: {payment.paidDate ? formatDate(payment.paidDate) : "Not paid yet"} / Method: {payment.paymentMethod || "Not set"}</p>
                           {payment.notes ? <p className="mt-2 text-sm leading-6 text-lead-gray">{payment.notes}</p> : null}
-                          {payment.status === "Unpaid" ? (
+                          {payment.status === "Unpaid" && !showArchived ? (
                             <Button asChild variant="secondary" size="sm" className="mt-3">
                               <a href={`/admin/payments/${payment.id}/request`} target="_blank" rel="noreferrer">
                                 <ReceiptText className="h-4 w-4" />
@@ -558,6 +588,7 @@ export default async function AdminPaymentsPage({
                             </Button>
                           ) : null}
                         </div>
+                        {!showArchived ? (
                         <ActionFeedbackForm action={updateStudentPaymentStatus} successMessage="Payment updated successfully." className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
                           <input type="hidden" name="id" value={payment.id} />
                           <select name="status" defaultValue={payment.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
@@ -588,6 +619,7 @@ export default async function AdminPaymentsPage({
                           </div>
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
                         </ActionFeedbackForm>
+                        ) : null}
                       </div>
                     </div>
                   ))}

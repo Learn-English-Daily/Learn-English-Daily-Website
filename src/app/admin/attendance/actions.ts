@@ -6,6 +6,7 @@ import { ObjectId } from "mongodb";
 import type { Db } from "mongodb";
 import { markClassSessionCompletedByAttendance } from "@/app/admin/sessions/actions";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
+import { getBillingPeriodFromDate, isBillingPeriodClosed } from "@/lib/billing-periods";
 import {
   getStudentAttendanceCollectionName,
   isAttendanceStatus,
@@ -75,6 +76,7 @@ async function syncPaymentFromAttendance({
   classMode,
   meetingNumber,
   meetingDate,
+  previousMeetingDate,
   status
 }: {
   studentId: string;
@@ -84,23 +86,44 @@ async function syncPaymentFromAttendance({
   classMode: string;
   meetingNumber: number;
   meetingDate: string;
+  previousMeetingDate?: string;
   status: AttendanceStatus;
 }) {
   const db = await getMongoDb();
   const payments = db.collection(getStudentPaymentsCollectionName());
   const amountDue = getSuggestedPerMeetingPrice(courseJoined, classType);
+  const period = getBillingPeriodFromDate(meetingDate);
+  const previousPeriod = previousMeetingDate ? getBillingPeriodFromDate(previousMeetingDate) : period;
+
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized records cannot be changed.");
+  }
+
+  if (previousPeriod.billingPeriod && previousPeriod.billingPeriod !== period.billingPeriod) {
+    await payments.deleteOne({
+      studentId,
+      meetingNumber,
+      billingMonth: previousPeriod.billingMonth,
+      billingYear: previousPeriod.billingYear,
+      status: "Unpaid",
+      source: "attendance"
+    });
+  }
 
   if (!isBillableAttendance(status) || amountDue <= 0) {
     await payments.updateOne(
       {
-        studentId,
-        meetingNumber,
-        status: "Paid",
-        source: "attendance"
+        $or: [
+          { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear, status: "Paid", source: "attendance" },
+          { studentId, meetingNumber, meetingDate, status: "Paid", source: "attendance" }
+        ]
       },
       {
         $set: {
           meetingDate,
+          billingMonth: period.billingMonth,
+          billingYear: period.billingYear,
+          billingPeriod: period.billingPeriod,
           classMode,
           attendanceStatus: status,
           updatedAt: new Date()
@@ -108,10 +131,10 @@ async function syncPaymentFromAttendance({
       }
     );
     await payments.deleteOne({
-      studentId,
-      meetingNumber,
-      status: "Unpaid",
-      source: "attendance"
+      $or: [
+        { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear, status: "Unpaid", source: "attendance" },
+        { studentId, meetingNumber, meetingDate, status: "Unpaid", source: "attendance" }
+      ]
     });
     return;
   }
@@ -119,7 +142,12 @@ async function syncPaymentFromAttendance({
   const now = new Date();
 
   await payments.updateOne(
-    { studentId, meetingNumber },
+    {
+      $or: [
+        { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
+        { studentId, meetingNumber, meetingDate, source: "attendance" }
+      ]
+    },
     {
       $set: {
         studentId,
@@ -129,6 +157,9 @@ async function syncPaymentFromAttendance({
         classMode,
         meetingNumber,
         meetingDate,
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        billingPeriod: period.billingPeriod,
         amountDue,
         source: "attendance",
         attendanceStatus: status,
@@ -167,8 +198,19 @@ export async function saveStudentAttendance(formData: FormData) {
   const now = new Date();
   const db = await getMongoDb();
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
+  const period = getBillingPeriodFromDate(meetingDate);
+
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized records cannot be changed.");
+  }
+
   const attendanceResult = await db.collection(getStudentAttendanceCollectionName()).updateOne(
-    { studentId, meetingNumber },
+    {
+      $or: [
+        { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
+        { studentId, meetingNumber, meetingDate }
+      ]
+    },
     {
       $set: {
         studentId,
@@ -178,6 +220,9 @@ export async function saveStudentAttendance(formData: FormData) {
         classMode,
         meetingNumber,
         meetingDate,
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        billingPeriod: period.billingPeriod,
         status,
         notes,
         teacherIds,
@@ -203,6 +248,7 @@ export async function saveStudentAttendance(formData: FormData) {
   await markClassSessionCompletedByAttendance({
     studentId,
     meetingNumber,
+    meetingDate,
     attendanceId: attendanceResult.upsertedId?.toString()
   });
 
@@ -233,6 +279,7 @@ export async function updateStudentAttendance(formData: FormData) {
     classType?: string;
     classMode?: string;
     meetingNumber?: number;
+    meetingDate?: string;
   }>(getStudentAttendanceCollectionName()).findOne({ _id: new ObjectId(id) });
 
   if (
@@ -245,11 +292,19 @@ export async function updateStudentAttendance(formData: FormData) {
     throw new Error("Attendance record not found");
   }
 
+  const period = getBillingPeriodFromDate(meetingDate);
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized records cannot be changed.");
+  }
+
   await db.collection(getStudentAttendanceCollectionName()).updateOne(
     { _id: new ObjectId(id) },
     {
       $set: {
         meetingDate,
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        billingPeriod: period.billingPeriod,
         classMode,
         status,
         notes,
@@ -267,11 +322,13 @@ export async function updateStudentAttendance(formData: FormData) {
     classMode,
     meetingNumber: existingAttendance.meetingNumber,
     meetingDate,
+    previousMeetingDate: existingAttendance.meetingDate,
     status
   });
   await markClassSessionCompletedByAttendance({
     studentId: existingAttendance.studentId,
     meetingNumber: existingAttendance.meetingNumber,
+    meetingDate,
     attendanceId: id
   });
 

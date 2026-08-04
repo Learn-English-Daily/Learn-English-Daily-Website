@@ -5,6 +5,13 @@ import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import { getMonthlyAssessmentsCollectionName } from "@/lib/assessments";
+import {
+  getBillingPeriodFromDate,
+  getBillingPeriodFromMonthInput,
+  getClosedBillingPeriodsCollectionName,
+  getRecordBillingPeriod,
+  isBillingPeriodClosed
+} from "@/lib/billing-periods";
 import { getMongoDb } from "@/lib/mongodb";
 import {
   getStudentPaymentsCollectionName,
@@ -51,6 +58,17 @@ export async function updateStudentPaymentStatus(formData: FormData) {
   }
 
   const db = await getMongoDb();
+  const existingPayment = await db.collection<{
+    billingMonth?: number;
+    billingYear?: number;
+    meetingDate?: string;
+  }>(getStudentPaymentsCollectionName()).findOne({ _id: new ObjectId(id) });
+
+  const period = getRecordBillingPeriod(existingPayment || {});
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized payments cannot be changed.");
+  }
+
   await db.collection(getStudentPaymentsCollectionName()).updateOne(
     { _id: new ObjectId(id) },
     {
@@ -93,6 +111,12 @@ export async function saveGroupStudentPayment(formData: FormData) {
   }
 
   const db = await getMongoDb();
+  const period = getBillingPeriodFromMonthInput(billingMonthValue);
+
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized payments cannot be changed.");
+  }
+
   const student = await db.collection(getStudentRegistrationCollectionName()).findOne({
     $and: [{ studentId, classType: "Basic Group" }, getActiveStudentFilter()]
   });
@@ -153,4 +177,61 @@ export async function saveGroupStudentPayment(formData: FormData) {
   );
 
   revalidatePath("/admin/payments");
+}
+
+export async function closeMonthlyBalance(formData: FormData) {
+  await assertAdmin();
+
+  const billingMonthValue = clean(formData.get("billingMonth"));
+  const notes = clean(formData.get("notes"));
+  const period = getBillingPeriodFromMonthInput(billingMonthValue);
+
+  if (!period.billingPeriod) {
+    throw new Error("Select a valid month to close");
+  }
+
+  const db = await getMongoDb();
+  const payments = await db.collection<{
+    billingMonth?: number;
+    billingYear?: number;
+    meetingDate?: string;
+    status?: PaymentStatus;
+    amountDue?: number;
+  }>(getStudentPaymentsCollectionName()).find({}).limit(50000).toArray();
+
+  const monthPayments = payments.filter((payment) => {
+    const paymentPeriod = payment.billingMonth && payment.billingYear
+      ? { billingMonth: payment.billingMonth, billingYear: payment.billingYear, billingPeriod: `${payment.billingYear}-${String(payment.billingMonth).padStart(2, "0")}` }
+      : getBillingPeriodFromDate(payment.meetingDate || "");
+    return paymentPeriod.billingPeriod === period.billingPeriod;
+  });
+  const paidPayments = monthPayments.filter((payment) => payment.status === "Paid");
+  const unpaidPayments = monthPayments.filter((payment) => payment.status !== "Paid");
+  const now = new Date();
+
+  await db.collection(getClosedBillingPeriodsCollectionName()).updateOne(
+    { billingPeriod: period.billingPeriod },
+    {
+      $set: {
+        ...period,
+        notes,
+        paymentCount: monthPayments.length,
+        paidCount: paidPayments.length,
+        unpaidCount: unpaidPayments.length,
+        totalPaid: paidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0),
+        totalUnpaid: unpaidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0),
+        updatedAt: now
+      },
+      $setOnInsert: {
+        closedAt: now,
+        closedBy: "admin",
+        createdAt: now
+      }
+    },
+    { upsert: true }
+  );
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/attendance");
+  revalidatePath("/ceo/finance");
 }

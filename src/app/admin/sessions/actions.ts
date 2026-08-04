@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import type { Db } from "mongodb";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
+import { getBillingPeriodFromDate, isBillingPeriodClosed } from "@/lib/billing-periods";
 import {
   getClassSessionsCollectionName,
   getScheduledAt,
@@ -111,9 +112,19 @@ export async function createClassSession(formData: FormData) {
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
   const classMode = isClassMode(selectedClassMode) ? selectedClassMode : isClassMode(student.classMode || "") ? student.classMode || "" : "Online";
   const now = new Date();
+  const period = getBillingPeriodFromDate(sessionDate);
+
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized class sessions cannot be changed.");
+  }
 
   await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
-    { studentId, meetingNumber },
+    {
+      $or: [
+        { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
+        { studentId, meetingNumber, sessionDate }
+      ]
+    },
     {
       $set: {
         studentId,
@@ -123,6 +134,9 @@ export async function createClassSession(formData: FormData) {
         classMode,
         meetingNumber,
         sessionDate,
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        billingPeriod: period.billingPeriod,
         sessionTime: startTime,
         startTime,
         endTime,
@@ -160,6 +174,11 @@ export async function updateClassSession(formData: FormData) {
 
   const db = await getMongoDb();
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
+  const period = getBillingPeriodFromDate(sessionDate);
+
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized class sessions cannot be changed.");
+  }
 
   await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
     { _id: new ObjectId(id) },
@@ -167,6 +186,9 @@ export async function updateClassSession(formData: FormData) {
       $set: {
         meetingNumber,
         sessionDate,
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        billingPeriod: period.billingPeriod,
         classMode,
         sessionTime: startTime,
         startTime,
@@ -188,16 +210,24 @@ export async function updateClassSession(formData: FormData) {
 export async function markClassSessionCompletedByAttendance({
   studentId,
   meetingNumber,
+  meetingDate,
   attendanceId
 }: {
   studentId: string;
   meetingNumber: number;
+  meetingDate: string;
   attendanceId?: string;
 }) {
   const db = await getMongoDb();
+  const period = getBillingPeriodFromDate(meetingDate);
 
   await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
-    { studentId, meetingNumber },
+    {
+      $or: [
+        { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
+        { studentId, meetingNumber, sessionDate: meetingDate }
+      ]
+    },
     {
       $set: {
         status: "Completed",

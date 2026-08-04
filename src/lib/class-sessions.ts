@@ -11,6 +11,9 @@ export type ClassSessionDocument = {
   classMode?: string;
   meetingNumber?: number;
   sessionDate?: string;
+  billingMonth?: number;
+  billingYear?: number;
+  billingPeriod?: string;
   sessionTime?: string;
   startTime?: string;
   endTime?: string;

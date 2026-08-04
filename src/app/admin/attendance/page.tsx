@@ -11,6 +11,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
 import {
   attendanceStatuses,
   getStudentAttendanceCollectionName,
@@ -57,6 +58,9 @@ type AttendanceDocument = {
   classMode?: string;
   meetingNumber?: number;
   meetingDate?: string;
+  billingMonth?: number;
+  billingYear?: number;
+  billingPeriod?: string;
   status?: AttendanceStatus;
   notes?: string;
   teacherIds?: string[];
@@ -68,6 +72,7 @@ type Attendance = {
   id: string;
   meetingNumber: number;
   meetingDate: string;
+  billingPeriod: string;
   status: AttendanceStatus;
   classMode: string;
   notes: string;
@@ -156,7 +161,7 @@ async function getSelectedStudent(studentId = "") {
   };
 }
 
-async function getAttendance(studentId = ""): Promise<Attendance[]> {
+async function getAttendance(studentId = "", showArchived = false, closedPeriodKeys = new Set<string>()): Promise<Attendance[]> {
   if (!studentId) return [];
 
   const db = await getMongoDb();
@@ -167,10 +172,15 @@ async function getAttendance(studentId = ""): Promise<Attendance[]> {
     .limit(200)
     .toArray()) as WithId<AttendanceDocument>[];
 
-  return docs.map((doc) => ({
+  return docs.filter((doc) => {
+    const period = getRecordBillingPeriod(doc);
+    const isClosed = period.billingPeriod ? closedPeriodKeys.has(period.billingPeriod) : false;
+    return showArchived ? isClosed : !isClosed;
+  }).map((doc) => ({
     id: doc._id.toString(),
     meetingNumber: doc.meetingNumber || 0,
     meetingDate: doc.meetingDate || "",
+    billingPeriod: getRecordBillingPeriod(doc).billingPeriod,
     status: doc.status || "Present",
     classMode: doc.classMode || "Online",
     notes: doc.notes || "",
@@ -224,6 +234,7 @@ export default async function AdminAttendancePage({
     meetingDate?: string | string[];
     classMode?: string | string[];
     teacherIds?: string | string[];
+    view?: string | string[];
   }>;
 }) {
   noStore();
@@ -248,6 +259,8 @@ export default async function AdminAttendancePage({
     : resolvedSearchParams?.teacherIds
       ? [resolvedSearchParams.teacherIds]
       : [];
+  const viewMode = Array.isArray(resolvedSearchParams?.view) ? resolvedSearchParams?.view[0] || "" : resolvedSearchParams?.view || "";
+  const showArchived = viewMode === "history";
   const prefillMeetingNumber = Number(prefillMeetingNumberValue);
 
   if (!isAdminConfigured()) {
@@ -283,7 +296,8 @@ export default async function AdminAttendancePage({
     getSelectedStudent(selectedStudentId),
     getTeachers()
   ]);
-  const attendance = selectedStudent ? await getAttendance(selectedStudent.studentId) : [];
+  const closedPeriodKeys = await getClosedBillingPeriodKeys(await getMongoDb());
+  const attendance = selectedStudent ? await getAttendance(selectedStudent.studentId, showArchived, closedPeriodKeys) : [];
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -298,6 +312,7 @@ export default async function AdminAttendancePage({
         <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">
           <Card className="p-4">
             <form action="/admin/attendance" className="flex flex-col gap-3 md:flex-row">
+              <input type="hidden" name="view" value={showArchived ? "history" : "active"} />
               <label className="relative flex-1">
                 <span className="sr-only">Search students</span>
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
@@ -313,6 +328,14 @@ export default async function AdminAttendancePage({
                 Search
               </Button>
             </form>
+            <div className="mt-3 flex gap-2">
+              <Button asChild size="sm" variant={showArchived ? "secondary" : "primary"}>
+                <a href={`/admin/attendance${selectedStudentId ? `?studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Current Attendance</a>
+              </Button>
+              <Button asChild size="sm" variant={showArchived ? "primary" : "secondary"}>
+                <a href={`/admin/attendance?view=history${selectedStudentId ? `&studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Archived History</a>
+              </Button>
+            </div>
           </Card>
 
           <Card className="p-5 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
@@ -321,7 +344,7 @@ export default async function AdminAttendancePage({
               {students.map((student) => (
                 <a
                   key={student.id}
-                  href={`/admin/attendance?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
+                  href={`/admin/attendance?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}${showArchived ? "&view=history" : ""}`}
                   className={`focus-ring rounded-lg border p-4 transition hover:border-lead-blue hover:bg-blue-50 ${
                     selectedStudent?.studentId === student.studentId ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white"
                   }`}
@@ -361,6 +384,7 @@ export default async function AdminAttendancePage({
                 </div>
               </Card>
 
+              {!showArchived ? (
               <Card className="p-5">
                 <h2 className="font-heading text-xl font-bold text-lead-navy">Mark attendance</h2>
                 {prefillMeetingNumber && prefillMeetingDate ? (
@@ -400,9 +424,11 @@ export default async function AdminAttendancePage({
                   </Button>
                 </ActionFeedbackForm>
               </Card>
+              ) : null}
 
               <Card className="p-5">
-                <h2 className="font-heading text-xl font-bold text-lead-navy">Attendance history</h2>
+                <h2 className="font-heading text-xl font-bold text-lead-navy">{showArchived ? "Archived attendance history" : "Attendance history"}</h2>
+                {showArchived ? <p className="mt-2 text-sm text-lead-gray">Closed months are shown read-only.</p> : null}
                 <div className="mt-5 grid gap-4">
                   {attendance.map((record) => (
                     <div key={record.id} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -418,6 +444,7 @@ export default async function AdminAttendancePage({
                             <span className="font-bold text-lead-navy">Teachers:</span> {record.teacherNames.length ? record.teacherNames.join(", ") : "Not assigned"}
                           </p>
                         </div>
+                        {!showArchived ? (
                         <ActionFeedbackForm action={updateStudentAttendance} successMessage="Attendance updated successfully." className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
                           <input type="hidden" name="id" value={record.id} />
                           <input name="meetingDate" type="date" defaultValue={record.meetingDate} required className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
@@ -431,6 +458,7 @@ export default async function AdminAttendancePage({
                           <textarea name="notes" rows={5} defaultValue={record.notes} placeholder="Journal notes" className="focus-ring resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-lead-navy sm:col-span-2" />
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
                         </ActionFeedbackForm>
+                        ) : null}
                       </div>
                     </div>
                   ))}
