@@ -26,6 +26,7 @@ import {
   type ComputedClassSessionStatus
 } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
+import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { formatRupiah, getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
 import { getReviewCollectionName, type ReviewStatus } from "@/lib/reviews";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
@@ -44,6 +45,7 @@ type StudentDocument = {
   studentName?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
   createdAt?: Date;
 };
 
@@ -64,7 +66,9 @@ type PaymentDocument = {
   meetingDate?: string;
   amountDue?: number;
   status?: PaymentStatus;
+  source?: string;
   paidDate?: string;
+  classMode?: string;
   receiptUploadedToDrive?: boolean;
   createdAt?: Date;
 };
@@ -192,6 +196,7 @@ async function getDashboardData(period: Period) {
     db.collection<ReviewDocument>(getReviewCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({}).sort({ scheduledAt: -1 }).limit(5000).toArray()
   ]);
+  const studentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
   const attendanceKeys = new Set(attendance.map((record) => `${record.studentId || ""}:${record.meetingNumber || 0}`));
 
   const periodAttendance = attendance.filter((record) => isInRange(record.meetingDate || "", range));
@@ -206,7 +211,7 @@ async function getDashboardData(period: Period) {
   );
   const revenue = paidInPeriod.reduce((sum, payment) => sum + (payment.amountDue || 0), 0);
   const unpaidPayments = payments.filter((payment) => payment.status === "Unpaid");
-  const outstandingAmount = unpaidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0);
+  const outstandingAmount = unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0);
   const outstandingByStudent = new Map<
     string,
     { studentId: string; name: string; amount: number; meetings: number; oldestDate: string; oldestMeeting: number }
@@ -221,7 +226,7 @@ async function getDashboardData(period: Period) {
       oldestDate: payment.meetingDate || "",
       oldestMeeting: payment.meetingNumber || 0
     };
-    current.amount += payment.amountDue || 0;
+    current.amount += getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || ""));
     current.meetings += 1;
     if (payment.meetingDate && (!current.oldestDate || payment.meetingDate < current.oldestDate)) {
       current.oldestDate = payment.meetingDate;
@@ -358,7 +363,10 @@ async function getDashboardData(period: Period) {
     trendMonths,
     recent: {
       students: students.slice(0, 5),
-      payments: payments.slice(0, 5),
+      payments: payments.slice(0, 5).map((payment) => ({
+        ...payment,
+        amountDue: payment.status === "Paid" ? payment.amountDue || 0 : getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || ""))
+      })),
       leads: leads.slice(0, 5)
     }
   };

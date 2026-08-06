@@ -57,6 +57,7 @@ import {
   profitDistributionStatuses
 } from "@/lib/finance";
 import { getMongoDb } from "@/lib/mongodb";
+import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getTeachersCollectionName, type TeacherDocument } from "@/lib/teachers";
@@ -93,6 +94,7 @@ type StudentPaymentDocument = {
   meetingDate?: string;
   amountDue?: number;
   status?: PaymentStatus;
+  source?: string;
   paidDate?: string;
   paymentMethod?: string;
   createdAt?: Date;
@@ -427,21 +429,25 @@ async function getFinanceData(searchParams: SearchParams) {
     if (!isLikelySameFinanceName(paymentName, registeredName)) return [];
     return [{ payment, student }];
   });
-  const existingIncome: NormalizedIncome[] = matchedStudentPayments.map(({ payment, student }) => ({
-    id: payment._id.toString(),
-    student: student.studentName || payment.studentName || payment.studentId || "Student",
-    course: student.courseJoined || payment.courseJoined || "",
-    branch: branchFromMode(student.classMode || payment.classMode),
-    teacher: "",
-    paymentMethod: payment.paymentMethod || "",
-    paymentDate: payment.status === "Paid" ? payment.paidDate || payment.meetingDate || "" : payment.meetingDate || "",
-    amount: payment.amountDue || 0,
-    discount: 0,
-    currency: "IDR",
-    invoiceNumber: payment.meetingNumber ? `MEETING-${payment.meetingNumber}` : "",
-    status: payment.status === "Paid" ? "Paid" : "Pending",
-    source: "Student payment"
-  }));
+  const existingIncome: NormalizedIncome[] = matchedStudentPayments.map(({ payment, student }) => {
+    const status = payment.status === "Paid" ? "Paid" : "Pending";
+
+    return {
+      id: payment._id.toString(),
+      student: student.studentName || payment.studentName || payment.studentId || "Student",
+      course: status === "Paid" ? payment.courseJoined || student.courseJoined || "" : student.courseJoined || payment.courseJoined || "",
+      branch: branchFromMode(status === "Paid" ? payment.classMode || student.classMode : student.classMode || payment.classMode),
+      teacher: "",
+      paymentMethod: payment.paymentMethod || "",
+      paymentDate: payment.status === "Paid" ? payment.paidDate || payment.meetingDate || "" : payment.meetingDate || "",
+      amount: status === "Paid" ? payment.amountDue || 0 : getEffectivePaymentAmountDue(payment, student),
+      discount: 0,
+      currency: "IDR",
+      invoiceNumber: payment.meetingNumber ? `MEETING-${payment.meetingNumber}` : "",
+      status,
+      source: "Student payment"
+    };
+  });
   const manualIncomeRows: NormalizedIncome[] = manualIncome.map((income) => ({
     id: income._id.toString(),
     student: income.student || "Student",

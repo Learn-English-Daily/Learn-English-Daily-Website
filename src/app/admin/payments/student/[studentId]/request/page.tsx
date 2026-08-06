@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { formatRupiah, getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
@@ -25,6 +26,7 @@ type PaymentDocument = {
   meetingDate?: string;
   amountDue?: number;
   status?: PaymentStatus;
+  source?: string;
   attendanceStatus?: string;
 };
 
@@ -33,6 +35,7 @@ type StudentDocument = {
   studentName?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
 };
 
 type CumulativePaymentRequest = {
@@ -78,12 +81,12 @@ async function getCumulativePaymentRequest(studentId: string): Promise<Cumulativ
     studentName: student?.studentName || firstPayment?.studentName || "Student",
     courseJoined: student?.courseJoined || firstPayment?.courseJoined || "",
     classType: student?.classType || firstPayment?.classType || "",
-    totalAmountDue: payments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0),
+    totalAmountDue: payments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, student), 0),
     payments: payments.map((payment) => ({
       id: payment._id.toString(),
       meetingNumber: payment.meetingNumber || 0,
       meetingDate: payment.meetingDate || "",
-      amountDue: payment.amountDue || 0,
+      amountDue: getEffectivePaymentAmountDue(payment, student),
       attendanceStatus: payment.attendanceStatus || ""
     }))
   };

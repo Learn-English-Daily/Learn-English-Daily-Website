@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { formatRupiah, getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
@@ -25,6 +26,7 @@ type PaymentDocument = {
   meetingDate?: string;
   amountDue?: number;
   status?: PaymentStatus;
+  source?: string;
   paidDate?: string;
   paymentMethod?: string;
   attendanceStatus?: string;
@@ -35,6 +37,7 @@ type StudentDocument = {
   studentName?: string;
   courseJoined?: string;
   classType?: string;
+  classMode?: string;
 };
 
 type PaymentRequest = {
@@ -82,7 +85,7 @@ async function getPaymentRequest(id: string): Promise<PaymentRequest | null> {
     classType: student?.classType || payment.classType || "",
     meetingNumber: payment.meetingNumber || 0,
     meetingDate: payment.meetingDate || "",
-    amountDue: payment.amountDue || 0,
+    amountDue: getEffectivePaymentAmountDue(payment, student),
     status: payment.status || "Unpaid",
     paidDate: payment.paidDate || "",
     paymentMethod: payment.paymentMethod || "",

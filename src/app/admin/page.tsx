@@ -23,6 +23,7 @@ import {
   type ClassSessionDocument
 } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
+import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { formatRupiah, getStudentPaymentsCollectionName } from "@/lib/payments";
 import { getReviewCollectionName } from "@/lib/reviews";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, getTrialStudentFilter } from "@/lib/student-registration";
@@ -38,12 +39,22 @@ type LeadDocument = {
 };
 
 type PaymentDocument = {
+  studentId?: string;
   status?: string;
   amountDue?: number;
+  source?: string;
   studentName?: string;
   meetingNumber?: number;
   meetingDate?: string;
   createdAt?: Date;
+};
+
+type StudentDocument = {
+  studentId?: string;
+  studentName?: string;
+  courseJoined?: string;
+  classType?: string;
+  classMode?: string;
 };
 
 type ReviewDocument = {
@@ -110,7 +121,8 @@ async function getDashboardData(): Promise<DashboardData> {
     currentStudents,
     trialStudents,
     latestInquiry,
-    latestUnpaid
+    latestUnpaid,
+    studentDocs
   ] = await Promise.all([
     db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
@@ -124,8 +136,10 @@ async function getDashboardData(): Promise<DashboardData> {
     db.collection(getStudentRegistrationCollectionName()).countDocuments(getActiveStudentFilter()),
     db.collection(getStudentRegistrationCollectionName()).countDocuments(getTrialStudentFilter()),
     db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next(),
-    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ status: "Unpaid" }).sort({ meetingDate: -1, createdAt: -1 }).limit(1).next()
+    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ status: "Unpaid" }).sort({ meetingDate: -1, createdAt: -1 }).limit(1).next(),
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).limit(50000).toArray()
   ]);
+  const studentsById = new Map(studentDocs.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
 
   const todaySessions = sessionDocs
     .filter((doc) => doc.sessionDate === today)
@@ -155,7 +169,7 @@ async function getDashboardData(): Promise<DashboardData> {
     todaySessions,
     needsAttendance,
     unpaidPayments: unpaidPayments.length,
-    unpaidAmount: unpaidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0),
+    unpaidAmount: unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0),
     newInquiries,
     pendingReviews,
     currentStudents,
@@ -170,7 +184,7 @@ async function getDashboardData(): Promise<DashboardData> {
       ? {
           studentName: latestUnpaid.studentName || "Unknown",
           meetingNumber: latestUnpaid.meetingNumber || 0,
-          amountDue: latestUnpaid.amountDue || 0
+          amountDue: getEffectivePaymentAmountDue(latestUnpaid, studentsById.get(latestUnpaid.studentId || ""))
         }
       : null
   };

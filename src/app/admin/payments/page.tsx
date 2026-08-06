@@ -13,6 +13,7 @@ import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/
 import { getMonthlyAssessmentsCollectionName } from "@/lib/assessments";
 import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
 import { getMongoDb } from "@/lib/mongodb";
+import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import {
   formatRupiah,
   getStudentPaymentsCollectionName,
@@ -241,14 +242,14 @@ async function getSelectedStudent(studentId = "") {
   };
 }
 
-async function getPayments(studentId = "", studentName = "", showArchived = false, closedPeriodKeys = new Set<string>()): Promise<Payment[]> {
-  if (!studentId) return [];
+async function getPayments(student: Student, showArchived = false, closedPeriodKeys = new Set<string>()): Promise<Payment[]> {
+  if (!student.studentId) return [];
 
   const db = await getMongoDb();
-  const normalizedStudentName = normalizePaymentName(studentName);
+  const normalizedStudentName = normalizePaymentName(student.studentName);
   const docs = (await db
     .collection<PaymentDocument>(getStudentPaymentsCollectionName())
-    .find({ studentId })
+    .find({ studentId: student.studentId })
     .sort({ meetingNumber: -1, meetingDate: -1 })
     .limit(200)
     .toArray()) as WithId<PaymentDocument>[];
@@ -263,7 +264,7 @@ async function getPayments(studentId = "", studentName = "", showArchived = fals
     meetingNumber: doc.meetingNumber || 0,
     meetingDate: doc.meetingDate || "",
     billingPeriod: getRecordBillingPeriod(doc).billingPeriod,
-    amountDue: doc.amountDue || 0,
+    amountDue: getEffectivePaymentAmountDue(doc, student),
     status: doc.status || "Unpaid",
     paidDate: doc.paidDate || "",
     paymentMethod: doc.paymentMethod || "",
@@ -276,7 +277,7 @@ async function getPayments(studentId = "", studentName = "", showArchived = fals
     amountPerMeeting: doc.amountPerMeeting || 0,
     batchName: doc.batchName || "",
     attendanceStatus: doc.attendanceStatus || "",
-    classMode: doc.classMode || "",
+    classMode: doc.classMode || student.classMode || "",
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
   }));
 }
@@ -360,7 +361,7 @@ export default async function AdminPaymentsPage({
   const closedPeriodKeys = await getClosedBillingPeriodKeys(await getMongoDb());
   const isGroupStudent = selectedStudent?.classType === "Basic Group";
   const [payments, groupPaymentContext] = await Promise.all([
-    selectedStudent ? getPayments(selectedStudent.studentId, selectedStudent.studentName, showArchived, closedPeriodKeys) : [],
+    selectedStudent ? getPayments(selectedStudent, showArchived, closedPeriodKeys) : [],
     selectedStudent ? getGroupPaymentContext(selectedStudent.studentId, isGroupStudent) : null
   ]);
   const totalPaid = payments.filter((payment) => payment.status === "Paid").reduce((sum, payment) => sum + payment.amountDue, 0);

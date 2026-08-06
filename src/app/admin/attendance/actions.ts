@@ -17,7 +17,7 @@ import {
   getStudentPaymentsCollectionName,
   getSuggestedPerMeetingPrice
 } from "@/lib/payments";
-import { isClassMode } from "@/lib/student-registration";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName, isClassMode } from "@/lib/student-registration";
 import {
   ensureDefaultTeachers,
   getTeachersCollectionName,
@@ -290,6 +290,17 @@ export async function updateStudentAttendance(formData: FormData) {
   ) {
     throw new Error("Attendance record not found");
   }
+  const currentStudent = await db.collection<{
+    studentId?: string;
+    studentName?: string;
+    courseJoined?: string;
+    classType?: string;
+  }>(getStudentRegistrationCollectionName()).findOne({
+    $and: [{ studentId: existingAttendance.studentId }, getActiveStudentFilter()]
+  });
+  const studentName = currentStudent?.studentName || existingAttendance.studentName;
+  const courseJoined = currentStudent?.courseJoined || existingAttendance.courseJoined;
+  const classType = currentStudent?.classType || existingAttendance.classType;
 
   const period = getBillingPeriodFromDate(meetingDate);
   if (await isBillingPeriodClosed(db, period)) {
@@ -304,6 +315,9 @@ export async function updateStudentAttendance(formData: FormData) {
         billingMonth: period.billingMonth,
         billingYear: period.billingYear,
         billingPeriod: period.billingPeriod,
+        studentName,
+        courseJoined,
+        classType,
         classMode,
         status,
         notes,
@@ -315,9 +329,9 @@ export async function updateStudentAttendance(formData: FormData) {
   );
   await syncPaymentFromAttendance({
     studentId: existingAttendance.studentId,
-    studentName: existingAttendance.studentName,
-    courseJoined: existingAttendance.courseJoined,
-    classType: existingAttendance.classType,
+    studentName,
+    courseJoined,
+    classType,
     classMode,
     meetingNumber: existingAttendance.meetingNumber,
     meetingDate,

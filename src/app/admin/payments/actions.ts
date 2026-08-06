@@ -13,6 +13,7 @@ import {
   isBillingPeriodClosed
 } from "@/lib/billing-periods";
 import { getMongoDb } from "@/lib/mongodb";
+import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import {
   getStudentPaymentsCollectionName,
   isPaymentMethod,
@@ -59,6 +60,11 @@ export async function updateStudentPaymentStatus(formData: FormData) {
 
   const db = await getMongoDb();
   const existingPayment = await db.collection<{
+    studentId?: string;
+    status?: PaymentStatus;
+    source?: string;
+    amountDue?: number;
+    meetingNumber?: number;
     billingMonth?: number;
     billingYear?: number;
     meetingDate?: string;
@@ -69,10 +75,32 @@ export async function updateStudentPaymentStatus(formData: FormData) {
     throw new Error("This month is closed. Finalized payments cannot be changed.");
   }
 
+  const student = existingPayment?.studentId
+    ? await db.collection<{
+        studentId?: string;
+        studentName?: string;
+        courseJoined?: string;
+        classType?: string;
+        classMode?: string;
+      }>(getStudentRegistrationCollectionName()).findOne({
+        $and: [{ studentId: existingPayment.studentId }, getActiveStudentFilter()]
+      })
+    : null;
+  const amountDue = getEffectivePaymentAmountDue(existingPayment || {}, student);
+
   await db.collection(getStudentPaymentsCollectionName()).updateOne(
     { _id: new ObjectId(id) },
     {
       $set: {
+        ...(status === "Paid" && amountDue > 0 ? { amountDue } : {}),
+        ...(student
+          ? {
+              studentName: student.studentName || "Student",
+              courseJoined: student.courseJoined || "",
+              classType: student.classType || "",
+              classMode: student.classMode || ""
+            }
+          : {}),
         status,
         paidDate: status === "Paid" ? paidDate || new Date().toISOString().slice(0, 10) : "",
         paymentMethod,
@@ -192,12 +220,23 @@ export async function closeMonthlyBalance(formData: FormData) {
 
   const db = await getMongoDb();
   const payments = await db.collection<{
+    studentId?: string;
     billingMonth?: number;
     billingYear?: number;
     meetingDate?: string;
     status?: PaymentStatus;
     amountDue?: number;
+    source?: string;
+    meetingNumber?: number;
   }>(getStudentPaymentsCollectionName()).find({}).limit(50000).toArray();
+  const students = await db.collection<{
+    studentId?: string;
+    studentName?: string;
+    courseJoined?: string;
+    classType?: string;
+    classMode?: string;
+  }>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).limit(50000).toArray();
+  const studentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
 
   const monthPayments = payments.filter((payment) => {
     const paymentPeriod = payment.billingMonth && payment.billingYear
@@ -219,7 +258,7 @@ export async function closeMonthlyBalance(formData: FormData) {
         paidCount: paidPayments.length,
         unpaidCount: unpaidPayments.length,
         totalPaid: paidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0),
-        totalUnpaid: unpaidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0),
+        totalUnpaid: unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0),
         updatedAt: now
       },
       $setOnInsert: {

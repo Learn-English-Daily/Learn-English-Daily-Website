@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { refreshUnpaidStudentPaymentPricing } from "@/lib/payment-pricing";
 import { generateParentAccessToken } from "@/lib/parent-access";
 import {
   getStudentIdCountersCollectionName,
@@ -137,8 +138,19 @@ export async function updateStudentRegistration(formData: FormData) {
     }
   );
 
+  await refreshUnpaidStudentPaymentPricing(db, {
+    studentId: upgradedStudentId || existingRegistration?.studentId || "",
+    studentName: registration.studentName,
+    courseJoined: registration.courseJoined,
+    classType: registration.classType,
+    classMode: registration.classMode
+  });
+
   revalidatePath("/admin/students");
   revalidatePath("/admin/students/trials");
+  revalidatePath("/admin/payments");
+  revalidatePath("/ceo");
+  revalidatePath("/ceo/finance");
   revalidatePath(`/admin/students/${id}/edit`);
   redirect(`/admin/students/${id}/edit?updated=1`);
 }
