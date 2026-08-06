@@ -18,11 +18,7 @@ import {
   getActiveStudentFilter,
   getStudentRegistrationCollectionName
 } from "@/lib/student-registration";
-import {
-  ensureDefaultTeachers,
-  getTeachersCollectionName,
-  type TeacherDocument
-} from "@/lib/teachers";
+import { resolveAvailableTeacher } from "@/lib/teachers";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -45,17 +41,7 @@ async function assertAdmin() {
 
 async function resolveTeacher(teacherId: string) {
   const db = await getMongoDb();
-  await ensureDefaultTeachers(db);
-  const teacher = await db.collection<TeacherDocument>(getTeachersCollectionName()).findOne({
-    _id: teacherId,
-    active: true
-  });
-
-  if (!teacher) {
-    throw new Error("Select a valid teacher");
-  }
-
-  return teacher;
+  return resolveAvailableTeacher(db, teacherId);
 }
 
 function getBasicGroupStudentFilter() {

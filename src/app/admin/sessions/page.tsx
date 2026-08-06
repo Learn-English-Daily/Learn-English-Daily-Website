@@ -36,9 +36,8 @@ import {
 import { getMongoDb } from "@/lib/mongodb";
 import { classModeOptions, getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
-  ensureDefaultTeachers,
-  getTeachersCollectionName,
-  type TeacherDocument
+  getAvailableTeachers,
+  type TeacherOption
 } from "@/lib/teachers";
 
 export const dynamic = "force-dynamic";
@@ -62,10 +61,7 @@ type Student = {
   classMode: string;
 };
 
-type Teacher = {
-  id: string;
-  name: string;
-};
+type Teacher = TeacherOption;
 
 type AttendanceDocument = {
   studentId?: string;
@@ -122,14 +118,7 @@ async function getStudents(): Promise<Student[]> {
 
 async function getTeachers(): Promise<Teacher[]> {
   const db = await getMongoDb();
-  await ensureDefaultTeachers(db);
-  const teachers = await db
-    .collection<TeacherDocument>(getTeachersCollectionName())
-    .find({ active: true })
-    .sort({ name: 1 })
-    .toArray();
-
-  return teachers.map((teacher) => ({ id: teacher._id, name: teacher.name }));
+  return getAvailableTeachers(db);
 }
 
 async function getSessions(): Promise<ClassSession[]> {

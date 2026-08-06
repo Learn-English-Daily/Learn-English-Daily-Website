@@ -22,9 +22,7 @@ import {
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, isClassMode } from "@/lib/student-registration";
 import {
-  ensureDefaultTeachers,
-  getTeachersCollectionName,
-  type TeacherDocument
+  resolveAvailableTeachers
 } from "@/lib/teachers";
 
 function clean(value: unknown) {
@@ -60,25 +58,13 @@ async function assertAdmin() {
 }
 
 async function resolveSelectedTeachers(db: Db, formData: FormData) {
-  await ensureDefaultTeachers(db);
   const teacherIds = [...new Set(formData.getAll("teacherIds").map(clean).filter(Boolean))];
 
   if (!teacherIds.length) {
     throw new Error("Select at least one teacher");
   }
 
-  const teachers = await db
-    .collection<TeacherDocument>(getTeachersCollectionName())
-    .find({ _id: { $in: teacherIds }, active: true })
-    .toArray();
-  const namesById = new Map(teachers.map((teacher) => [teacher._id, teacher.name]));
-  const teacherNames = teacherIds.map((id) => namesById.get(id)).filter((name): name is string => Boolean(name));
-
-  if (teacherNames.length !== teacherIds.length) {
-    throw new Error("Invalid teacher selection");
-  }
-
-  return { teacherIds, teacherNames };
+  return resolveAvailableTeachers(db, teacherIds);
 }
 
 export async function createClassSession(formData: FormData) {

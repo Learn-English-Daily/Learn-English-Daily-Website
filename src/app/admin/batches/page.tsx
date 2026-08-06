@@ -29,7 +29,7 @@ import {
 } from "@/lib/assessments";
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
-import { ensureDefaultTeachers, getTeachersCollectionName, type TeacherDocument } from "@/lib/teachers";
+import { getAvailableTeachers, type TeacherOption } from "@/lib/teachers";
 
 export const dynamic = "force-dynamic";
 
@@ -117,10 +117,7 @@ type Assessment = {
   teacherCommentId: string;
 };
 
-type Teacher = {
-  id: string;
-  name: string;
-};
+type Teacher = TeacherOption;
 
 type AssessmentRatings = {
   communication: {
@@ -172,12 +169,11 @@ function getBasicGroupStudentFilter() {
 
 async function getBatchPageData() {
   const db = await getMongoDb();
-  await ensureDefaultTeachers(db);
   const { month, year } = currentJakartaMonth();
 
   const [batchDocs, teacherDocs, studentDocs, currentAssessmentDocs, savedAssessmentDocs] = await Promise.all([
     db.collection<BatchDocument>(getBatchesCollectionName()).find({}).sort({ status: 1, startDate: -1 }).limit(100).toArray() as Promise<WithId<BatchDocument>[]>,
-    db.collection<TeacherDocument>(getTeachersCollectionName()).find({ active: true }).sort({ name: 1 }).toArray(),
+    getAvailableTeachers(db),
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getBasicGroupStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>,
     db.collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName()).find({ month, year }).limit(2000).toArray() as Promise<WithId<AssessmentDocument>[]>,
     db.collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName()).find({}).sort({ year: -1, month: -1, updatedAt: -1 }).limit(5000).toArray() as Promise<WithId<AssessmentDocument>[]>
@@ -216,7 +212,7 @@ async function getBatchPageData() {
       maximumStudents: batch.maximumStudents || 12,
       status: batch.status || "active"
     })),
-    teachers: teacherDocs.map((teacher) => ({ id: teacher._id, name: teacher.name })),
+    teachers: teacherDocs,
     students: studentDocs.map((student) => ({
       id: student._id.toString(),
       studentId: student.studentId || "",
