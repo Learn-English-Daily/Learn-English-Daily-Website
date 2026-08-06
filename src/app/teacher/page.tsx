@@ -272,7 +272,7 @@ export default async function TeacherPortalPage() {
   const data = await getTeacherPortalData(teacher.id);
   const today = getTodayJakarta();
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
-  const needsAttendance = data.sessions.filter((session) => session.status === "Needs Attendance");
+  const needsAttendance = todaysSessions.filter((session) => session.status === "Needs Attendance");
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -302,7 +302,7 @@ export default async function TeacherPortalPage() {
       <section className="container-shell grid gap-6 py-8">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length} detail="Classes scheduled today" />
-          <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={needsAttendance.length} detail="Past classes waiting" tone="rose" />
+          <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={needsAttendance.length} detail="Today's classes waiting" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Recent Records" value={data.recentAttendance.length} detail="Your latest attendance entries" tone="blue" />
           <TeacherKpi icon={GraduationCap} label="Batches" value={data.batches.length} detail="Assigned active batches" />
         </div>
@@ -312,13 +312,13 @@ export default async function TeacherPortalPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Your Class Queue</h2>
-                <p className="mt-1 text-sm text-lead-gray">Only classes assigned to you appear here. Times are Indonesia WIB.</p>
+                <p className="mt-1 text-sm text-lead-gray">Only today's classes assigned to you appear here. Times are Indonesia WIB.</p>
               </div>
-              <span className="w-fit rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue">{data.sessions.length} open</span>
+              <span className="w-fit rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue">{todaysSessions.length} today</span>
             </div>
 
             <div className="mt-5 grid gap-4">
-              {data.sessions.map((session) => (
+              {todaysSessions.map((session) => (
                 <div key={session.id} className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-heading text-lg font-bold text-lead-navy">{session.studentName}</h3>
@@ -375,7 +375,7 @@ export default async function TeacherPortalPage() {
                   </div>
                 </div>
               ))}
-              {!data.sessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No open classes assigned to you right now.</p> : null}
+              {!todaysSessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No classes assigned to you for today.</p> : null}
             </div>
           </Card>
 
