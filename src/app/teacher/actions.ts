@@ -141,7 +141,7 @@ async function syncPaymentFromTeacherAttendance({
 }
 
 export async function loginTeacher(_: unknown, formData: FormData) {
-  const teacherId = clean(formData.get("teacherId"));
+  const teacherId = (clean(formData.get("username")) || clean(formData.get("teacherId"))).toLowerCase();
   const password = clean(formData.get("password"));
 
   const db = await getMongoDb();

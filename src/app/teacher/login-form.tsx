@@ -5,30 +5,20 @@ import { LockKeyhole } from "lucide-react";
 import { loginTeacher } from "@/app/teacher/actions";
 import { Button } from "@/components/ui/button";
 
-type TeacherOption = {
-  id: string;
-  name: string;
-};
-
-export function TeacherLoginForm({ teachers }: { teachers: TeacherOption[] }) {
+export function TeacherLoginForm() {
   const [state, formAction, pending] = useActionState(loginTeacher, { error: "" });
 
   return (
     <form action={formAction} className="mt-8 grid gap-4">
       <label className="grid gap-2 text-sm font-semibold text-lead-navy">
-        Teacher
-        <select
+        Teacher username
+        <input
           required
-          name="teacherId"
+          name="username"
+          autoComplete="username"
+          placeholder="Enter your teacher username"
           className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy"
-        >
-          <option value="">Select teacher</option>
-          {teachers.map((teacher) => (
-            <option key={teacher.id} value={teacher.id}>
-              {teacher.name}
-            </option>
-          ))}
-        </select>
+        />
       </label>
       <label className="grid gap-2 text-sm font-semibold text-lead-navy">
         Teacher password

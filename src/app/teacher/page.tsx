@@ -22,8 +22,6 @@ import { getMongoDb } from "@/lib/mongodb";
 import { classModeOptions } from "@/lib/student-registration";
 import { getBatchesCollectionName } from "@/lib/assessments";
 import {
-  getTeacherPasswordEnvName,
-  isTeacherPasswordConfigured,
   isValidTeacherSession,
   TEACHER_ID_COOKIE,
   TEACHER_SESSION_COOKIE
@@ -35,12 +33,6 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Teacher Portal | LEAD",
   robots: { index: false, follow: false }
-};
-
-type Teacher = {
-  id: string;
-  name: string;
-  configured: boolean;
 };
 
 type AttendanceDocument = {
@@ -142,18 +134,6 @@ function statusClassName(status: ComputedClassSessionStatus | AttendanceStatus) 
   if (status === "Needs Attendance" || status === "Absent") return "bg-rose-50 text-rose-700";
   if (status === "Late") return "bg-yellow-50 text-yellow-800";
   return "bg-blue-50 text-lead-blue";
-}
-
-async function getTeachers(): Promise<Teacher[]> {
-  const db = await getMongoDb();
-  await ensureDefaultTeachers(db);
-  const teachers = await db.collection<TeacherDocument>(getTeachersCollectionName()).find({ active: true }).sort({ name: 1 }).toArray();
-
-  return teachers.map((teacher) => ({
-    id: teacher._id,
-    name: teacher.name,
-    configured: isTeacherPasswordConfigured(teacher._id)
-  }));
 }
 
 async function getAuthenticatedTeacher() {
@@ -274,29 +254,7 @@ async function getTeacherPortalData(teacherId: string) {
 
 export default async function TeacherPortalPage() {
   noStore();
-  const teachers = await getTeachers();
-  const configuredTeachers = teachers.filter((teacher) => teacher.configured);
   const teacher = await getAuthenticatedTeacher();
-
-  if (!configuredTeachers.length) {
-    return (
-      <main className="min-h-screen bg-lead-soft px-4 py-10">
-        <Card className="mx-auto max-w-2xl p-8">
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Teacher</p>
-          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Teacher passwords missing</h1>
-          <p className="mt-4 leading-7 text-lead-gray">
-            Add separate passwords in Vercel Environment Variables, then teachers can log in here.
-          </p>
-          <div className="mt-5 grid gap-2 rounded-lg bg-slate-50 p-4 text-sm font-semibold text-lead-navy">
-            {teachers.map((item) => (
-              <code key={item.id}>{getTeacherPasswordEnvName(item.id)}=</code>
-            ))}
-            <code>TEACHER_SESSION_SECRET=</code>
-          </div>
-        </Card>
-      </main>
-    );
-  }
 
   if (!teacher) {
     return (
@@ -305,7 +263,7 @@ export default async function TeacherPortalPage() {
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Teacher</p>
           <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Teacher portal</h1>
           <p className="mt-3 leading-7 text-lead-gray">Sign in to see your classes, mark attendance, write journal notes, and generate games links.</p>
-          <TeacherLoginForm teachers={configuredTeachers} />
+          <TeacherLoginForm />
         </Card>
       </main>
     );
