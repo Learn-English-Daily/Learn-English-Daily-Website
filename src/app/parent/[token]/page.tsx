@@ -147,6 +147,17 @@ function currentJakartaMonth() {
   };
 }
 
+function getCurrentPhaseAttendance(records: WithId<AttendanceDocument>[]) {
+  const latestResetRecord = records.find((record) => record.meetingNumber === 1 && record.meetingDate);
+
+  if (!latestResetRecord?.meetingDate) {
+    return records;
+  }
+
+  const phaseStartDate = latestResetRecord.meetingDate;
+  return records.filter((record) => record.meetingDate && record.meetingDate >= phaseStartDate);
+}
+
 async function getParentPortalData(token: string): Promise<{ student: Student; attendance: Attendance[]; assessment: MonthlyAssessment | null } | null> {
   if (!token || token.length < 20) return null;
 
@@ -160,25 +171,11 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
 
   const attendanceDocs = (await db
     .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
-    .find({
-      studentId: studentDoc.studentId,
-      $or: [
-        { billingMonth: currentPeriod.month, billingYear: currentPeriod.year },
-        {
-          billingMonth: { $exists: false },
-          billingYear: { $exists: false },
-          meetingDate: {
-            $gte: `${currentPeriod.year}-${String(currentPeriod.month).padStart(2, "0")}-01`,
-            $lt: currentPeriod.month === 12
-              ? `${currentPeriod.year + 1}-01-01`
-              : `${currentPeriod.year}-${String(currentPeriod.month + 1).padStart(2, "0")}-01`
-          }
-        }
-      ]
-    })
+    .find({ studentId: studentDoc.studentId })
     .sort({ meetingDate: -1, updatedAt: -1, createdAt: -1, meetingNumber: -1 })
-    .limit(200)
+    .limit(500)
     .toArray()) as WithId<AttendanceDocument>[];
+  const currentPhaseAttendanceDocs = getCurrentPhaseAttendance(attendanceDocs);
   const assessmentDoc = (await db
     .collection<MonthlyAssessmentDocument>(getMonthlyAssessmentsCollectionName())
     .find({ studentId: studentDoc.studentId, month: currentPeriod.month, year: currentPeriod.year })
@@ -192,7 +189,7 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
       courseJoined: studentDoc.courseJoined || "",
       classType: studentDoc.classType || ""
     },
-    attendance: attendanceDocs.map((record) => ({
+    attendance: currentPhaseAttendanceDocs.map((record) => ({
       meetingNumber: record.meetingNumber || 0,
       meetingDate: record.meetingDate || "",
       status: record.status || "Present",
@@ -271,8 +268,8 @@ export default async function ParentAttendancePortalPage({
             <div className="p-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h3 className="font-heading text-xl font-bold text-lead-navy">This Month's Attendance</h3>
-                <p className="mt-1 text-sm text-lead-gray">Current month results only. Meeting count restarts from 1 each month.</p>
+                <h3 className="font-heading text-xl font-bold text-lead-navy">Current Course Phase</h3>
+                <p className="mt-1 text-sm text-lead-gray">Counts reset from the latest Meeting 1 and continue until the next course phase reset.</p>
               </div>
               <p className="text-sm font-semibold text-lead-gray">
                 Attendance rate: <span className="font-heading text-xl font-extrabold text-lead-blue">{attendanceRate === null ? "Not available" : `${attendanceRate}%`}</span>
