@@ -35,6 +35,9 @@ type AttendanceDocument = {
   studentId?: string;
   meetingNumber?: number;
   meetingDate?: string;
+  billingMonth?: number;
+  billingYear?: number;
+  billingPeriod?: string;
   status?: AttendanceStatus;
   classMode?: string;
   notes?: string;
@@ -157,7 +160,22 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
 
   const attendanceDocs = (await db
     .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
-    .find({ studentId: studentDoc.studentId })
+    .find({
+      studentId: studentDoc.studentId,
+      $or: [
+        { billingMonth: currentPeriod.month, billingYear: currentPeriod.year },
+        {
+          billingMonth: { $exists: false },
+          billingYear: { $exists: false },
+          meetingDate: {
+            $gte: `${currentPeriod.year}-${String(currentPeriod.month).padStart(2, "0")}-01`,
+            $lt: currentPeriod.month === 12
+              ? `${currentPeriod.year + 1}-01-01`
+              : `${currentPeriod.year}-${String(currentPeriod.month + 1).padStart(2, "0")}-01`
+          }
+        }
+      ]
+    })
     .sort({ meetingDate: -1, updatedAt: -1, createdAt: -1, meetingNumber: -1 })
     .limit(200)
     .toArray()) as WithId<AttendanceDocument>[];
@@ -253,8 +271,8 @@ export default async function ParentAttendancePortalPage({
             <div className="p-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h3 className="font-heading text-xl font-bold text-lead-navy">Attendance to date</h3>
-                <p className="mt-1 text-sm text-lead-gray">Cumulative results for all recorded meetings.</p>
+                <h3 className="font-heading text-xl font-bold text-lead-navy">This Month's Attendance</h3>
+                <p className="mt-1 text-sm text-lead-gray">Current month results only. Meeting count restarts from 1 each month.</p>
               </div>
               <p className="text-sm font-semibold text-lead-gray">
                 Attendance rate: <span className="font-heading text-xl font-extrabold text-lead-blue">{attendanceRate === null ? "Not available" : `${attendanceRate}%`}</span>
