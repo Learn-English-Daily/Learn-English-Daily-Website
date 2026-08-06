@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import type { WithId } from "mongodb";
-import { CalendarCheck, CalendarClock, Gamepad2, GraduationCap, LogOut, NotebookPen, Users } from "lucide-react";
+import { CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookPen, Users } from "lucide-react";
 import { generateTeacherGamesLink, logoutTeacher, saveTeacherAttendance } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
@@ -272,6 +272,7 @@ export default async function TeacherPortalPage() {
   const data = await getTeacherPortalData(teacher.id);
   const today = getTodayJakarta();
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
+  const missedSessions = data.sessions.filter((session) => session.sessionDate < today);
   const needsAttendance = todaysSessions.filter((session) => session.status === "Needs Attendance");
 
   return (
@@ -303,81 +304,28 @@ export default async function TeacherPortalPage() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length} detail="Classes scheduled today" />
           <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={needsAttendance.length} detail="Today's classes waiting" tone="rose" />
+          <TeacherKpi icon={CalendarCheck} label="Missed" value={missedSessions.length} detail="Past unmarked classes" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Recent Records" value={data.recentAttendance.length} detail="Your latest attendance entries" tone="blue" />
-          <TeacherKpi icon={GraduationCap} label="Batches" value={data.batches.length} detail="Assigned active batches" />
         </div>
 
         <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <Card className="p-5">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Your Class Queue</h2>
-                <p className="mt-1 text-sm text-lead-gray">Only today's classes assigned to you appear here. Times are Indonesia WIB.</p>
-              </div>
-              <span className="w-fit rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue">{todaysSessions.length} today</span>
-            </div>
-
-            <div className="mt-5 grid gap-4">
-              {todaysSessions.map((session) => (
-                <div key={session.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-heading text-lg font-bold text-lead-navy">{session.studentName}</h3>
-                    <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{session.studentId}</span>
-                    <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(session.status)}`}>{session.status}</span>
-                    <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{session.classMode}</span>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-lead-gray">
-                    Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
-                  </p>
-                  <p className="mt-1 text-sm text-lead-gray">{session.courseJoined} / {session.classType || "Class type not set"}</p>
-
-                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    <ActionFeedbackForm action={saveTeacherAttendance} successMessage="Attendance saved. This class will leave your queue." className="grid gap-3 rounded-lg border border-blue-100 bg-blue-50/50 p-4">
-                      <input type="hidden" name="classSessionId" value={session.id} />
-                      <label className="grid gap-2 text-sm font-bold text-lead-navy">
-                        Attendance
-                        <select name="status" defaultValue="Present" className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
-                          {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
-                        </select>
-                      </label>
-                      <label className="grid gap-2 text-sm font-bold text-lead-navy">
-                        Class Mode
-                        <select name="classMode" defaultValue={session.classMode} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
-                          {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                        </select>
-                      </label>
-                      <label className="grid gap-2 text-sm font-bold text-lead-navy sm:col-span-2">
-                        Journal Notes
-                        <textarea name="notes" rows={4} placeholder="Write what was covered, student progress, homework, or parent update." className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
-                      </label>
-                      <Button type="submit" className="sm:col-span-2">
-                        <CalendarCheck className="h-4 w-4" />
-                        Save Attendance
-                      </Button>
-                    </ActionFeedbackForm>
-
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-bold text-lead-navy">Class games</p>
-                          <p className="mt-1 text-xs text-lead-gray">Private games hub link for this class.</p>
-                        </div>
-                        <ActionFeedbackForm action={generateTeacherGamesLink} successMessage="Games link generated." className="grid gap-2">
-                          <input type="hidden" name="classSessionId" value={session.id} />
-                          <Button type="submit" size="sm" variant="secondary">
-                            <Gamepad2 className="h-4 w-4" />
-                            {session.gameLink ? "Regenerate" : "Generate"}
-                          </Button>
-                        </ActionFeedbackForm>
-                      </div>
-                      {session.gameLink ? <div className="mt-3"><GameSessionLink url={session.gameLink.url} expiresAt={session.gameLink.expiresAt} /></div> : null}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {!todaysSessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No classes assigned to you for today.</p> : null}
-            </div>
-          </Card>
+          <div className="grid gap-6 content-start">
+            <TeacherSessionList
+              title="Today's Class Queue"
+              description="Only today's classes assigned to you appear here. Times are Indonesia WIB."
+              badge={`${todaysSessions.length} today`}
+              sessions={todaysSessions}
+              emptyText="No classes assigned to you for today."
+            />
+            <TeacherSessionList
+              title="Missed Attendance"
+              description="Past assigned classes that still do not have attendance. Future scheduled classes stay hidden."
+              badge={`${missedSessions.length} missed`}
+              sessions={missedSessions}
+              emptyText="No missed attendance. Nice and clean."
+              urgent
+            />
+          </div>
 
           <div className="grid gap-6 content-start">
             <Card className="p-5">
@@ -454,5 +402,102 @@ function TeacherKpi({
       <p className="mt-2 font-heading text-4xl font-extrabold text-lead-navy">{value}</p>
       <p className="mt-1 text-sm font-semibold text-lead-gray">{detail}</p>
     </Card>
+  );
+}
+
+function TeacherSessionList({
+  title,
+  description,
+  badge,
+  sessions,
+  emptyText,
+  urgent = false
+}: {
+  title: string;
+  description: string;
+  badge: string;
+  sessions: TeacherSession[];
+  emptyText: string;
+  urgent?: boolean;
+}) {
+  return (
+    <Card className={`p-5 ${urgent && sessions.length ? "border-rose-200" : ""}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="font-heading text-2xl font-extrabold text-lead-navy">{title}</h2>
+          <p className="mt-1 text-sm text-lead-gray">{description}</p>
+        </div>
+        <span className={`w-fit rounded-lg px-3 py-2 text-sm font-bold ${urgent && sessions.length ? "bg-rose-50 text-rose-700" : "bg-blue-50 text-lead-blue"}`}>
+          {badge}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-4">
+        {sessions.map((session) => (
+          <TeacherSessionCard key={session.id} session={session} />
+        ))}
+        {!sessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">{emptyText}</p> : null}
+      </div>
+    </Card>
+  );
+}
+
+function TeacherSessionCard({ session }: { session: TeacherSession }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-heading text-lg font-bold text-lead-navy">{session.studentName}</h3>
+        <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{session.studentId}</span>
+        <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(session.status)}`}>{session.status}</span>
+        <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{session.classMode}</span>
+      </div>
+      <p className="mt-2 text-sm font-semibold text-lead-gray">
+        Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
+      </p>
+      <p className="mt-1 text-sm text-lead-gray">{session.courseJoined} / {session.classType || "Class type not set"}</p>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <ActionFeedbackForm action={saveTeacherAttendance} successMessage="Attendance saved. This class will leave your queue." className="grid gap-3 rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+          <input type="hidden" name="classSessionId" value={session.id} />
+          <label className="grid gap-2 text-sm font-bold text-lead-navy">
+            Attendance
+            <select name="status" defaultValue="Present" className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
+              {attendanceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-lead-navy">
+            Class Mode
+            <select name="classMode" defaultValue={session.classMode} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
+              {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-lead-navy sm:col-span-2">
+            Journal Notes
+            <textarea name="notes" rows={4} placeholder="Write what was covered, student progress, homework, or parent update." className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
+          </label>
+          <Button type="submit" className="sm:col-span-2">
+            <CalendarCheck className="h-4 w-4" />
+            Save Attendance
+          </Button>
+        </ActionFeedbackForm>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-lead-navy">Class games</p>
+              <p className="mt-1 text-xs text-lead-gray">Private games hub link for this class.</p>
+            </div>
+            <ActionFeedbackForm action={generateTeacherGamesLink} successMessage="Games link generated." className="grid gap-2">
+              <input type="hidden" name="classSessionId" value={session.id} />
+              <Button type="submit" size="sm" variant="secondary">
+                <Gamepad2 className="h-4 w-4" />
+                {session.gameLink ? "Regenerate" : "Generate"}
+              </Button>
+            </ActionFeedbackForm>
+          </div>
+          {session.gameLink ? <div className="mt-3"><GameSessionLink url={session.gameLink.url} expiresAt={session.gameLink.expiresAt} /></div> : null}
+        </div>
+      </div>
+    </div>
   );
 }
