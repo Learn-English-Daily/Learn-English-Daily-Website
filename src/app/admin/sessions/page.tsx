@@ -252,6 +252,10 @@ function attendanceHref(session: ClassSession) {
   return `/admin/attendance?${params.toString()}`;
 }
 
+function canMarkAttendance(session: ClassSession, today: string) {
+  return Boolean(session.sessionDate) && session.sessionDate <= today;
+}
+
 function expiresAt(endsAt: string, scheduledAt: string) {
   const date = endsAt ? new Date(endsAt) : scheduledAt ? new Date(scheduledAt) : new Date();
   date.setHours(date.getHours() + 3);
@@ -390,49 +394,59 @@ export default async function AdminSessionsPage() {
           </div>
 
           <div className="mt-5 grid gap-4">
-            {sessions.map((session) => (
-              <div key={session.id} className="rounded-lg border border-slate-200 bg-white p-4">
-                <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-heading text-lg font-bold text-lead-navy">{session.studentName}</h3>
-                      <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{session.studentId}</span>
-                      <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(session.status)}`}>{session.status}</span>
-                    </div>
-                    <p className="mt-2 text-sm font-semibold text-lead-gray">
-                      Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
-                    </p>
-                    <p className="mt-1 text-sm text-lead-gray">{session.courseJoined} / {session.classType || "Class type not set"} / {session.classMode}</p>
-                    <p className="mt-1 text-sm text-lead-gray">
-                      <span className="font-bold text-lead-navy">Teachers:</span> {session.teacherNames.length ? session.teacherNames.join(", ") : "Not assigned"}
-                    </p>
-                    <div className="mt-4">
-                      <GchatSessionMessage
-                        studentName={session.studentName}
-                        meetingNumber={session.meetingNumber}
-                        meetingDate={formatDate(session.scheduledAt)}
-                        meetingTime={formatTimeRange(session.scheduledAt, session.endsAt)}
-                        teachers={session.teacherNames}
-                      />
-                    </div>
-                    <div className="mt-4">
-                      <ClassGamePanel classSessionId={session.id} link={session.gameLink} />
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Button asChild size="sm" variant={session.status === "Completed" ? "secondary" : "primary"}>
-                        <a href={attendanceHref(session)}>
-                          <CalendarCheck className="h-4 w-4" />
-                          {session.status === "Completed" ? "View Attendance" : "Mark Attendance"}
-                        </a>
-                      </Button>
-                      <ActionFeedbackForm action={deleteClassSession} successMessage="Session removed." className="contents">
-                        <input type="hidden" name="id" value={session.id} />
-                        <Button type="submit" variant="ghost" size="sm">
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </Button>
-                      </ActionFeedbackForm>
-                    </div>
+            {sessions.map((session) => {
+              const attendanceAvailable = canMarkAttendance(session, today);
+
+              return (
+                <div key={session.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-heading text-lg font-bold text-lead-navy">{session.studentName}</h3>
+                        <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{session.studentId}</span>
+                        <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(session.status)}`}>{session.status}</span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-lead-gray">
+                        Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
+                      </p>
+                      <p className="mt-1 text-sm text-lead-gray">{session.courseJoined} / {session.classType || "Class type not set"} / {session.classMode}</p>
+                      <p className="mt-1 text-sm text-lead-gray">
+                        <span className="font-bold text-lead-navy">Teachers:</span> {session.teacherNames.length ? session.teacherNames.join(", ") : "Not assigned"}
+                      </p>
+                      <div className="mt-4">
+                        <GchatSessionMessage
+                          studentName={session.studentName}
+                          meetingNumber={session.meetingNumber}
+                          meetingDate={formatDate(session.scheduledAt)}
+                          meetingTime={formatTimeRange(session.scheduledAt, session.endsAt)}
+                          teachers={session.teacherNames}
+                        />
+                      </div>
+                      <div className="mt-4">
+                        <ClassGamePanel classSessionId={session.id} link={session.gameLink} />
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {attendanceAvailable ? (
+                          <Button asChild size="sm" variant="primary">
+                            <a href={attendanceHref(session)}>
+                              <CalendarCheck className="h-4 w-4" />
+                              Mark Attendance
+                            </a>
+                          </Button>
+                        ) : (
+                          <span className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue">
+                            <CalendarClock className="h-4 w-4" />
+                            Attendance opens on {formatDate(session.scheduledAt)}
+                          </span>
+                        )}
+                        <ActionFeedbackForm action={deleteClassSession} successMessage="Session removed." className="contents">
+                          <input type="hidden" name="id" value={session.id} />
+                          <Button type="submit" variant="ghost" size="sm">
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </Button>
+                        </ActionFeedbackForm>
+                      </div>
                     <details className="mt-4 rounded-lg border border-slate-200 bg-slate-50">
                       <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-bold text-lead-blue [&::-webkit-details-marker]:hidden">
                         <Pencil className="h-4 w-4" />
@@ -465,7 +479,8 @@ export default async function AdminSessionsPage() {
                   <TemporaryMeetLink sessionId={session.id} expiresAt={expiresAt(session.endsAt, session.scheduledAt)} />
                 </div>
               </div>
-            ))}
+            );
+            })}
             {!sessions.length ? (
               <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">
                 No class sessions yet. Schedule the next class to start tracking attendance reminders.
