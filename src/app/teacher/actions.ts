@@ -1,0 +1,318 @@
+"use server";
+
+import { randomBytes } from "crypto";
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { ObjectId } from "mongodb";
+import {
+  getBillingPeriodFromDate,
+  isBillingPeriodClosed
+} from "@/lib/billing-periods";
+import { getClassSessionsCollectionName, type ClassSessionDocument } from "@/lib/class-sessions";
+import {
+  getGameSessionExpiry,
+  getGameSessionsCollectionName,
+  type GameSessionDocument
+} from "@/lib/game-sessions";
+import {
+  getStudentAttendanceCollectionName,
+  isAttendanceStatus,
+  type AttendanceStatus
+} from "@/lib/attendance";
+import { getMongoDb } from "@/lib/mongodb";
+import { getStudentPaymentsCollectionName, getSuggestedPerMeetingPrice } from "@/lib/payments";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName, isClassMode } from "@/lib/student-registration";
+import {
+  createTeacherSessionToken,
+  getTeacherPassword,
+  isValidTeacherSession,
+  TEACHER_ID_COOKIE,
+  TEACHER_SESSION_COOKIE
+} from "@/lib/teacher-auth";
+import { ensureDefaultTeachers, getTeachersCollectionName, type TeacherDocument } from "@/lib/teachers";
+
+function clean(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isBillableAttendance(status: AttendanceStatus) {
+  return status === "Present" || status === "Late";
+}
+
+async function getCurrentTeacher() {
+  const cookieStore = await cookies();
+  const teacherId = cookieStore.get(TEACHER_ID_COOKIE)?.value || "";
+  const session = cookieStore.get(TEACHER_SESSION_COOKIE)?.value || "";
+
+  if (!isValidTeacherSession(teacherId, session)) {
+    return null;
+  }
+
+  const db = await getMongoDb();
+  await ensureDefaultTeachers(db);
+  const teacher = await db.collection<TeacherDocument>(getTeachersCollectionName()).findOne({ _id: teacherId, active: true });
+  return teacher || null;
+}
+
+async function assertTeacher() {
+  const teacher = await getCurrentTeacher();
+  if (!teacher) {
+    throw new Error("Unauthorized");
+  }
+  return teacher;
+}
+
+async function syncPaymentFromTeacherAttendance({
+  studentId,
+  studentName,
+  courseJoined,
+  classType,
+  classMode,
+  meetingNumber,
+  meetingDate,
+  status
+}: {
+  studentId: string;
+  studentName: string;
+  courseJoined: string;
+  classType: string;
+  classMode: string;
+  meetingNumber: number;
+  meetingDate: string;
+  status: AttendanceStatus;
+}) {
+  const db = await getMongoDb();
+  const payments = db.collection(getStudentPaymentsCollectionName());
+  const amountDue = getSuggestedPerMeetingPrice(courseJoined, classType);
+  const period = getBillingPeriodFromDate(meetingDate);
+
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized records cannot be changed.");
+  }
+
+  if (!isBillableAttendance(status) || amountDue <= 0) {
+    await payments.deleteOne({
+      $or: [
+        { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear, status: "Unpaid", source: "attendance" },
+        { studentId, meetingNumber, meetingDate, status: "Unpaid", source: "attendance" }
+      ]
+    });
+    return;
+  }
+
+  const now = new Date();
+
+  await payments.updateOne(
+    {
+      $or: [
+        { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
+        { studentId, meetingNumber, meetingDate, source: "attendance" }
+      ]
+    },
+    {
+      $set: {
+        studentId,
+        studentName,
+        courseJoined,
+        classType,
+        classMode,
+        meetingNumber,
+        meetingDate,
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        billingPeriod: period.billingPeriod,
+        amountDue,
+        source: "attendance",
+        attendanceStatus: status,
+        updatedAt: now
+      },
+      $setOnInsert: {
+        status: "Unpaid",
+        paidDate: "",
+        paymentMethod: "",
+        notes: "",
+        receiptUploadedToDrive: false,
+        createdAt: now
+      }
+    },
+    { upsert: true }
+  );
+}
+
+export async function loginTeacher(_: unknown, formData: FormData) {
+  const teacherId = clean(formData.get("teacherId"));
+  const password = clean(formData.get("password"));
+
+  const db = await getMongoDb();
+  await ensureDefaultTeachers(db);
+  const teacher = await db.collection<TeacherDocument>(getTeachersCollectionName()).findOne({ _id: teacherId, active: true });
+
+  if (!teacher) {
+    return { error: "Select a valid teacher." };
+  }
+
+  const teacherPassword = getTeacherPassword(teacherId);
+  if (!teacherPassword) {
+    return { error: "This teacher password is not configured yet." };
+  }
+
+  if (password !== teacherPassword) {
+    return { error: "Invalid password." };
+  }
+
+  const cookieStore = await cookies();
+  const cookieOptions = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 8,
+    path: "/teacher"
+  };
+
+  cookieStore.set(TEACHER_ID_COOKIE, teacherId, cookieOptions);
+  cookieStore.set(TEACHER_SESSION_COOKIE, createTeacherSessionToken(teacherId), cookieOptions);
+
+  redirect("/teacher");
+}
+
+export async function logoutTeacher() {
+  const cookieStore = await cookies();
+  cookieStore.delete(TEACHER_ID_COOKIE);
+  cookieStore.delete(TEACHER_SESSION_COOKIE);
+  redirect("/teacher");
+}
+
+export async function saveTeacherAttendance(formData: FormData) {
+  const teacher = await assertTeacher();
+
+  const classSessionId = clean(formData.get("classSessionId"));
+  const status = clean(formData.get("status")) as AttendanceStatus;
+  const classMode = clean(formData.get("classMode"));
+  const notes = clean(formData.get("notes"));
+
+  if (!ObjectId.isValid(classSessionId) || !isAttendanceStatus(status) || !isClassMode(classMode)) {
+    throw new Error("Invalid attendance record");
+  }
+
+  const db = await getMongoDb();
+  const session = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({ _id: new ObjectId(classSessionId) });
+
+  if (!session?.studentId || !session.meetingNumber || !session.sessionDate || !session.teacherIds?.includes(teacher._id)) {
+    throw new Error("Class session not found for this teacher");
+  }
+
+  const student = await db.collection<{
+    studentId?: string;
+    studentName?: string;
+    courseJoined?: string;
+    classType?: string;
+  }>(getStudentRegistrationCollectionName()).findOne({
+    $and: [{ studentId: session.studentId }, getActiveStudentFilter()]
+  });
+  const studentName = student?.studentName || session.studentName || "Student";
+  const courseJoined = student?.courseJoined || session.courseJoined || "";
+  const classType = student?.classType || session.classType || "";
+  const period = getBillingPeriodFromDate(session.sessionDate);
+
+  if (await isBillingPeriodClosed(db, period)) {
+    throw new Error("This month is closed. Finalized records cannot be changed.");
+  }
+
+  await db.collection(getStudentAttendanceCollectionName()).updateOne(
+    {
+      $or: [
+        { studentId: session.studentId, meetingNumber: session.meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
+        { studentId: session.studentId, meetingNumber: session.meetingNumber, meetingDate: session.sessionDate }
+      ]
+    },
+    {
+      $set: {
+        studentId: session.studentId,
+        studentName,
+        courseJoined,
+        classType,
+        classMode,
+        meetingNumber: session.meetingNumber,
+        meetingDate: session.sessionDate,
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        billingPeriod: period.billingPeriod,
+        status,
+        notes,
+        teacherIds: [teacher._id],
+        teacherNames: [teacher.name],
+        updatedAt: new Date()
+      },
+      $setOnInsert: {
+        createdAt: new Date()
+      }
+    },
+    { upsert: true }
+  );
+
+  await syncPaymentFromTeacherAttendance({
+    studentId: session.studentId,
+    studentName,
+    courseJoined,
+    classType,
+    classMode,
+    meetingNumber: session.meetingNumber,
+    meetingDate: session.sessionDate,
+    status
+  });
+
+  await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).deleteMany({
+    $or: [
+      { studentId: session.studentId, meetingNumber: session.meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
+      { studentId: session.studentId, meetingNumber: session.meetingNumber, sessionDate: session.sessionDate }
+    ]
+  });
+
+  revalidatePath("/teacher");
+  revalidatePath("/admin/attendance");
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/sessions");
+  revalidatePath("/ceo");
+}
+
+export async function generateTeacherGamesLink(formData: FormData) {
+  const teacher = await assertTeacher();
+
+  const classSessionId = clean(formData.get("classSessionId"));
+  if (!ObjectId.isValid(classSessionId)) {
+    throw new Error("Invalid class session");
+  }
+
+  const db = await getMongoDb();
+  const classSession = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({ _id: new ObjectId(classSessionId) });
+
+  if (!classSession?.teacherIds?.includes(teacher._id)) {
+    throw new Error("Class session not found for this teacher");
+  }
+
+  const now = new Date();
+  const token = randomBytes(24).toString("base64url");
+
+  await db.collection<GameSessionDocument>(getGameSessionsCollectionName()).updateOne(
+    { classSessionId, gameType: "games-hub" },
+    {
+      $set: {
+        token,
+        gameType: "games-hub",
+        classSessionId,
+        studentId: classSession.studentId || "",
+        studentName: classSession.studentName || "",
+        meetingNumber: classSession.meetingNumber || 0,
+        expiresAt: getGameSessionExpiry(now),
+        updatedAt: now
+      },
+      $setOnInsert: {
+        createdAt: now
+      }
+    },
+    { upsert: true }
+  );
+
+  revalidatePath("/teacher");
+}
