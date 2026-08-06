@@ -40,6 +40,7 @@ type AttendanceDocument = {
   notes?: string;
   teacherNames?: string[];
   createdAt?: Date;
+  updatedAt?: Date;
 };
 
 type MonthlyAssessmentDocument = {
@@ -157,7 +158,7 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
   const attendanceDocs = (await db
     .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
     .find({ studentId: studentDoc.studentId })
-    .sort({ meetingNumber: 1, meetingDate: 1 })
+    .sort({ meetingDate: -1, updatedAt: -1, createdAt: -1, meetingNumber: -1 })
     .limit(200)
     .toArray()) as WithId<AttendanceDocument>[];
   const assessmentDoc = (await db
@@ -220,7 +221,7 @@ export default async function ParentAttendancePortalPage({
 
   const { student, attendance, assessment } = data;
   const isGroupStudent = student.classType === "Basic Group";
-  const latestAttendance = attendance[attendance.length - 1];
+  const latestAttendance = attendance[0];
   const presentCount = countStatus(attendance, "Present");
   const lateCount = countStatus(attendance, "Late");
   const absentCount = countStatus(attendance, "Absent");
