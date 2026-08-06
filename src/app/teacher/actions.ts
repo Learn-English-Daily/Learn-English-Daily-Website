@@ -6,6 +6,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
 import {
+  assessmentAttendanceStatuses,
+  buildMonthlyAssessment,
+  getBatchesCollectionName,
+  getMonthlyAssessmentsCollectionName,
+  isAssessmentAttendanceStatus,
+  type MeetingAssessmentInput
+} from "@/lib/assessments";
+import {
   getBillingPeriodFromDate,
   isBillingPeriodClosed
 } from "@/lib/billing-periods";
@@ -36,8 +44,35 @@ function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function numberInRange(value: FormDataEntryValue | null, min: number, max: number, fallback = min) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(parsed)));
+}
+
 function isBillableAttendance(status: AttendanceStatus) {
   return status === "Present" || status === "Late";
+}
+
+function getBasicGroupStudentFilter() {
+  return {
+    $and: [getActiveStudentFilter(), { classType: "Basic Group" }]
+  };
+}
+
+function parseAssessmentMeetings(formData: FormData) {
+  const meetings: MeetingAssessmentInput[] = [];
+
+  for (let index = 1; index <= 12; index += 1) {
+    const attendance = clean(formData.get(`attendance_${index}`));
+    meetings.push({
+      attendance: isAssessmentAttendanceStatus(attendance) ? attendance : assessmentAttendanceStatuses[1],
+      participationStars: numberInRange(formData.get(`stars_${index}`), 0, 5, 0),
+      minutesLate: numberInRange(formData.get(`late_${index}`), 0, 240, 0)
+    });
+  }
+
+  return meetings;
 }
 
 async function getCurrentTeacher() {
@@ -315,4 +350,116 @@ export async function generateTeacherGamesLink(formData: FormData) {
   );
 
   revalidatePath("/teacher");
+}
+
+export async function saveTeacherMonthlyAssessment(formData: FormData) {
+  const teacher = await assertTeacher();
+
+  const batchId = clean(formData.get("batchId"));
+  const studentId = clean(formData.get("studentId"));
+  const month = numberInRange(formData.get("month"), 1, 12, new Date().getMonth() + 1);
+  const year = numberInRange(formData.get("year"), 2020, 2100, new Date().getFullYear());
+
+  if (!ObjectId.isValid(batchId) || !studentId) {
+    throw new Error("Select a student and batch");
+  }
+
+  const db = await getMongoDb();
+  const [batch, student] = await Promise.all([
+    db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), teacherId: teacher._id }),
+    db.collection(getStudentRegistrationCollectionName()).findOne({
+      studentId,
+      ...getBasicGroupStudentFilter()
+    })
+  ]);
+
+  if (!batch || !student) {
+    throw new Error("Student or batch not found for this teacher");
+  }
+
+  if (student.activeBatchId !== batchId) {
+    throw new Error("Student must be assigned to this batch before assessment");
+  }
+
+  const calculated = buildMonthlyAssessment({
+    meetings: parseAssessmentMeetings(formData),
+    communication: {
+      speaking: numberInRange(formData.get("speaking"), 1, 5, 3),
+      pronunciation: numberInRange(formData.get("pronunciation"), 1, 5, 3),
+      fluency: numberInRange(formData.get("fluency"), 1, 5, 3)
+    },
+    englishSkills: {
+      vocabulary: numberInRange(formData.get("vocabulary"), 1, 5, 3),
+      grammar: numberInRange(formData.get("grammar"), 1, 5, 3)
+    },
+    creativity: {
+      originalIdeas: numberInRange(formData.get("originalIdeas"), 1, 5, 3),
+      storytelling: numberInRange(formData.get("storytelling"), 1, 5, 3),
+      rolePlay: numberInRange(formData.get("rolePlay"), 1, 5, 3)
+    },
+    learningHabits: {
+      homework: numberInRange(formData.get("homework"), 1, 5, 3),
+      respect: numberInRange(formData.get("respect"), 1, 5, 3)
+    }
+  });
+  const ratings = {
+    communication: {
+      speaking: numberInRange(formData.get("speaking"), 1, 5, 3),
+      pronunciation: numberInRange(formData.get("pronunciation"), 1, 5, 3),
+      fluency: numberInRange(formData.get("fluency"), 1, 5, 3)
+    },
+    englishSkills: {
+      vocabulary: numberInRange(formData.get("vocabulary"), 1, 5, 3),
+      grammar: numberInRange(formData.get("grammar"), 1, 5, 3)
+    },
+    creativity: {
+      originalIdeas: numberInRange(formData.get("originalIdeas"), 1, 5, 3),
+      storytelling: numberInRange(formData.get("storytelling"), 1, 5, 3),
+      rolePlay: numberInRange(formData.get("rolePlay"), 1, 5, 3)
+    },
+    learningHabits: {
+      homework: numberInRange(formData.get("homework"), 1, 5, 3),
+      respect: numberInRange(formData.get("respect"), 1, 5, 3)
+    }
+  };
+  const teacherCommentEn = clean(formData.get("teacherCommentEn")) || calculated.automaticComments.en;
+  const teacherCommentId = clean(formData.get("teacherCommentId")) || calculated.automaticComments.id;
+  const now = new Date();
+
+  await db.collection(getMonthlyAssessmentsCollectionName()).updateOne(
+    {
+      studentId,
+      month,
+      year
+    },
+    {
+      $set: {
+        studentId,
+        studentName: student.studentName || "Student",
+        batchId: batch._id.toString(),
+        batchName: batch.batchName || "",
+        program: batch.program || "",
+        teacherId: teacher._id,
+        teacherName: teacher.name,
+        month,
+        year,
+        status: "finalized",
+        ...calculated,
+        ratings,
+        teacherComments: {
+          en: teacherCommentEn,
+          id: teacherCommentId
+        },
+        updatedAt: now
+      },
+      $setOnInsert: {
+        createdAt: now
+      }
+    },
+    { upsert: true }
+  );
+
+  revalidatePath("/teacher");
+  revalidatePath("/admin/batches");
+  revalidatePath("/parent");
 }
