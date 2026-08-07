@@ -26,12 +26,8 @@ export function getMasterPasswordEnvName(username: string) {
   return `MASTER_PASSWORD_${username.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
 }
 
-function getLegacyAdminPasswordEnvName(username: string) {
-  return `ADMIN_PASSWORD_${username.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
-}
-
 export function getMasterPassword(username: string) {
-  return process.env[getMasterPasswordEnvName(username)] || process.env[getLegacyAdminPasswordEnvName(username)] || "";
+  return process.env[getMasterPasswordEnvName(username)] || "";
 }
 
 export function isMasterUsername(username = "") {
