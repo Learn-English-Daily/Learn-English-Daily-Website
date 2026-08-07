@@ -336,7 +336,7 @@ export default async function TeacherJournalPage({
         </div>
       </header>
 
-      <section className="container-shell grid gap-6 py-8 xl:grid-cols-[380px_1fr]">
+      <section className="container-shell grid gap-6 py-8 xl:grid-cols-[320px_minmax(0,1fr)]">
         <div className="grid gap-5 content-start">
           <Card className="p-5">
             <form action="/teacher/journals" className="grid gap-3">
@@ -421,23 +421,9 @@ export default async function TeacherJournalPage({
                     rows={24}
                     defaultValue={draftNotes}
                     placeholder="Complete the guided journal report for this class."
-                    className="focus-ring min-h-[640px] resize-y rounded-xl border border-slate-200 bg-white px-4 py-4 font-mono text-sm leading-7 text-lead-navy"
+                    className="focus-ring min-h-[760px] w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-4 font-mono text-sm leading-7 text-lead-navy"
                   />
                 </label>
-                <div className="grid gap-3 rounded-xl border border-yellow-100 bg-yellow-50/70 p-4 text-sm text-lead-navy md:grid-cols-3">
-                  <div>
-                    <p className="font-bold">Keep the headings</p>
-                    <p className="mt-1 text-lead-gray">Parents can scan quickly when every journal follows the same structure.</p>
-                  </div>
-                  <div>
-                    <p className="font-bold">Write specific progress</p>
-                    <p className="mt-1 text-lead-gray">Mention topic, performance score, problem, and next practice.</p>
-                  </div>
-                  <div>
-                    <p className="font-bold">Parent note matters</p>
-                    <p className="mt-1 text-lead-gray">Use simple language so parents know what happened and what to support.</p>
-                  </div>
-                </div>
                 <Button type="submit" className="w-full sm:w-fit">
                   <NotebookPen className="h-4 w-4" />
                   Save Journal
