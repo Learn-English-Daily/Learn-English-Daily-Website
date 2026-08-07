@@ -7,7 +7,7 @@ import {
   isEmployeeStatus,
   isEmployeeWorkMode
 } from "@/lib/employee-onboarding";
-import { normalizeTeacherUsername } from "@/lib/teachers";
+import { normalizeEmployeeUsername } from "@/lib/teachers";
 import { getMongoDb } from "@/lib/mongodb";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ type EmployeeOnboardingPayload = {
   gender?: string;
   role?: string;
   employeeStatus?: string;
-  teacherUsername?: string;
+  username?: string;
   employmentType?: string;
   workMode?: string;
   expectedStartDate?: string;
@@ -71,8 +71,40 @@ function isValidDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function isValidTeacherUsername(value: string) {
+function isValidEmployeeUsername(value: string) {
   return /^[a-z0-9._-]{3,40}$/.test(value);
+}
+
+function slugifyUsername(value: string) {
+  return normalizeEmployeeUsername(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ".")
+      .replace(/^\.+|\.+$/g, "")
+      .replace(/\.{2,}/g, ".")
+  );
+}
+
+async function generateUniqueUsername(db: Awaited<ReturnType<typeof getMongoDb>>, baseName: string) {
+  const collection = db.collection(getEmployeeOnboardingCollectionName());
+  const baseUsername = slugifyUsername(baseName) || "employee";
+
+  for (let index = 0; index < 100; index += 1) {
+    const username = index === 0 ? baseUsername : `${baseUsername}${index + 1}`;
+    if (!isValidEmployeeUsername(username)) continue;
+
+    const existing = await collection.findOne({
+      $or: [
+        { username },
+        { teacherUsername: username }
+      ],
+      status: { $nin: ["archived", "rejected"] }
+    });
+
+    if (!existing) return username;
+  }
+
+  return `${baseUsername}.${Date.now().toString(36)}`.slice(0, 40);
 }
 
 export async function POST(request: Request) {
@@ -93,7 +125,7 @@ export async function POST(request: Request) {
     gender: clean(payload.gender),
     role: clean(payload.role),
     employeeStatus: clean(payload.employeeStatus) || "Active",
-    teacherUsername: normalizeTeacherUsername(clean(payload.teacherUsername)),
+    username: normalizeEmployeeUsername(clean(payload.username)),
     employmentType: clean(payload.employmentType),
     workMode: clean(payload.workMode),
     expectedStartDate: clean(payload.expectedStartDate),
@@ -138,10 +170,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Please complete all required fields correctly." }, { status: 400 });
   }
 
-  if (employee.role === "Teacher" && !isValidTeacherUsername(employee.teacherUsername)) {
-    return NextResponse.json({ ok: false, error: "Teacher username must be 3-40 characters using letters, numbers, dot, dash, or underscore." }, { status: 400 });
-  }
-
   if (
     !isOptionalText(employee.preferredName) ||
     !isOptionalText(employee.education) ||
@@ -166,26 +194,21 @@ export async function POST(request: Request) {
   try {
     const db = await getMongoDb();
     const now = new Date();
-    if (employee.role === "Teacher") {
-      const existingTeacher = await db.collection(getEmployeeOnboardingCollectionName()).findOne({
-        role: "Teacher",
-        teacherUsername: employee.teacherUsername,
-        status: { $nin: ["archived", "rejected"] }
-      });
+    const username = employee.username || await generateUniqueUsername(db, employee.preferredName || employee.fullName);
 
-      if (existingTeacher) {
-        return NextResponse.json({ ok: false, error: "This teacher username is already used." }, { status: 409 });
-      }
+    if (!isValidEmployeeUsername(username)) {
+      return NextResponse.json({ ok: false, error: "Unable to generate a valid username. Please check the employee name." }, { status: 400 });
     }
 
     const result = await db.collection(getEmployeeOnboardingCollectionName()).insertOne({
       ...employee,
+      username,
       status: "submitted",
       createdAt: now,
       updatedAt: now
     });
 
-    return NextResponse.json({ ok: true, id: result.insertedId.toString() }, { status: 201 });
+    return NextResponse.json({ ok: true, id: result.insertedId.toString(), username }, { status: 201 });
   } catch (error) {
     console.error("Employee onboarding insert failed", error);
     return NextResponse.json({ ok: false, error: "Unable to submit right now. Please try again." }, { status: 500 });

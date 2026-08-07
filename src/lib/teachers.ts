@@ -11,6 +11,7 @@ export type EmployeeTeacherDocument = {
   employeeStatus?: string;
   employeeTitle?: string;
   gender?: string;
+  username?: string;
   teacherUsername?: string;
   createdAt?: Date;
 };
@@ -26,9 +27,11 @@ export function employeeTeacherId(id: ObjectId | string) {
   return `employee:${id.toString()}`;
 }
 
-export function normalizeTeacherUsername(value = "") {
+export function normalizeEmployeeUsername(value = "") {
   return value.trim().toLowerCase();
 }
+
+export const normalizeTeacherUsername = normalizeEmployeeUsername;
 
 function isActiveEmployeeTeacher(teacher: EmployeeTeacherDocument) {
   const employeeStatus = (teacher.employeeStatus || "Active").toLowerCase();
@@ -50,7 +53,7 @@ function mapEmployeeTeacher(teacher: EmployeeTeacherDocument): TeacherOption | n
   return {
     id: employeeTeacherId(teacher._id),
     name: formatTeacherDisplayName(name, teacher),
-    username: normalizeTeacherUsername(teacher.teacherUsername || ""),
+    username: normalizeEmployeeUsername(teacher.username || teacher.teacherUsername || ""),
     source: "employee-onboarding"
   };
 }
@@ -67,7 +70,7 @@ function inferTeacherTitle(name: string, teacher: EmployeeTeacherDocument) {
   const oldTitle = (teacher.employeeTitle || "").trim();
   if (oldTitle === "Ms" || oldTitle === "Mr.") return oldTitle;
 
-  const lookupValue = `${name} ${teacher.teacherUsername || ""} ${teacher.email || ""}`.toLowerCase();
+  const lookupValue = `${name} ${teacher.username || ""} ${teacher.teacherUsername || ""} ${teacher.email || ""}`.toLowerCase();
   if (/\b(eva|yulia|fiana)\b/.test(lookupValue)) return "Ms";
   if (/\b(adam)\b/.test(lookupValue)) return "Mr.";
 
@@ -112,12 +115,13 @@ export async function getEmployeeTeacherById(db: Db, teacherId: string): Promise
 }
 
 export async function getEmployeeTeacherByUsername(db: Db, username: string): Promise<TeacherOption | null> {
-  const normalizedUsername = normalizeTeacherUsername(username);
+  const normalizedUsername = normalizeEmployeeUsername(username);
   if (!normalizedUsername) return null;
 
   const teacher = await db.collection<EmployeeTeacherDocument>(getEmployeeOnboardingCollectionName()).findOne({
     role: "Teacher",
     $or: [
+      { username: normalizedUsername },
       { teacherUsername: normalizedUsername },
       { email: normalizedUsername }
     ]

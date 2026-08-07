@@ -16,6 +16,7 @@ const inputClass =
 
 export function EmployeeOnboardingForm() {
   const [sent, setSent] = useState(false);
+  const [generatedUsername, setGeneratedUsername] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,6 +24,7 @@ export function EmployeeOnboardingForm() {
     event.preventDefault();
     const form = event.currentTarget;
     setSent(false);
+    setGeneratedUsername("");
     setError("");
     setSubmitting(true);
 
@@ -38,7 +40,6 @@ export function EmployeeOnboardingForm() {
       gender: String(formData.get("gender") || ""),
       role: String(formData.get("role") || ""),
       employeeStatus: String(formData.get("employeeStatus") || ""),
-      teacherUsername: String(formData.get("teacherUsername") || ""),
       employmentType: String(formData.get("employmentType") || ""),
       workMode: String(formData.get("workMode") || ""),
       expectedStartDate: String(formData.get("expectedStartDate") || ""),
@@ -66,13 +67,14 @@ export function EmployeeOnboardingForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const result = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      const result = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; username?: string } | null;
 
       if (!response.ok || !result?.ok) {
         throw new Error(result?.error || "Unable to submit right now. Please try again.");
       }
 
       form.reset();
+      setGeneratedUsername(result.username || "");
       setSent(true);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit right now. Please try again.");
@@ -105,7 +107,6 @@ export function EmployeeOnboardingForm() {
       >
         <SelectField name="role" label="Role joining as" options={employeeRoleOptions} required />
         <SelectField name="employeeStatus" label="Employee status" options={employeeStatusOptions} defaultValue="Active" required />
-        <TextField name="teacherUsername" label="Teacher portal username" placeholder="Example: eva.yulia" />
         <SelectField name="employmentType" label="Employment type" options={employeeEmploymentTypeOptions} required />
         <SelectField name="workMode" label="Work mode" options={employeeWorkModeOptions} required />
         <TextField name="expectedStartDate" label="Expected start date" type="date" required />
@@ -153,7 +154,10 @@ export function EmployeeOnboardingForm() {
       {sent ? (
         <p className="flex items-start gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-          Thank you. Your employee onboarding form has been submitted to LEAD.
+          <span>
+            Thank you. Your employee onboarding form has been submitted to LEAD.
+            {generatedUsername ? <span className="block text-lead-navy">Your username: {generatedUsername}</span> : null}
+          </span>
         </p>
       ) : null}
       {error ? <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{error}</p> : null}

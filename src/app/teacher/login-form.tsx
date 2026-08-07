@@ -11,12 +11,12 @@ export function TeacherLoginForm() {
   return (
     <form action={formAction} className="mt-8 grid gap-4">
       <label className="grid gap-2 text-sm font-semibold text-lead-navy">
-        Teacher username
+        Username
         <input
           required
           name="username"
           autoComplete="username"
-          placeholder="Enter your teacher username"
+          placeholder="Enter your username"
           className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy"
         />
       </label>

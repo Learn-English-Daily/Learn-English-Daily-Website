@@ -38,7 +38,7 @@ import {
   TEACHER_ID_COOKIE,
   TEACHER_SESSION_COOKIE
 } from "@/lib/teacher-auth";
-import { getEmployeeTeacherById, getEmployeeTeacherByUsername, normalizeTeacherUsername, type TeacherOption } from "@/lib/teachers";
+import { getEmployeeTeacherById, getEmployeeTeacherByUsername, normalizeEmployeeUsername, type TeacherOption } from "@/lib/teachers";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -176,7 +176,7 @@ async function syncPaymentFromTeacherAttendance({
 }
 
 export async function loginTeacher(_: unknown, formData: FormData) {
-  const username = normalizeTeacherUsername(clean(formData.get("username")) || clean(formData.get("teacherId")));
+  const username = normalizeEmployeeUsername(clean(formData.get("username")) || clean(formData.get("teacherId")));
   const password = clean(formData.get("password"));
 
   const db = await getMongoDb();
@@ -187,7 +187,7 @@ export async function loginTeacher(_: unknown, formData: FormData) {
   }
 
   if (!teacher.username) {
-    return { error: "This teacher does not have a portal username configured yet." };
+    return { error: "This employee does not have a portal username configured yet." };
   }
 
   const teacherPassword = getTeacherPassword(teacher.username);
