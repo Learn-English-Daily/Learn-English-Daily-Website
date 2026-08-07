@@ -148,7 +148,7 @@ export async function updateStudentRegistration(formData: FormData) {
 
   revalidatePath("/admin/students");
   revalidatePath("/admin/students/trials");
-  revalidatePath("/admin/payments");
+  revalidatePath("/finance/payments");
   revalidatePath("/ceo");
   revalidatePath("/ceo/finance");
   revalidatePath(`/admin/students/${id}/edit`);

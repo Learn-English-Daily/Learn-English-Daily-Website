@@ -306,7 +306,7 @@ export default async function AdminStudentsPage({
                             </a>
                           </Button>
                           <Button asChild variant="secondary" size="sm">
-                            <a href={`/admin/payments?studentId=${encodeURIComponent(registration.studentId)}`}>
+                            <a href={`/finance/payments?studentId=${encodeURIComponent(registration.studentId)}`}>
                               Payments
                             </a>
                           </Button>

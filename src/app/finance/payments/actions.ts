@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
-import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import { getMonthlyAssessmentsCollectionName } from "@/lib/assessments";
 import {
   getBillingPeriodFromDate,
@@ -12,6 +11,8 @@ import {
   getRecordBillingPeriod,
   isBillingPeriodClosed
 } from "@/lib/billing-periods";
+import { FINANCE_ID_COOKIE, FINANCE_SESSION_COOKIE, isValidFinanceSession } from "@/lib/finance-auth";
+import { getFinanceEmployeeById } from "@/lib/finance-employees";
 import { getMongoDb } from "@/lib/mongodb";
 import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import {
@@ -31,17 +32,20 @@ function numberFromForm(value: unknown) {
   return Number.isFinite(numericValue) ? Math.max(0, Math.round(numericValue)) : 0;
 }
 
-async function assertAdmin() {
+async function assertFinance() {
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const employeeId = cookieStore.get(FINANCE_ID_COOKIE)?.value || "";
+  const session = cookieStore.get(FINANCE_SESSION_COOKIE)?.value || "";
+  const db = await getMongoDb();
+  const employee = employeeId ? await getFinanceEmployeeById(db, employeeId) : null;
 
-  if (!isAuthenticated) {
+  if (!employee?.username || !isValidFinanceSession(employee.id, employee.username, session)) {
     throw new Error("Unauthorized");
   }
 }
 
 export async function updateStudentPaymentStatus(formData: FormData) {
-  await assertAdmin();
+  await assertFinance();
 
   const id = clean(formData.get("id"));
   const status = clean(formData.get("status")) as PaymentStatus;
@@ -111,11 +115,12 @@ export async function updateStudentPaymentStatus(formData: FormData) {
     }
   );
 
-  revalidatePath("/admin/payments");
+  revalidatePath("/finance/payments");
+  revalidatePath("/ceo/finance");
 }
 
 export async function saveGroupStudentPayment(formData: FormData) {
-  await assertAdmin();
+  await assertFinance();
 
   const studentId = clean(formData.get("studentId"));
   const billingMonthValue = clean(formData.get("billingMonth"));
@@ -204,11 +209,12 @@ export async function saveGroupStudentPayment(formData: FormData) {
     { upsert: true }
   );
 
-  revalidatePath("/admin/payments");
+  revalidatePath("/finance/payments");
+  revalidatePath("/ceo/finance");
 }
 
 export async function closeMonthlyBalance(formData: FormData) {
-  await assertAdmin();
+  await assertFinance();
 
   const billingMonthValue = clean(formData.get("billingMonth"));
   const notes = clean(formData.get("notes"));
@@ -263,14 +269,14 @@ export async function closeMonthlyBalance(formData: FormData) {
       },
       $setOnInsert: {
         closedAt: now,
-        closedBy: "admin",
+        closedBy: "finance",
         createdAt: now
       }
     },
     { upsert: true }
   );
 
-  revalidatePath("/admin/payments");
+  revalidatePath("/finance/payments");
   revalidatePath("/admin/attendance");
   revalidatePath("/ceo/finance");
 }

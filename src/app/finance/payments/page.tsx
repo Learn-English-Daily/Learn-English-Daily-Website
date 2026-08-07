@@ -4,14 +4,15 @@ import { ExternalLink, ReceiptText, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { logoutAdmin } from "@/app/admin/actions";
-import { AdminLoginForm } from "@/app/admin/login-form";
-import { closeMonthlyBalance, saveGroupStudentPayment, updateStudentPaymentStatus } from "@/app/admin/payments/actions";
+import { logoutFinance } from "@/app/finance/actions";
+import { FinanceLoginForm } from "@/app/finance/login-form";
+import { closeMonthlyBalance, saveGroupStudentPayment, updateStudentPaymentStatus } from "@/app/finance/payments/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { FinancePageHeader } from "@/components/finance/finance-page-header";
 import { getMonthlyAssessmentsCollectionName } from "@/lib/assessments";
 import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
+import { FINANCE_ID_COOKIE, FINANCE_SESSION_COOKIE, isValidFinanceSession } from "@/lib/finance-auth";
+import { getFinanceEmployeeById } from "@/lib/finance-employees";
 import { getMongoDb } from "@/lib/mongodb";
 import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import {
@@ -315,43 +316,42 @@ function statusClassName(status: PaymentStatus) {
   return status === "Paid" ? "bg-emerald-50 text-emerald-700" : "bg-yellow-50 text-yellow-800";
 }
 
-export default async function AdminPaymentsPage({
+async function getAuthenticatedFinanceEmployee() {
+  const cookieStore = await cookies();
+  const employeeId = cookieStore.get(FINANCE_ID_COOKIE)?.value || "";
+  const session = cookieStore.get(FINANCE_SESSION_COOKIE)?.value || "";
+
+  const db = await getMongoDb();
+  const employee = employeeId ? await getFinanceEmployeeById(db, employeeId) : null;
+
+  if (!employee?.username || !isValidFinanceSession(employee.id, employee.username, session)) {
+    return null;
+  }
+
+  return employee;
+}
+
+export default async function FinancePaymentsPage({
   searchParams
 }: {
   searchParams?: Promise<{ q?: string | string[]; studentId?: string | string[]; view?: string | string[] }>;
 }) {
   noStore();
-  const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const financeEmployee = await getAuthenticatedFinanceEmployee();
   const resolvedSearchParams = await searchParams;
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
   const selectedStudentId = Array.isArray(resolvedSearchParams?.studentId) ? resolvedSearchParams?.studentId[0] || "" : resolvedSearchParams?.studentId || "";
   const viewMode = Array.isArray(resolvedSearchParams?.view) ? resolvedSearchParams?.view[0] || "" : resolvedSearchParams?.view || "";
   const showArchived = viewMode === "history";
 
-  if (!isAdminConfigured()) {
-    return (
-      <main className="min-h-screen bg-lead-soft px-4 py-10">
-        <Card className="mx-auto max-w-xl p-8">
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Admin password missing</h1>
-          <p className="mt-4 leading-7 text-lead-gray">
-            Add <code className="rounded bg-slate-100 px-2 py-1">ADMIN_PASSWORD</code> in Vercel Environment Variables and in
-            your local <code className="rounded bg-slate-100 px-2 py-1">.env.local</code> file.
-          </p>
-        </Card>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
+  if (!financeEmployee) {
     return (
       <main className="grid min-h-screen place-items-center bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#fff7d6_100%)] px-4 py-10">
         <Card className="w-full max-w-md p-8 shadow-soft">
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Finance</p>
           <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Track student payments</h1>
           <p className="mt-3 leading-7 text-lead-gray">Sign in to update payment status for attendance-generated records.</p>
-          <AdminLoginForm />
+          <FinanceLoginForm />
         </Card>
       </main>
     );
@@ -369,11 +369,11 @@ export default async function AdminPaymentsPage({
 
   return (
     <main className="min-h-screen bg-lead-soft">
-      <AdminPageHeader
-        active="payments"
+      <FinancePageHeader
         title="Student payments"
         description="Review individual attendance payments and create flexible group payments from batch assessments."
-        logoutAction={logoutAdmin}
+        employeeName={financeEmployee.name}
+        logoutAction={logoutFinance}
       />
 
       <section className="container-shell grid items-start gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
@@ -389,7 +389,7 @@ export default async function AdminPaymentsPage({
           </Card>
 
           <Card className="p-4">
-            <form action="/admin/payments" className="flex flex-col gap-3 md:flex-row">
+            <form action="/finance/payments" className="flex flex-col gap-3 md:flex-row">
               <input type="hidden" name="view" value={showArchived ? "history" : "active"} />
               <label className="relative flex-1">
                 <span className="sr-only">Search students</span>
@@ -408,10 +408,10 @@ export default async function AdminPaymentsPage({
             </form>
             <div className="mt-3 flex gap-2">
               <Button asChild size="sm" variant={showArchived ? "secondary" : "primary"}>
-                <a href={`/admin/payments${selectedStudentId ? `?studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Active Payments</a>
+                <a href={`/finance/payments${selectedStudentId ? `?studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Active Payments</a>
               </Button>
               <Button asChild size="sm" variant={showArchived ? "primary" : "secondary"}>
-                <a href={`/admin/payments?view=history${selectedStudentId ? `&studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Archived History</a>
+                <a href={`/finance/payments?view=history${selectedStudentId ? `&studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Archived History</a>
               </Button>
             </div>
           </Card>
@@ -422,7 +422,7 @@ export default async function AdminPaymentsPage({
               {students.map((student) => (
                 <a
                   key={student.id}
-                  href={`/admin/payments?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}${showArchived ? "&view=history" : ""}`}
+                  href={`/finance/payments?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}${showArchived ? "&view=history" : ""}`}
                   className={`focus-ring rounded-lg border p-4 transition hover:border-lead-blue hover:bg-blue-50 ${
                     selectedStudent?.studentId === student.studentId ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white"
                   }`}
@@ -462,7 +462,7 @@ export default async function AdminPaymentsPage({
                     <p className="text-yellow-700">Unpaid: {formatRupiah(totalUnpaid)}</p>
                     {totalUnpaid > 0 && !showArchived ? (
                       <Button asChild variant="secondary" size="sm">
-                        <a href={`/admin/payments/student/${encodeURIComponent(selectedStudent.studentId)}/request`} target="_blank" rel="noreferrer">
+                        <a href={`/finance/payments/student/${encodeURIComponent(selectedStudent.studentId)}/request`} target="_blank" rel="noreferrer">
                           <ReceiptText className="h-4 w-4" />
                           Open Cumulative Request
                         </a>
@@ -582,7 +582,7 @@ export default async function AdminPaymentsPage({
                           {payment.notes ? <p className="mt-2 text-sm leading-6 text-lead-gray">{payment.notes}</p> : null}
                           {payment.status === "Unpaid" && !showArchived ? (
                             <Button asChild variant="secondary" size="sm" className="mt-3">
-                              <a href={`/admin/payments/${payment.id}/request`} target="_blank" rel="noreferrer">
+                              <a href={`/finance/payments/${payment.id}/request`} target="_blank" rel="noreferrer">
                                 <ReceiptText className="h-4 w-4" />
                                 Open Payment Request
                               </a>

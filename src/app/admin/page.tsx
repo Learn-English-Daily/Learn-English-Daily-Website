@@ -238,7 +238,7 @@ export default async function AdminDashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DashboardKpi icon={CalendarClock} label="Today's classes" value={data.todaySessions.length} detail="Scheduled for today" href="/admin/sessions" />
           <DashboardKpi icon={AlertCircle} label="Need attendance" value={data.needsAttendance} detail="Past classes not closed" href="/admin/sessions" tone="rose" />
-          <DashboardKpi icon={CreditCard} label="Unpaid payments" value={data.unpaidPayments} detail={formatRupiah(data.unpaidAmount)} href="/admin/payments" tone="yellow" />
+          <DashboardKpi icon={CreditCard} label="Unpaid payments" value={data.unpaidPayments} detail={formatRupiah(data.unpaidAmount)} href="/finance/payments" tone="yellow" />
           <DashboardKpi icon={Star} label="Pending reviews" value={data.pendingReviews} detail="Waiting approval" href="/admin/reviews" tone="blue" />
         </div>
 
@@ -277,7 +277,7 @@ export default async function AdminDashboardPage() {
               <div className="mt-4 grid gap-3">
                 <QuickAction href="/admin/sessions" label="Schedule class" icon={CalendarClock} />
                 <QuickAction href="/admin/attendance" label="Mark attendance" icon={CalendarCheck} />
-                <QuickAction href="/admin/payments" label="Open payments" icon={CreditCard} />
+                <QuickAction href="/finance/payments" label="Open payments" icon={CreditCard} />
                 <QuickAction href="/admin/students" label="View students" icon={Users} />
               </div>
             </Card>
@@ -305,7 +305,7 @@ export default async function AdminDashboardPage() {
           <InsightCard
             icon={CreditCard}
             title="Latest unpaid payment"
-            href="/admin/payments"
+            href="/finance/payments"
             action="Open payments"
             empty="No unpaid payments."
             lines={

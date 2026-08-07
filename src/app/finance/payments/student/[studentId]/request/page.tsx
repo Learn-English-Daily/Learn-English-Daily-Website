@@ -4,12 +4,13 @@ import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { ArrowLeft } from "lucide-react";
 import type { WithId } from "mongodb";
-import { logoutAdmin } from "@/app/admin/actions";
-import { AdminLoginForm } from "@/app/admin/login-form";
+import { logoutFinance } from "@/app/finance/actions";
+import { FinanceLoginForm } from "@/app/finance/login-form";
 import { CumulativePaymentRequestActions } from "@/components/admin/cumulative-payment-request-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { FINANCE_ID_COOKIE, FINANCE_SESSION_COOKIE, isValidFinanceSession } from "@/lib/finance-auth";
+import { getFinanceEmployeeById } from "@/lib/finance-employees";
 import { getMongoDb } from "@/lib/mongodb";
 import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { formatRupiah, getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
@@ -99,29 +100,21 @@ export default async function CumulativePaymentRequestPage({
 }) {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const employeeId = cookieStore.get(FINANCE_ID_COOKIE)?.value || "";
+  const session = cookieStore.get(FINANCE_SESSION_COOKIE)?.value || "";
+  const employee = employeeId ? await getFinanceEmployeeById(await getMongoDb(), employeeId) : null;
+  const isAuthenticated = Boolean(employee?.username && isValidFinanceSession(employee.id, employee.username, session));
   const resolvedParams = await params;
   const studentId = decodeURIComponent(resolvedParams.studentId || "");
-
-  if (!isAdminConfigured()) {
-    return (
-      <main className="min-h-screen bg-lead-soft px-4 py-10">
-        <Card className="mx-auto max-w-xl p-8">
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
-          <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Admin password missing</h1>
-        </Card>
-      </main>
-    );
-  }
 
   if (!isAuthenticated) {
     return (
       <main className="grid min-h-screen place-items-center bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#fff7d6_100%)] px-4 py-10">
         <Card className="w-full max-w-md p-8 shadow-soft">
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Admin</p>
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Finance</p>
           <h1 className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">Cumulative payment request</h1>
           <p className="mt-3 leading-7 text-lead-gray">Sign in to open this student&apos;s combined payment request.</p>
-          <AdminLoginForm />
+          <FinanceLoginForm />
         </Card>
       </main>
     );
@@ -141,12 +134,12 @@ export default async function CumulativePaymentRequestPage({
     <main className="min-h-screen bg-slate-100 px-4 py-8 print:bg-white print:p-0">
       <div className="mx-auto mb-5 flex w-full max-w-4xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <Button asChild variant="secondary">
-          <a href={`/admin/payments?studentId=${encodeURIComponent(request.studentId)}`}>
+          <a href={`/finance/payments?studentId=${encodeURIComponent(request.studentId)}`}>
             <ArrowLeft className="h-4 w-4" />
             Back to Payments
           </a>
         </Button>
-        <form action={logoutAdmin}>
+        <form action={logoutFinance}>
           <Button type="submit" variant="secondary">Logout</Button>
         </form>
       </div>

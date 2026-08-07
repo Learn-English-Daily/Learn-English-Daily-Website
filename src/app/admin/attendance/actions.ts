@@ -238,7 +238,7 @@ export async function saveStudentAttendance(formData: FormData) {
   });
 
   revalidatePath("/admin/attendance");
-  revalidatePath("/admin/payments");
+  revalidatePath("/finance/payments");
   revalidatePath("/admin/sessions");
 }
 
@@ -331,6 +331,6 @@ export async function updateStudentAttendance(formData: FormData) {
   });
 
   revalidatePath("/admin/attendance");
-  revalidatePath("/admin/payments");
+  revalidatePath("/finance/payments");
   revalidatePath("/admin/sessions");
 }

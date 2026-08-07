@@ -524,7 +524,7 @@ export default async function CeoDashboardPage({
                       <p className="mt-1 text-xs text-lead-gray">Oldest: Meeting {student.oldestMeeting} / {formatDate(student.oldestDate)}</p>
                     </div>
                     <Button asChild variant="secondary" size="sm">
-                      <a href={student.studentId ? `/admin/payments?studentId=${encodeURIComponent(student.studentId)}` : "/admin/payments"}>View payments</a>
+                      <a href={student.studentId ? `/finance/payments?studentId=${encodeURIComponent(student.studentId)}` : "/finance/payments"}>View payments</a>
                     </Button>
                   </div>
                 ))}
@@ -541,8 +541,8 @@ export default async function CeoDashboardPage({
             <div><h2 className="font-heading text-2xl font-bold text-lead-navy">Action required</h2><p className="text-sm text-lead-gray">Items that may need management attention.</p></div>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <ActionCard label="Unpaid payments" value={data.actions.unpaidCount} detail={formatRupiah(data.kpis.outstandingAmount)} href="/admin/payments" />
-            <ActionCard label="Drive receipts pending" value={data.actions.pendingReceipts} detail="Paid receipts not marked uploaded" href="/admin/payments" />
+            <ActionCard label="Unpaid payments" value={data.actions.unpaidCount} detail={formatRupiah(data.kpis.outstandingAmount)} href="/finance/payments" />
+            <ActionCard label="Drive receipts pending" value={data.actions.pendingReceipts} detail="Paid receipts not marked uploaded" href="/finance/payments" />
             <ActionCard label="Reviews pending" value={data.actions.pendingReviews} detail="Waiting for approval" href="/admin/reviews" />
             <ActionCard label="Class details missing" value={data.actions.missingClassDetails} detail="Missing journal or teacher in period" href="/admin/attendance" />
             <ActionCard label="Sessions need attendance" value={data.actions.sessionsNeedingAttendance} detail="Scheduled classes past their time" href="/admin/sessions" />

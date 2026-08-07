@@ -309,7 +309,7 @@ export async function saveTeacherAttendance(formData: FormData) {
 
   revalidatePath("/teacher");
   revalidatePath("/admin/attendance");
-  revalidatePath("/admin/payments");
+  revalidatePath("/finance/payments");
   revalidatePath("/admin/sessions");
   revalidatePath("/ceo");
 }
