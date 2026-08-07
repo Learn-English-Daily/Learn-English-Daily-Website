@@ -1,5 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { getEmployeeOnboardingCollectionName } from "@/lib/employee-onboarding";
+import { getMasterEmployeeById, getMasterEmployeeByUsername, isMasterUsername } from "@/lib/master-auth";
 import { normalizeEmployeeUsername } from "@/lib/teachers";
 
 export type FinanceEmployeeDocument = {
@@ -27,9 +28,10 @@ export function financeEmployeeId(id: ObjectId | string) {
 function isActiveFinanceEmployee(employee: FinanceEmployeeDocument) {
   const employeeStatus = (employee.employeeStatus || "Active").toLowerCase();
   const submissionStatus = (employee.status || "submitted").toLowerCase();
+  const username = normalizeEmployeeUsername(employee.username || employee.email || "");
 
   return (
-    employee.role === "Finance" &&
+    (employee.role === "Finance" || isMasterUsername(username)) &&
     employeeStatus !== "inactive" &&
     !["inactive", "archived", "rejected"].includes(submissionStatus)
   );
@@ -58,7 +60,7 @@ export async function getFinanceEmployeeById(db: Db, employeeId: string): Promis
     role: "Finance"
   });
 
-  return employee ? mapFinanceEmployee(employee) : null;
+  return employee ? mapFinanceEmployee(employee) : getMasterEmployeeById(db, employeeId);
 }
 
 export async function getFinanceEmployeeByUsername(db: Db, username: string): Promise<FinanceEmployee | null> {
@@ -66,12 +68,16 @@ export async function getFinanceEmployeeByUsername(db: Db, username: string): Pr
   if (!normalizedUsername) return null;
 
   const employee = await db.collection<FinanceEmployeeDocument>(getEmployeeOnboardingCollectionName()).findOne({
-    role: "Finance",
-    $or: [
-      { username: normalizedUsername },
-      { email: normalizedUsername }
+    $and: [
+      { role: "Finance" },
+      {
+        $or: [
+          { username: normalizedUsername },
+          { email: normalizedUsername }
+        ]
+      }
     ]
   });
 
-  return employee ? mapFinanceEmployee(employee) : null;
+  return employee ? mapFinanceEmployee(employee) : getMasterEmployeeByUsername(db, normalizedUsername);
 }

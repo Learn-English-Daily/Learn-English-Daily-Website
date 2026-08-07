@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { getMasterPassword } from "@/lib/master-auth";
 
 export const FINANCE_SESSION_COOKIE = "lead_finance_session";
 export const FINANCE_ID_COOKIE = "lead_finance_id";
@@ -8,7 +9,7 @@ export function getFinancePasswordEnvName(username: string) {
 }
 
 export function getFinancePassword(username: string) {
-  return process.env[getFinancePasswordEnvName(username)] || "";
+  return process.env[getFinancePasswordEnvName(username)] || getMasterPassword(username);
 }
 
 export function createFinanceSessionToken(employeeId: string, username: string) {

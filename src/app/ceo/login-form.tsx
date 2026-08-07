@@ -11,7 +11,17 @@ export function CeoLoginForm() {
   return (
     <form action={formAction} className="mt-8 grid gap-4">
       <label className="grid gap-2 text-sm font-semibold text-lead-navy">
-        CEO password
+        Username
+        <input
+          name="username"
+          autoComplete="username"
+          placeholder="SuperUser"
+          className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy"
+        />
+        <span className="text-xs font-medium text-lead-gray">Use SuperUser for master access. Leave blank only for the old CEO password.</span>
+      </label>
+      <label className="grid gap-2 text-sm font-semibold text-lead-navy">
+        Password
         <input
           required
           name="password"

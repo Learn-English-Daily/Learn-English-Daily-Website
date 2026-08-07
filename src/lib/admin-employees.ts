@@ -1,5 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { getEmployeeOnboardingCollectionName } from "@/lib/employee-onboarding";
+import { getMasterEmployeeById, getMasterEmployeeByUsername, isMasterUsername } from "@/lib/master-auth";
 import { normalizeEmployeeUsername } from "@/lib/teachers";
 
 export type AdminEmployeeDocument = {
@@ -31,9 +32,10 @@ function escapeRegex(value: string) {
 function isActiveAdminEmployee(employee: AdminEmployeeDocument) {
   const employeeStatus = (employee.employeeStatus || "Active").toLowerCase();
   const submissionStatus = (employee.status || "submitted").toLowerCase();
+  const username = normalizeEmployeeUsername(employee.username || employee.email || "");
 
   return (
-    employee.role === "Admin" &&
+    (employee.role === "Admin" || isMasterUsername(username)) &&
     employeeStatus !== "inactive" &&
     !["inactive", "archived", "rejected"].includes(submissionStatus)
   );
@@ -62,7 +64,7 @@ export async function getAdminEmployeeById(db: Db, employeeId: string): Promise<
     role: "Admin"
   });
 
-  return employee ? mapAdminEmployee(employee) : null;
+  return employee ? mapAdminEmployee(employee) : getMasterEmployeeById(db, employeeId);
 }
 
 export async function getAdminEmployeeByUsername(db: Db, username: string): Promise<AdminEmployee | null> {
@@ -79,5 +81,5 @@ export async function getAdminEmployeeByUsername(db: Db, username: string): Prom
     ]
   });
 
-  return employee ? mapAdminEmployee(employee) : null;
+  return employee ? mapAdminEmployee(employee) : getMasterEmployeeByUsername(db, normalizedUsername);
 }

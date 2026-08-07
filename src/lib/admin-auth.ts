@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { getAdminEmployeeById, type AdminEmployee } from "@/lib/admin-employees";
+import { getMasterPassword } from "@/lib/master-auth";
 import { getMongoDb } from "@/lib/mongodb";
 
 export const ADMIN_SESSION_COOKIE = "lead_admin_session";
@@ -11,7 +12,7 @@ export function getAdminPasswordEnvName(username: string) {
 }
 
 export function getAdminPassword(username: string) {
-  return process.env[getAdminPasswordEnvName(username)] || "";
+  return process.env[getAdminPasswordEnvName(username)] || getMasterPassword(username);
 }
 
 export function isAdminConfigured() {
