@@ -7,6 +7,7 @@ import {
   employeeEmploymentTypeOptions,
   employeeRoleOptions,
   employeeStatusOptions,
+  employeeTitleOptions,
   employeeWorkModeOptions
 } from "@/lib/employee-onboarding";
 
@@ -36,6 +37,7 @@ export function EmployeeOnboardingForm() {
       dateOfBirth: String(formData.get("dateOfBirth") || ""),
       role: String(formData.get("role") || ""),
       employeeStatus: String(formData.get("employeeStatus") || ""),
+      employeeTitle: String(formData.get("employeeTitle") || ""),
       teacherUsername: String(formData.get("teacherUsername") || ""),
       employmentType: String(formData.get("employmentType") || ""),
       workMode: String(formData.get("workMode") || ""),
@@ -102,6 +104,7 @@ export function EmployeeOnboardingForm() {
       >
         <SelectField name="role" label="Role joining as" options={employeeRoleOptions} required />
         <SelectField name="employeeStatus" label="Employee status" options={employeeStatusOptions} defaultValue="Active" required />
+        <SelectField name="employeeTitle" label="Teacher title" options={employeeTitleOptions} />
         <TextField name="teacherUsername" label="Teacher portal username" placeholder="Example: eva.yulia" />
         <SelectField name="employmentType" label="Employment type" options={employeeEmploymentTypeOptions} required />
         <SelectField name="workMode" label="Work mode" options={employeeWorkModeOptions} required />

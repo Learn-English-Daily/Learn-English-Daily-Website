@@ -4,6 +4,7 @@ import {
   isEmployeeEmploymentType,
   isEmployeeRole,
   isEmployeeStatus,
+  isEmployeeTitle,
   isEmployeeWorkMode
 } from "@/lib/employee-onboarding";
 import { normalizeTeacherUsername } from "@/lib/teachers";
@@ -21,6 +22,7 @@ type EmployeeOnboardingPayload = {
   dateOfBirth?: string;
   role?: string;
   employeeStatus?: string;
+  employeeTitle?: string;
   teacherUsername?: string;
   employmentType?: string;
   workMode?: string;
@@ -90,6 +92,7 @@ export async function POST(request: Request) {
     dateOfBirth: clean(payload.dateOfBirth),
     role: clean(payload.role),
     employeeStatus: clean(payload.employeeStatus) || "Active",
+    employeeTitle: clean(payload.employeeTitle),
     teacherUsername: normalizeTeacherUsername(clean(payload.teacherUsername)),
     employmentType: clean(payload.employmentType),
     workMode: clean(payload.workMode),
@@ -136,6 +139,10 @@ export async function POST(request: Request) {
 
   if (employee.role === "Teacher" && !isValidTeacherUsername(employee.teacherUsername)) {
     return NextResponse.json({ ok: false, error: "Teacher username must be 3-40 characters using letters, numbers, dot, dash, or underscore." }, { status: 400 });
+  }
+
+  if (employee.role === "Teacher" && !isEmployeeTitle(employee.employeeTitle)) {
+    return NextResponse.json({ ok: false, error: "Please select Ms or Mr. for teacher title." }, { status: 400 });
   }
 
   if (

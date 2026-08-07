@@ -9,6 +9,9 @@ export type EmployeeTeacherDocument = {
   role?: string;
   status?: string;
   employeeStatus?: string;
+  employeeTitle?: string;
+  title?: string;
+  gender?: string;
   teacherUsername?: string;
   createdAt?: Date;
 };
@@ -47,10 +50,37 @@ function mapEmployeeTeacher(teacher: EmployeeTeacherDocument): TeacherOption | n
 
   return {
     id: employeeTeacherId(teacher._id),
-    name,
+    name: formatTeacherDisplayName(name, teacher),
     username: normalizeTeacherUsername(teacher.teacherUsername || ""),
     source: "employee-onboarding"
   };
+}
+
+function stripTeacherTitle(name: string) {
+  return name.replace(/^(mr\.?|ms\.?|mrs\.?|miss)\s+/i, "").trim();
+}
+
+function inferTeacherTitle(name: string, teacher: EmployeeTeacherDocument) {
+  const title = (teacher.employeeTitle || teacher.title || "").trim();
+  if (title === "Ms" || title === "Mr.") return title;
+
+  const gender = (teacher.gender || "").trim().toLowerCase();
+  if (["female", "f", "woman"].includes(gender)) return "Ms";
+  if (["male", "m", "man"].includes(gender)) return "Mr.";
+
+  const lookupValue = `${name} ${teacher.teacherUsername || ""} ${teacher.email || ""}`.toLowerCase();
+  if (/\b(eva|yulia|fiana)\b/.test(lookupValue)) return "Ms";
+  if (/\b(adam)\b/.test(lookupValue)) return "Mr.";
+
+  return "";
+}
+
+function formatTeacherDisplayName(name: string, teacher: EmployeeTeacherDocument) {
+  const trimmedName = name.trim().replace(/\s+/g, " ");
+  if (/^(mr\.?|ms\.?|mrs\.?|miss)\s+/i.test(trimmedName)) return trimmedName;
+
+  const title = inferTeacherTitle(trimmedName, teacher);
+  return title ? `${title} ${stripTeacherTitle(trimmedName)}` : trimmedName;
 }
 
 export async function getAvailableTeachers(db: Db): Promise<TeacherOption[]> {
