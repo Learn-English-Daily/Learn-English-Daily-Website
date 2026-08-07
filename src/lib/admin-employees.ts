@@ -24,6 +24,10 @@ export function adminEmployeeId(id: ObjectId | string) {
   return `employee:${id.toString()}`;
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function isActiveAdminEmployee(employee: AdminEmployeeDocument) {
   const employeeStatus = (employee.employeeStatus || "Active").toLowerCase();
   const submissionStatus = (employee.status || "submitted").toLowerCase();
@@ -69,7 +73,9 @@ export async function getAdminEmployeeByUsername(db: Db, username: string): Prom
     role: "Admin",
     $or: [
       { username: normalizedUsername },
-      { email: normalizedUsername }
+      { username: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: "i" } },
+      { email: normalizedUsername },
+      { email: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: "i" } }
     ]
   });
 
