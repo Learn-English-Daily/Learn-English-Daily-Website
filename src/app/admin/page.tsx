@@ -5,7 +5,6 @@ import {
   ArrowRight,
   CalendarCheck,
   CalendarClock,
-  CreditCard,
   Inbox,
   Star,
   Users
@@ -23,8 +22,6 @@ import {
   type ClassSessionDocument
 } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
-import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
-import { formatRupiah, getStudentPaymentsCollectionName } from "@/lib/payments";
 import { getReviewCollectionName } from "@/lib/reviews";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, getTrialStudentFilter } from "@/lib/student-registration";
 
@@ -36,25 +33,6 @@ type LeadDocument = {
   whatsapp?: string;
   goal?: string;
   createdAt?: Date;
-};
-
-type PaymentDocument = {
-  studentId?: string;
-  status?: string;
-  amountDue?: number;
-  source?: string;
-  studentName?: string;
-  meetingNumber?: number;
-  meetingDate?: string;
-  createdAt?: Date;
-};
-
-type StudentDocument = {
-  studentId?: string;
-  studentName?: string;
-  courseJoined?: string;
-  classType?: string;
-  classMode?: string;
 };
 
 type ReviewDocument = {
@@ -73,8 +51,6 @@ type DashboardData = {
     status: string;
   }>;
   needsAttendance: number;
-  unpaidPayments: number;
-  unpaidAmount: number;
   newInquiries: number;
   pendingReviews: number;
   currentStudents: number;
@@ -82,11 +58,6 @@ type DashboardData = {
   latestInquiry: {
     name: string;
     goal: string;
-  } | null;
-  latestUnpaid: {
-    studentName: string;
-    meetingNumber: number;
-    amountDue: number;
   } | null;
 };
 
@@ -115,14 +86,11 @@ async function getDashboardData(): Promise<DashboardData> {
 
   const [
     sessionDocs,
-    unpaidPayments,
     newInquiries,
     pendingReviews,
     currentStudents,
     trialStudents,
-    latestInquiry,
-    latestUnpaid,
-    studentDocs
+    latestInquiry
   ] = await Promise.all([
     db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
@@ -130,16 +98,12 @@ async function getDashboardData(): Promise<DashboardData> {
       .sort({ scheduledAt: 1 })
       .limit(200)
       .toArray() as Promise<WithId<ClassSessionDocument>[]>,
-    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ status: "Unpaid" }).limit(1000).toArray(),
     db.collection<LeadDocument>(leadsCollectionName).countDocuments(),
     db.collection<ReviewDocument>(getReviewCollectionName()).countDocuments({ status: "pending" }),
     db.collection(getStudentRegistrationCollectionName()).countDocuments(getActiveStudentFilter()),
     db.collection(getStudentRegistrationCollectionName()).countDocuments(getTrialStudentFilter()),
-    db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next(),
-    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ status: "Unpaid" }).sort({ meetingDate: -1, createdAt: -1 }).limit(1).next(),
-    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).limit(50000).toArray()
+    db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next()
   ]);
-  const studentsById = new Map(studentDocs.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
 
   const todaySessions = sessionDocs
     .filter((doc) => doc.sessionDate === today)
@@ -168,8 +132,6 @@ async function getDashboardData(): Promise<DashboardData> {
   return {
     todaySessions,
     needsAttendance,
-    unpaidPayments: unpaidPayments.length,
-    unpaidAmount: unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0),
     newInquiries,
     pendingReviews,
     currentStudents,
@@ -178,13 +140,6 @@ async function getDashboardData(): Promise<DashboardData> {
       ? {
           name: latestInquiry.name || "Unknown",
           goal: latestInquiry.goal || "No message"
-        }
-      : null,
-    latestUnpaid: latestUnpaid
-      ? {
-          studentName: latestUnpaid.studentName || "Unknown",
-          meetingNumber: latestUnpaid.meetingNumber || 0,
-          amountDue: getEffectivePaymentAmountDue(latestUnpaid, studentsById.get(latestUnpaid.studentId || ""))
         }
       : null
   };
@@ -238,8 +193,8 @@ export default async function AdminDashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DashboardKpi icon={CalendarClock} label="Today's classes" value={data.todaySessions.length} detail="Scheduled for today" href="/admin/sessions" />
           <DashboardKpi icon={AlertCircle} label="Need attendance" value={data.needsAttendance} detail="Past classes not closed" href="/admin/sessions" tone="rose" />
-          <DashboardKpi icon={CreditCard} label="Unpaid payments" value={data.unpaidPayments} detail={formatRupiah(data.unpaidAmount)} href="/finance/payments" tone="yellow" />
           <DashboardKpi icon={Star} label="Pending reviews" value={data.pendingReviews} detail="Waiting approval" href="/admin/reviews" tone="blue" />
+          <DashboardKpi icon={Users} label="Current students" value={data.currentStudents} detail="Active registrations" href="/admin/students" tone="blue" />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -277,8 +232,8 @@ export default async function AdminDashboardPage() {
               <div className="mt-4 grid gap-3">
                 <QuickAction href="/admin/sessions" label="Schedule class" icon={CalendarClock} />
                 <QuickAction href="/admin/attendance" label="Mark attendance" icon={CalendarCheck} />
-                <QuickAction href="/finance/payments" label="Open payments" icon={CreditCard} />
                 <QuickAction href="/admin/students" label="View students" icon={Users} />
+                <QuickAction href="/admin/inquiries" label="View inquiries" icon={Inbox} />
               </div>
             </Card>
 
@@ -293,7 +248,7 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6">
           <InsightCard
             icon={Inbox}
             title="Latest inquiry"
@@ -301,18 +256,6 @@ export default async function AdminDashboardPage() {
             action="Open inquiries"
             empty="No inquiries yet."
             lines={data.latestInquiry ? [data.latestInquiry.name, data.latestInquiry.goal] : []}
-          />
-          <InsightCard
-            icon={CreditCard}
-            title="Latest unpaid payment"
-            href="/finance/payments"
-            action="Open payments"
-            empty="No unpaid payments."
-            lines={
-              data.latestUnpaid
-                ? [data.latestUnpaid.studentName, `Meeting ${data.latestUnpaid.meetingNumber} / ${formatRupiah(data.latestUnpaid.amountDue)}`]
-                : []
-            }
           />
         </div>
       </section>

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { ExternalLink, ReceiptText, Search } from "lucide-react";
+import { AlertCircle, CheckCircle2, ExternalLink, ReceiptText, Search, UploadCloud } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -118,6 +118,15 @@ type GroupPaymentContext = {
   completedMeetings: number;
   attendancePercentage: number;
 } | null;
+
+type FinancePaymentSummary = {
+  paidCount: number;
+  unpaidCount: number;
+  activeRecordCount: number;
+  receiptPendingCount: number;
+  totalPaid: number;
+  totalUnpaid: number;
+};
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -312,6 +321,30 @@ async function getGroupPaymentContext(studentId = "", isGroupStudent = false): P
   };
 }
 
+async function getFinancePaymentSummary(closedPeriodKeys = new Set<string>()): Promise<FinancePaymentSummary> {
+  const db = await getMongoDb();
+  const [paymentDocs, studentDocs] = await Promise.all([
+    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({}).limit(50000).toArray() as Promise<WithId<PaymentDocument>[]>,
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).limit(50000).toArray() as Promise<WithId<StudentDocument>[]>
+  ]);
+  const studentsById = new Map(studentDocs.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
+  const activePayments = paymentDocs.filter((payment) => {
+    const period = getRecordBillingPeriod(payment);
+    return period.billingPeriod ? !closedPeriodKeys.has(period.billingPeriod) : true;
+  });
+  const paidPayments = activePayments.filter((payment) => payment.status === "Paid");
+  const unpaidPayments = activePayments.filter((payment) => payment.status !== "Paid");
+
+  return {
+    paidCount: paidPayments.length,
+    unpaidCount: unpaidPayments.length,
+    activeRecordCount: activePayments.length,
+    receiptPendingCount: paidPayments.filter((payment) => payment.receiptUploadedToDrive !== true).length,
+    totalPaid: paidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0),
+    totalUnpaid: unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0)
+  };
+}
+
 function statusClassName(status: PaymentStatus) {
   return status === "Paid" ? "bg-emerald-50 text-emerald-700" : "bg-yellow-50 text-yellow-800";
 }
@@ -357,8 +390,12 @@ export default async function FinancePaymentsPage({
     );
   }
 
-  const [students, selectedStudent] = await Promise.all([getStudents(searchQuery), getSelectedStudent(selectedStudentId)]);
   const closedPeriodKeys = await getClosedBillingPeriodKeys(await getMongoDb());
+  const [students, selectedStudent, financeSummary] = await Promise.all([
+    getStudents(searchQuery),
+    getSelectedStudent(selectedStudentId),
+    getFinancePaymentSummary(closedPeriodKeys)
+  ]);
   const isGroupStudent = selectedStudent?.classType === "Basic Group";
   const [payments, groupPaymentContext] = await Promise.all([
     selectedStudent ? getPayments(selectedStudent, showArchived, closedPeriodKeys) : [],
@@ -376,7 +413,15 @@ export default async function FinancePaymentsPage({
         logoutAction={logoutFinance}
       />
 
-      <section className="container-shell grid items-start gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
+      <section className="container-shell grid gap-6 py-8">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FinanceKpi icon={CheckCircle2} label="Paid active payments" value={formatRupiah(financeSummary.totalPaid)} detail={`${financeSummary.paidCount} paid record${financeSummary.paidCount === 1 ? "" : "s"}`} tone="green" />
+          <FinanceKpi icon={AlertCircle} label="Unpaid dues" value={formatRupiah(financeSummary.totalUnpaid)} detail={`${financeSummary.unpaidCount} unpaid record${financeSummary.unpaidCount === 1 ? "" : "s"}`} tone="yellow" />
+          <FinanceKpi icon={UploadCloud} label="Receipt pending" value={financeSummary.receiptPendingCount.toString()} detail="Paid records not marked uploaded" tone="blue" />
+          <FinanceKpi icon={ReceiptText} label="Active records" value={financeSummary.activeRecordCount.toString()} detail="Open payment records" />
+        </div>
+
+        <div className="grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">
           <Card className="p-5">
             <h2 className="font-heading text-xl font-bold text-lead-navy">Monthly close</h2>
@@ -641,8 +686,43 @@ export default async function FinancePaymentsPage({
             </Card>
           )}
         </div>
+        </div>
       </section>
     </main>
+  );
+}
+
+function FinanceKpi({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  tone = "navy"
+}: {
+  icon: typeof ReceiptText;
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "navy" | "green" | "yellow" | "blue";
+}) {
+  const toneClassName =
+    tone === "green"
+      ? "bg-emerald-50 text-emerald-700"
+      : tone === "yellow"
+        ? "bg-yellow-50 text-yellow-800"
+        : tone === "blue"
+          ? "bg-blue-50 text-lead-blue"
+          : "bg-slate-100 text-lead-navy";
+
+  return (
+    <Card className="p-5">
+      <span className={`grid h-12 w-12 place-items-center rounded-xl ${toneClassName}`}>
+        <Icon className="h-6 w-6" />
+      </span>
+      <p className="mt-5 text-sm font-bold uppercase tracking-[0.12em] text-lead-gray">{label}</p>
+      <p className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">{value}</p>
+      <p className="mt-1 text-sm font-semibold text-lead-gray">{detail}</p>
+    </Card>
   );
 }
 
