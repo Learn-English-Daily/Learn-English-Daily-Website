@@ -145,6 +145,7 @@ type TeacherAttendance = {
   courseJoined: string;
   classType: string;
   classMode: string;
+  updatedAt: Date | null;
 };
 
 type TeacherBatch = {
@@ -429,7 +430,8 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
       notes: doc.notes || "",
       courseJoined: doc.courseJoined || "",
       classType: doc.classType || "",
-      classMode: doc.classMode || ""
+      classMode: doc.classMode || "",
+      updatedAt: doc.updatedAt || null
     })),
     batches: batchDocs.map((doc) => {
       const batchId = doc._id.toString();
@@ -589,24 +591,32 @@ export default async function TeacherPortalPage({
             <Card className="p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                  <NotebookPen className="h-5 w-5 text-lead-blue" />
-                  <h2 className="font-heading text-xl font-bold text-lead-navy">Recent Teaching Records</h2>
+                  <CalendarCheck className="h-5 w-5 text-lead-blue" />
+                  <h2 className="font-heading text-xl font-bold text-lead-navy">Last Attendance Records</h2>
                 </div>
-                <a href="/teacher/journals" className="focus-ring w-fit rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-lead-blue transition hover:bg-blue-100">
-                  Open Journal Center
-                </a>
+                <span className="w-fit rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-lead-blue">
+                  Latest {Math.min(data.recentAttendance.length, 12)}
+                </span>
               </div>
-              <div className="mt-4 divide-y divide-slate-100">
+              <p className="mt-2 text-sm text-lead-gray">
+                Quick view of attendance you already marked. Journals are handled in the Journal tab.
+              </p>
+              <div className="mt-4 grid gap-3">
                 {data.recentAttendance.slice(0, 12).map((record) => (
-                  <div key={record.id} className="py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-heading font-bold text-lead-navy">{record.studentName}</p>
+                  <div key={record.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-heading font-bold text-lead-navy">{record.studentName}</p>
+                        <p className="mt-1 text-xs font-semibold text-lead-gray">{record.studentId || "Student ID not set"}</p>
+                      </div>
                       <span className={`rounded-lg px-2 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>{record.status}</span>
                     </div>
-                    <p className="mt-1 text-xs font-semibold text-lead-gray">
-                      Meeting {record.meetingNumber} / {formatDate(record.meetingDate)} / {record.courseJoined} / {record.classMode || "Mode not set"}
-                    </p>
-                    {record.notes ? <p className="mt-2 line-clamp-3 text-sm leading-6 text-lead-gray">{record.notes}</p> : null}
+                    <div className="mt-3 grid gap-2 text-xs font-semibold text-lead-gray sm:grid-cols-2">
+                      <p><span className="text-lead-navy">Meeting:</span> {record.meetingNumber}</p>
+                      <p><span className="text-lead-navy">Date:</span> {formatDate(record.meetingDate)}</p>
+                      <p><span className="text-lead-navy">Mode:</span> {record.classMode || "Mode not set"}</p>
+                      <p><span className="text-lead-navy">Course:</span> {record.courseJoined || "Course not set"}</p>
+                    </div>
                   </div>
                 ))}
                 {!data.recentAttendance.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance records yet.</p> : null}
