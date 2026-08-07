@@ -512,6 +512,7 @@ export default async function TeacherPortalPage({
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
   const missedSessions = data.sessions.filter((session) => session.sessionDate < today);
   const needsAttendance = todaysSessions.filter((session) => session.status === "Needs Attendance");
+  const attendanceNeededSessions = data.sessions.filter((session) => session.status === "Needs Attendance");
   const selectedBatch = data.batches.find((batch) => batch.id === selectedAssessmentBatchId);
   const selectedStudent = selectedBatch?.students.find((student) => student.studentId === selectedAssessmentStudentId);
   const selectedAssessment = data.assessments.find(
@@ -558,9 +559,12 @@ export default async function TeacherPortalPage({
           <TeacherKpi icon={NotebookPen} label="Recent Records" value={data.recentAttendance.length} detail="Your latest attendance entries" tone="blue" />
         </div>
 
+        {attendanceNeededSessions.length ? <TeacherAttendanceNeededCard sessions={attendanceNeededSessions.slice(0, 5)} total={attendanceNeededSessions.length} /> : null}
+
         <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="grid gap-6 content-start">
             <TeacherSessionList
+              id="teacher-class-queue"
               title="Today's Class Queue"
               description="Only today's classes assigned to you appear here. Times are Indonesia WIB."
               badge={`${todaysSessions.length} today`}
@@ -786,7 +790,39 @@ function TeacherKpi({
   );
 }
 
+function TeacherAttendanceNeededCard({ sessions, total }: { sessions: TeacherSession[]; total: number }) {
+  return (
+    <Card className="border-rose-100 bg-rose-50 p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.12em] text-rose-700">
+            <CalendarClock className="h-4 w-4" />
+            Attendance needed
+          </p>
+          <h2 className="mt-2 font-heading text-2xl font-bold text-lead-navy">
+            {total} class{total === 1 ? "" : "es"} waiting for attendance
+          </h2>
+          <div className="mt-3 grid gap-2 text-sm text-lead-gray">
+            {sessions.map((session) => (
+              <p key={session.id}>
+                <span className="font-bold text-lead-navy">{session.studentName}</span> / Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
+              </p>
+            ))}
+          </div>
+          {total > sessions.length ? (
+            <p className="mt-3 text-xs font-semibold text-rose-700">Showing first {sessions.length}. Check the queue below for the full list.</p>
+          ) : null}
+        </div>
+        <a href="#teacher-class-queue" className="focus-ring inline-flex rounded-lg bg-lead-blue px-4 py-3 text-sm font-bold text-white shadow-soft transition hover:bg-blue-700">
+          Open Queue
+        </a>
+      </div>
+    </Card>
+  );
+}
+
 function TeacherSessionList({
+  id,
   title,
   description,
   badge,
@@ -794,6 +830,7 @@ function TeacherSessionList({
   emptyText,
   urgent = false
 }: {
+  id?: string;
   title: string;
   description: string;
   badge: string;
@@ -802,7 +839,7 @@ function TeacherSessionList({
   urgent?: boolean;
 }) {
   return (
-    <Card className={`p-5 ${urgent && sessions.length ? "border-rose-200" : ""}`}>
+    <Card id={id} className={`scroll-mt-6 p-5 ${urgent && sessions.length ? "border-rose-200" : ""}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="font-heading text-2xl font-extrabold text-lead-navy">{title}</h2>

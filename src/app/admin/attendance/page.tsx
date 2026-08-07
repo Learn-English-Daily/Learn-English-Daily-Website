@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarCheck, Search } from "lucide-react";
+import { CalendarCheck, CalendarClock, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -11,6 +11,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { getAttendanceReminders } from "@/lib/attendance-reminders";
 import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
 import {
   attendanceStatuses,
@@ -99,6 +100,15 @@ function formatDate(value: string) {
   if (!value) return "Not set";
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date(value));
+}
+
+function formatDateTime(value: string) {
+  if (!value) return "Not set";
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
     timeZone: "Asia/Jakarta"
   }).format(new Date(value));
 }
@@ -280,12 +290,14 @@ export default async function AdminAttendancePage({
     );
   }
 
-  const [students, selectedStudent, teachers] = await Promise.all([
+  const db = await getMongoDb();
+  const [students, selectedStudent, teachers, attendanceReminders] = await Promise.all([
     getStudents(searchQuery),
     getSelectedStudent(selectedStudentId),
-    getTeachers()
+    getTeachers(),
+    getAttendanceReminders(db, { limit: 5 })
   ]);
-  const closedPeriodKeys = await getClosedBillingPeriodKeys(await getMongoDb());
+  const closedPeriodKeys = await getClosedBillingPeriodKeys(db);
   const attendance = selectedStudent ? await getAttendance(selectedStudent.studentId, showArchived, closedPeriodKeys) : [];
 
   return (
@@ -297,7 +309,35 @@ export default async function AdminAttendancePage({
         logoutAction={logoutAdmin}
       />
 
-      <section className="container-shell grid items-start gap-6 py-8 xl:grid-cols-[0.9fr_1.1fr]">
+      <section className="container-shell grid gap-6 py-8">
+        {attendanceReminders.length ? (
+          <Card className="border-rose-100 bg-rose-50 p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.12em] text-rose-700">
+                  <CalendarClock className="h-4 w-4" />
+                  Attendance needed
+                </p>
+                <h2 className="mt-2 font-heading text-2xl font-bold text-lead-navy">
+                  {attendanceReminders.length} class{attendanceReminders.length === 1 ? "" : "es"} need attendance
+                </h2>
+                <div className="mt-3 grid gap-2 text-sm text-lead-gray">
+                  {attendanceReminders.map((session) => (
+                    <p key={session.id}>
+                      <span className="font-bold text-lead-navy">{session.studentName}</span> / Meeting {session.meetingNumber} / {formatDateTime(session.scheduledAt)}
+                      {session.teacherNames.length ? ` / ${session.teacherNames.join(", ")}` : ""}
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <Button asChild>
+                <a href="/admin/sessions">Open Class Sessions</a>
+              </Button>
+            </div>
+          </Card>
+        ) : null}
+
+        <div className="grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">
           <Card className="p-4">
             <form action="/admin/attendance" className="flex flex-col gap-3 md:flex-row">
@@ -461,6 +501,7 @@ export default async function AdminAttendancePage({
               <p className="mt-3 text-lead-gray">Search or select a student to mark and review attendance.</p>
             </Card>
           )}
+        </div>
         </div>
       </section>
     </main>
