@@ -9,7 +9,7 @@ import { AdminLoginForm } from "@/app/admin/login-form";
 import { updateReviewStatus } from "@/app/admin/reviews/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 import { getReviewCollectionName, type ReviewDisplayOption, type ReviewRole, type ReviewStatus } from "@/lib/reviews";
 
@@ -136,7 +136,7 @@ export default async function AdminReviewsPage({
     );
   }
 
-  const reviews = await getReviews(searchQuery);
+  const [reviews, admin] = await Promise.all([getReviews(searchQuery), getAuthenticatedAdmin()]);
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -148,6 +148,7 @@ export default async function AdminReviewsPage({
             ? `Showing ${reviews.length} result${reviews.length === 1 ? "" : "s"} for "${searchQuery}".`
             : `Showing latest ${reviews.length} review submissions.`
         }
+        userName={admin?.name}
         logoutAction={logoutAdmin}
       />
 

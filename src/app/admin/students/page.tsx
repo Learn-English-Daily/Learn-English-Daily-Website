@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 import {
   getActiveStudentFilter,
@@ -186,7 +186,7 @@ export default async function AdminStudentsPage({
     );
   }
 
-  const registrations = await getStudentRegistrations(searchQuery, mode);
+  const [registrations, admin] = await Promise.all([getStudentRegistrations(searchQuery, mode), getAuthenticatedAdmin()]);
   const isTrialView = mode === "trial";
   const pagePath = isTrialView ? "/admin/students?view=trial" : "/admin/students";
   const otherPath = isTrialView ? "/admin/students" : "/admin/students/trials";
@@ -203,6 +203,7 @@ export default async function AdminStudentsPage({
             ? `Showing ${registrations.length} result${registrations.length === 1 ? "" : "s"} for "${searchQuery}".`
             : `Showing latest ${registrations.length} ${isTrialView ? "trial" : "current"} registrations.`
         }
+        userName={admin?.name}
         logoutAction={logoutAdmin}
       />
 

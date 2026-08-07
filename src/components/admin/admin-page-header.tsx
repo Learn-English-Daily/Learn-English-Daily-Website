@@ -29,11 +29,13 @@ export function AdminPageHeader({
   active,
   title,
   description,
+  userName,
   logoutAction
 }: {
   active: AdminPageKey;
   title: string;
   description: string;
+  userName?: string;
   logoutAction: () => void | Promise<void>;
 }) {
   return (
@@ -49,6 +51,7 @@ export function AdminPageHeader({
               {title}
             </h1>
             <p className="mt-3 text-sm leading-6 text-lead-gray">{description}</p>
+            {userName ? <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-lead-gray">Signed in as {userName}</p> : null}
           </div>
 
           <form action={logoutAction} className="lg:pt-2">

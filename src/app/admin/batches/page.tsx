@@ -17,7 +17,7 @@ import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import {
   assessmentAttendanceStatuses,
   assessmentPrograms,
@@ -340,7 +340,8 @@ export default async function AdminBatchesPage({
     );
   }
 
-  const { batches, teachers, students, assessments, savedAssessments, month, year } = await getBatchPageData();
+  const [batchPageData, admin] = await Promise.all([getBatchPageData(), getAuthenticatedAdmin()]);
+  const { batches, teachers, students, assessments, savedAssessments, month, year } = batchPageData;
   const activeBatches = batches.filter((batch) => batch.status === "active");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
   const assessmentsByStudent = new Map<string, Assessment>(assessments.map((assessment) => [assessment.studentId, assessment]));
@@ -373,6 +374,7 @@ export default async function AdminBatchesPage({
         active="batches"
         title="Batch management"
         description="Create group batches, assign active students, and finalize monthly assessments without manual score calculations."
+        userName={admin?.name}
         logoutAction={logoutAdmin}
       />
 

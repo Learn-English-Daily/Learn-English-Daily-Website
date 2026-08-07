@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
@@ -110,7 +110,7 @@ export default async function AdminPage({
     );
   }
 
-  const leads = await getLeads(searchQuery);
+  const [leads, admin] = await Promise.all([getLeads(searchQuery), getAuthenticatedAdmin()]);
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -122,6 +122,7 @@ export default async function AdminPage({
             ? `Showing ${leads.length} result${leads.length === 1 ? "" : "s"} for "${searchQuery}".`
             : `Showing latest ${leads.length} form submissions.`
         }
+        userName={admin?.name}
         logoutAction={logoutAdmin}
       />
 

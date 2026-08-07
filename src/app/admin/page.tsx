@@ -15,7 +15,7 @@ import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import {
   getClassSessionsCollectionName,
   getComputedClassSessionStatus,
@@ -178,7 +178,7 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  const data = await getDashboardData();
+  const [data, admin] = await Promise.all([getDashboardData(), getAuthenticatedAdmin()]);
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -186,6 +186,7 @@ export default async function AdminDashboardPage() {
         active="dashboard"
         title="Admin dashboard"
         description="Start here after login: see today's classes, follow-ups, payments, inquiries, and reviews in one place."
+        userName={admin?.name}
         logoutAction={logoutAdmin}
       />
 

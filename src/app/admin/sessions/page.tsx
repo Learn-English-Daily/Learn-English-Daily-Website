@@ -18,7 +18,7 @@ import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getRecordBillingPeriod } from "@/lib/billing-periods";
 import {
   getClassSessionsCollectionName,
@@ -320,7 +320,7 @@ export default async function AdminSessionsPage() {
     );
   }
 
-  const [students, teachers, sessions] = await Promise.all([getStudents(), getTeachers(), getSessions()]);
+  const [students, teachers, sessions, admin] = await Promise.all([getStudents(), getTeachers(), getSessions(), getAuthenticatedAdmin()]);
   const needsAttendance = sessions.filter((session) => session.status === "Needs Attendance");
   const today = getIndonesiaDateInput();
   const todaysSessions = sessions.filter((session) => session.sessionDate === today);
@@ -331,6 +331,7 @@ export default async function AdminSessionsPage() {
         active="sessions"
         title="Class sessions"
         description="Schedule classes first, then close them by marking attendance."
+        userName={admin?.name}
         logoutAction={logoutAdmin}
       />
 

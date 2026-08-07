@@ -10,7 +10,7 @@ import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getAttendanceReminders } from "@/lib/attendance-reminders";
 import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
 import {
@@ -291,11 +291,12 @@ export default async function AdminAttendancePage({
   }
 
   const db = await getMongoDb();
-  const [students, selectedStudent, teachers, attendanceReminders] = await Promise.all([
+  const [students, selectedStudent, teachers, attendanceReminders, admin] = await Promise.all([
     getStudents(searchQuery),
     getSelectedStudent(selectedStudentId),
     getTeachers(),
-    getAttendanceReminders(db, { limit: 5 })
+    getAttendanceReminders(db, { limit: 5 }),
+    getAuthenticatedAdmin()
   ]);
   const closedPeriodKeys = await getClosedBillingPeriodKeys(db);
   const attendance = selectedStudent ? await getAttendance(selectedStudent.studentId, showArchived, closedPeriodKeys) : [];
@@ -306,6 +307,7 @@ export default async function AdminAttendancePage({
         active="attendance"
         title="Student attendance"
         description="Mark attendance by meeting and review each student's class history."
+        userName={admin?.name}
         logoutAction={logoutAdmin}
       />
 
