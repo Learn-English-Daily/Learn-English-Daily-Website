@@ -2,14 +2,28 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_SESSION_COOKIE, createAdminSessionToken, getAdminPassword } from "@/lib/admin-auth";
+import { ADMIN_ID_COOKIE, ADMIN_SESSION_COOKIE, createAdminSessionToken, getAdminPassword } from "@/lib/admin-auth";
+import { getAdminEmployeeByUsername } from "@/lib/admin-employees";
+import { getMongoDb } from "@/lib/mongodb";
+import { normalizeEmployeeUsername } from "@/lib/teachers";
+
+function clean(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 export async function loginAdmin(_: unknown, formData: FormData) {
-  const password = String(formData.get("password") || "");
-  const adminPassword = getAdminPassword();
+  const username = normalizeEmployeeUsername(clean(formData.get("username")));
+  const password = clean(formData.get("password"));
+  const db = await getMongoDb();
+  const admin = await getAdminEmployeeByUsername(db, username);
 
+  if (!admin) {
+    return { error: "Enter a valid active admin employee username." };
+  }
+
+  const adminPassword = getAdminPassword(admin.username);
   if (!adminPassword) {
-    return { error: "Admin password is not configured." };
+    return { error: "This admin password is not configured yet." };
   }
 
   if (password !== adminPassword) {
@@ -17,20 +31,23 @@ export async function loginAdmin(_: unknown, formData: FormData) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(), {
+  const cookieOptions = {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60 * 8,
     path: "/admin"
-  });
+  };
+
+  cookieStore.set(ADMIN_ID_COOKIE, admin.id, cookieOptions);
+  cookieStore.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(admin.id, admin.username), cookieOptions);
 
   redirect("/admin");
 }
 
 export async function logoutAdmin() {
   const cookieStore = await cookies();
+  cookieStore.delete(ADMIN_ID_COOKIE);
   cookieStore.delete(ADMIN_SESSION_COOKIE);
   redirect("/admin");
 }
-

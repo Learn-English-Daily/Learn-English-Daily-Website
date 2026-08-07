@@ -11,6 +11,16 @@ export function AdminLoginForm() {
   return (
     <form action={formAction} className="mt-8 grid gap-4">
       <label className="grid gap-2 text-sm font-semibold text-lead-navy">
+        Username
+        <input
+          required
+          name="username"
+          autoComplete="username"
+          placeholder="Enter your employee username"
+          className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy"
+        />
+      </label>
+      <label className="grid gap-2 text-sm font-semibold text-lead-navy">
         Admin password
         <input
           required
@@ -28,4 +38,3 @@ export function AdminLoginForm() {
     </form>
   );
 }
-
