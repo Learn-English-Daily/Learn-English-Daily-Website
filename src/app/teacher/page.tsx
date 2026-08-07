@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import type { WithId } from "mongodb";
-import { CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookPen, Users } from "lucide-react";
+import { BookOpenText, CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookPen, Users } from "lucide-react";
 import { generateTeacherGamesLink, logoutTeacher, saveTeacherAttendance, saveTeacherMonthlyAssessment } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
@@ -542,12 +542,20 @@ export default async function TeacherPortalPage({
               Your teaching command center: classes, attendance, journal notes, games links, and batch overview.
             </p>
           </div>
-          <form action={logoutTeacher} className="lg:pt-2">
-            <Button type="submit" variant="secondary">
-              <LogOut className="h-4 w-4" />
-              Logout
+          <div className="flex flex-wrap gap-3 lg:pt-2">
+            <Button asChild>
+              <a href="/teacher/journals">
+                <BookOpenText className="h-4 w-4" />
+                Journal Center
+              </a>
             </Button>
-          </form>
+            <form action={logoutTeacher}>
+              <Button type="submit" variant="secondary">
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
+            </form>
+          </div>
         </div>
       </header>
 
@@ -731,9 +739,14 @@ export default async function TeacherPortalPage({
             </Card>
 
             <Card className="p-5">
-              <div className="flex items-center gap-3">
-                <NotebookPen className="h-5 w-5 text-lead-blue" />
-                <h2 className="font-heading text-xl font-bold text-lead-navy">Recent Teaching Records</h2>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <NotebookPen className="h-5 w-5 text-lead-blue" />
+                  <h2 className="font-heading text-xl font-bold text-lead-navy">Recent Teaching Records</h2>
+                </div>
+                <a href="/teacher/journals" className="focus-ring w-fit rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-lead-blue transition hover:bg-blue-100">
+                  Open Journal Center
+                </a>
               </div>
               <div className="mt-4 divide-y divide-slate-100">
                 {data.recentAttendance.slice(0, 12).map((record) => (

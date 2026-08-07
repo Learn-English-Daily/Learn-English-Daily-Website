@@ -308,10 +308,51 @@ export async function saveTeacherAttendance(formData: FormData) {
   });
 
   revalidatePath("/teacher");
+  revalidatePath("/teacher/journals");
   revalidatePath("/admin/attendance");
   revalidatePath("/finance/payments");
   revalidatePath("/admin/sessions");
   revalidatePath("/ceo");
+}
+
+export async function updateTeacherJournal(formData: FormData) {
+  const teacher = await assertTeacher();
+  const attendanceId = clean(formData.get("attendanceId"));
+  const notes = clean(formData.get("notes"));
+
+  if (!ObjectId.isValid(attendanceId)) {
+    throw new Error("Invalid journal record");
+  }
+
+  if (notes.length > 4000) {
+    throw new Error("Journal notes are too long");
+  }
+
+  const db = await getMongoDb();
+  const recordId = new ObjectId(attendanceId);
+  const existingRecord = await db.collection(getStudentAttendanceCollectionName()).findOne({
+    _id: recordId,
+    teacherIds: teacher.id
+  });
+
+  if (!existingRecord) {
+    throw new Error("Journal record not found for this teacher");
+  }
+
+  await db.collection(getStudentAttendanceCollectionName()).updateOne(
+    { _id: recordId },
+    {
+      $set: {
+        notes,
+        journalUpdatedAt: new Date(),
+        updatedAt: new Date()
+      }
+    }
+  );
+
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/journals");
+  revalidatePath("/admin/attendance");
 }
 
 export async function generateTeacherGamesLink(formData: FormData) {
