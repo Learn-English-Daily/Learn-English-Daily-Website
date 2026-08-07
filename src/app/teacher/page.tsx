@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import type { WithId } from "mongodb";
-import { CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookPen, Users } from "lucide-react";
+import { CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookPen, Search, Users } from "lucide-react";
 import { generateTeacherGamesLink, logoutTeacher, saveTeacherAttendance, saveTeacherMonthlyAssessment } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
@@ -148,6 +148,15 @@ type TeacherAttendance = {
   updatedAt: Date | null;
 };
 
+type TeacherStudentSummary = {
+  studentId: string;
+  studentName: string;
+  courseJoined: string;
+  classType: string;
+  classMode: string;
+  attendanceCount: number;
+};
+
 type TeacherBatch = {
   id: string;
   batchName: string;
@@ -239,6 +248,10 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || "" : value || "";
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function numberParam(value: string | string[] | undefined, fallback: number) {
   const parsed = Number(firstParam(value));
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -249,6 +262,17 @@ function statusClassName(status: ComputedClassSessionStatus | AttendanceStatus) 
   if (status === "Needs Attendance" || status === "Absent") return "bg-rose-50 text-rose-700";
   if (status === "Late") return "bg-yellow-50 text-yellow-800";
   return "bg-blue-50 text-lead-blue";
+}
+
+function summaryTextClassName(status: AttendanceStatus) {
+  if (status === "Present") return "text-emerald-600";
+  if (status === "Absent") return "text-rose-600";
+  if (status === "Late") return "text-yellow-700";
+  return "text-slate-600";
+}
+
+function countStatus(attendance: TeacherAttendance[], status: AttendanceStatus) {
+  return attendance.filter((record) => record.status === status).length;
 }
 
 function gradeClassName(grade: AssessmentGrade | "") {
@@ -334,7 +358,7 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
       .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
       .find({ teacherIds: teacherId })
       .sort({ meetingDate: -1, updatedAt: -1 })
-      .limit(40)
+      .limit(300)
       .toArray() as Promise<WithId<AttendanceDocument>[]>,
     db
       .collection<GameSessionDocument>(getGameSessionsCollectionName())
@@ -418,21 +442,50 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
   const teacherBatchIds = new Set(batchDocs.map((doc) => doc._id.toString()));
   const assessmentByStudent = new Map(assessmentDocs.map((doc) => [doc.studentId || "", doc]));
 
+  const recentAttendance = attendanceDocs.map((doc) => ({
+    id: doc._id.toString(),
+    studentName: doc.studentName || "Student",
+    studentId: doc.studentId || "",
+    meetingNumber: doc.meetingNumber || 0,
+    meetingDate: doc.meetingDate || "",
+    status: doc.status || "Present",
+    notes: doc.notes || "",
+    courseJoined: doc.courseJoined || "",
+    classType: doc.classType || "",
+    classMode: doc.classMode || "",
+    updatedAt: doc.updatedAt || null
+  }));
+  const studentsById = new Map<string, TeacherStudentSummary>();
+
+  for (const record of recentAttendance) {
+    if (!record.studentId) continue;
+    const existing = studentsById.get(record.studentId);
+    studentsById.set(record.studentId, {
+      studentId: record.studentId,
+      studentName: record.studentName,
+      courseJoined: record.courseJoined,
+      classType: record.classType,
+      classMode: record.classMode,
+      attendanceCount: (existing?.attendanceCount || 0) + 1
+    });
+  }
+
+  for (const session of sessions) {
+    if (!session.studentId || studentsById.has(session.studentId)) continue;
+    studentsById.set(session.studentId, {
+      studentId: session.studentId,
+      studentName: session.studentName,
+      courseJoined: session.courseJoined,
+      classType: session.classType,
+      classMode: session.classMode,
+      attendanceCount: 0
+    });
+  }
+
   return {
     sessions,
-    recentAttendance: attendanceDocs.map((doc) => ({
-      id: doc._id.toString(),
-      studentName: doc.studentName || "Student",
-      studentId: doc.studentId || "",
-      meetingNumber: doc.meetingNumber || 0,
-      meetingDate: doc.meetingDate || "",
-      status: doc.status || "Present",
-      notes: doc.notes || "",
-      courseJoined: doc.courseJoined || "",
-      classType: doc.classType || "",
-      classMode: doc.classMode || "",
-      updatedAt: doc.updatedAt || null
-    })),
+    recentAttendance,
+    students: Array.from(studentsById.values()).sort((a, b) => a.studentName.localeCompare(b.studentName)),
     batches: batchDocs.map((doc) => {
       const batchId = doc._id.toString();
       const students = studentDocs
@@ -486,6 +539,8 @@ export default async function TeacherPortalPage({
     assessmentStudentId?: string | string[];
     assessmentMonth?: string | string[];
     assessmentYear?: string | string[];
+    q?: string | string[];
+    studentId?: string | string[];
   }>;
 }) {
   noStore();
@@ -510,6 +565,8 @@ export default async function TeacherPortalPage({
   const selectedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, currentPeriod.year);
   const selectedAssessmentBatchId = firstParam(resolvedSearchParams?.assessmentBatchId);
   const selectedAssessmentStudentId = firstParam(resolvedSearchParams?.assessmentStudentId);
+  const searchQuery = firstParam(resolvedSearchParams?.q);
+  const selectedAttendanceStudentId = firstParam(resolvedSearchParams?.studentId);
   const data = await getTeacherPortalData(teacher.id, selectedAssessmentMonth, selectedAssessmentYear);
   const today = getTodayJakarta();
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
@@ -528,6 +585,24 @@ export default async function TeacherPortalPage({
   const selectedAssessmentMeetings = defaultMeetingsFromAssessment(selectedAssessment);
   const selectedAssessmentRatings = selectedAssessment?.ratings || defaultRatingsFromAssessment();
   const isAssessmentReadyToEdit = Boolean(selectedBatch && selectedStudent);
+  const studentSearch = searchQuery.trim();
+  const studentSearchRegex = studentSearch ? new RegExp(escapeRegex(studentSearch), "i") : null;
+  const visibleStudents = studentSearchRegex
+    ? data.students.filter((student) =>
+        studentSearchRegex.test(student.studentId) ||
+        studentSearchRegex.test(student.studentName) ||
+        studentSearchRegex.test(student.courseJoined) ||
+        studentSearchRegex.test(student.classMode)
+      )
+    : data.students;
+  const selectedAttendanceStudent =
+    visibleStudents.find((student) => student.studentId === selectedAttendanceStudentId) ||
+    data.students.find((student) => student.studentId === selectedAttendanceStudentId) ||
+    visibleStudents[0] ||
+    null;
+  const selectedStudentAttendance = selectedAttendanceStudent
+    ? data.recentAttendance.filter((record) => record.studentId === selectedAttendanceStudent.studentId)
+    : [];
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -567,8 +642,8 @@ export default async function TeacherPortalPage({
 
         {attendanceNeededSessions.length ? <TeacherAttendanceNeededCard sessions={attendanceNeededSessions.slice(0, 5)} total={attendanceNeededSessions.length} /> : null}
 
-        <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <div className="grid gap-6 content-start">
+        <section className="grid gap-6">
+          <div className="grid gap-6 xl:grid-cols-2">
             <TeacherSessionList
               id="teacher-class-queue"
               title="Today's Class Queue"
@@ -587,41 +662,106 @@ export default async function TeacherPortalPage({
             />
           </div>
 
-          <div className="grid gap-6 content-start">
-            <Card className="p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <CalendarCheck className="h-5 w-5 text-lead-blue" />
-                  <h2 className="font-heading text-xl font-bold text-lead-navy">Last Attendance Records</h2>
-                </div>
-                <span className="w-fit rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-lead-blue">
-                  Latest {Math.min(data.recentAttendance.length, 12)}
-                </span>
-              </div>
-              <p className="mt-2 text-sm text-lead-gray">
-                Quick view of attendance you already marked. Journals are handled in the Journal tab.
-              </p>
-              <div className="mt-4 grid gap-3">
-                {data.recentAttendance.slice(0, 12).map((record) => (
-                  <div key={record.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-heading font-bold text-lead-navy">{record.studentName}</p>
-                        <p className="mt-1 text-xs font-semibold text-lead-gray">{record.studentId || "Student ID not set"}</p>
+          <div className="grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+            <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">
+              <Card className="p-4">
+                <form action="/teacher" className="flex flex-col gap-3 md:flex-row">
+                  <label className="relative flex-1">
+                    <span className="sr-only">Search students</span>
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
+                    <input
+                      name="q"
+                      defaultValue={searchQuery}
+                      placeholder="Search student, ID, course, mode..."
+                      className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy"
+                    />
+                  </label>
+                  <Button type="submit" size="lg">
+                    <Search className="h-4 w-4" />
+                    Search
+                  </Button>
+                </form>
+              </Card>
+
+              <Card className="p-5 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Select student</h2>
+                <p className="mt-1 text-sm text-lead-gray">Students shown here are from your scheduled or marked classes.</p>
+                <div className="mt-4 grid gap-3">
+                  {visibleStudents.map((student) => (
+                    <a
+                      key={student.studentId}
+                      href={`/teacher?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
+                      className={`focus-ring rounded-lg border p-4 transition hover:border-lead-blue hover:bg-blue-50 ${
+                        selectedAttendanceStudent?.studentId === student.studentId ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{student.studentId || "No ID"}</span>
+                        <span className="font-heading font-bold text-lead-navy">{student.studentName}</span>
                       </div>
-                      <span className={`rounded-lg px-2 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>{record.status}</span>
+                      <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined || "Course not set"} / {student.classType || "Class type not set"} / {student.classMode || "Mode not set"}</p>
+                      <p className="mt-1 text-xs text-lead-gray">{student.attendanceCount} attendance record{student.attendanceCount === 1 ? "" : "s"}</p>
+                    </a>
+                  ))}
+                  {!visibleStudents.length ? <p className="rounded-lg bg-white p-4 text-sm text-lead-gray">No students found.</p> : null}
+                </div>
+              </Card>
+            </div>
+
+            <div className="grid gap-6">
+              {selectedAttendanceStudent ? (
+                <>
+                  <Card className="p-5">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h2 className="font-heading text-2xl font-bold text-lead-navy">{selectedAttendanceStudent.studentName}</h2>
+                          <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{selectedAttendanceStudent.studentId}</span>
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-lead-gray">
+                          {selectedAttendanceStudent.courseJoined || "Course not set"} / {selectedAttendanceStudent.classType || "Class type not set"} / {selectedAttendanceStudent.classMode || "Mode not set"}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm font-bold md:text-right">
+                        {attendanceStatuses.map((status) => (
+                          <p key={status} className={summaryTextClassName(status)}>
+                            {status}: {countStatus(selectedStudentAttendance, status)}
+                          </p>
+                        ))}
+                      </div>
                     </div>
-                    <div className="mt-3 grid gap-2 text-xs font-semibold text-lead-gray sm:grid-cols-2">
-                      <p><span className="text-lead-navy">Meeting:</span> {record.meetingNumber}</p>
-                      <p><span className="text-lead-navy">Date:</span> {formatDate(record.meetingDate)}</p>
-                      <p><span className="text-lead-navy">Mode:</span> {record.classMode || "Mode not set"}</p>
-                      <p><span className="text-lead-navy">Course:</span> {record.courseJoined || "Course not set"}</p>
+                  </Card>
+
+                  <Card className="p-5">
+                    <h2 className="font-heading text-xl font-bold text-lead-navy">Attendance History</h2>
+                    <p className="mt-2 text-sm text-lead-gray">Read-only history for this student. Mark attendance from scheduled classes above.</p>
+                    <div className="mt-5 grid gap-4">
+                      {selectedStudentAttendance.map((record) => (
+                        <div key={record.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="font-heading font-bold text-lead-navy">Meeting {record.meetingNumber}</h3>
+                                <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>{record.status}</span>
+                                <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">{record.classMode || "Mode not set"}</span>
+                              </div>
+                              <p className="mt-2 text-sm text-lead-gray">{formatDate(record.meetingDate)}</p>
+                              <p className="mt-1 text-sm text-lead-gray">{record.courseJoined || "Course not set"} / {record.classType || "Class type not set"}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {!selectedStudentAttendance.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance records yet for this student.</p> : null}
                     </div>
-                  </div>
-                ))}
-                {!data.recentAttendance.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance records yet.</p> : null}
-              </div>
-            </Card>
+                  </Card>
+                </>
+              ) : (
+                <Card className="p-8 text-center">
+                  <h2 className="font-heading text-2xl font-bold text-lead-navy">Choose a student</h2>
+                  <p className="mt-3 text-lead-gray">Search or select a student to review attendance.</p>
+                </Card>
+              )}
+            </div>
           </div>
         </section>
       </section>
