@@ -88,6 +88,38 @@ function statusClassName(status: AttendanceStatus) {
   return "bg-slate-100 text-slate-600";
 }
 
+function journalStateClassName(hasNotes: boolean) {
+  return hasNotes ? "bg-emerald-50 text-emerald-700" : "bg-yellow-50 text-yellow-800";
+}
+
+function buildBlankJournalTemplate(record: JournalRecord) {
+  const topic = record.courseJoined ? `${record.courseJoined} class` : "";
+
+  return `TOPIC: ${topic}
+
+1. OBJECTIVE TODAY
+[ ] Vocab    [ ] Speaking    [ ] Game    [ ] Review
+
+2. WHAT WE DID:
+- Activity 1: 
+- Activity 2: 
+- Activity 3: 
+
+3. STUDENT PROGRESS:
+Performance Score: 1  2  3  4  5  6  7  8  9  10
+
+Progress:
+
+Problem:
+
+4. NEXT MEETING PLAN:
+Teach:
+Homework:
+
+5. NOTE FOR PARENT / REFLEKSI GURU:
+`;
+}
+
 function mapJournalRecord(doc: WithId<AttendanceDocument>): JournalRecord {
   return {
     id: doc._id.toString(),
@@ -182,6 +214,9 @@ function JournalRecordCard({
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-heading text-lg font-bold text-lead-navy">{record.studentName}</p>
         <span className={`rounded-lg px-2 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>{record.status}</span>
+        <span className={`rounded-lg px-2 py-1 text-xs font-bold uppercase ${journalStateClassName(Boolean(record.notes))}`}>
+          {record.notes ? "Journal done" : "Needs journal"}
+        </span>
       </div>
       <p className="mt-1 text-xs font-semibold text-lead-gray">
         Meeting {record.meetingNumber} / {formatDate(record.meetingDate)} / {record.classMode || "Mode not set"}
@@ -255,11 +290,13 @@ export default async function TeacherJournalPage({
   const copyFromId = firstParam(resolvedSearchParams?.copyFromId);
   const records = await getTeacherJournalRecords(teacher.id, search);
   const requestedRecord = requestedRecordId ? await getTeacherJournalRecord(teacher.id, requestedRecordId) : null;
-  const selectedRecord = requestedRecord || records[0] || null;
+  const journalQueue = records.filter((record) => !record.notes);
+  const completedRecords = records.filter((record) => record.notes);
+  const selectedRecord = requestedRecord || journalQueue[0] || records[0] || null;
   const copySource = copyFromId ? await getTeacherJournalRecord(teacher.id, copyFromId) : null;
-  const draftNotes = copySource?.notes || selectedRecord?.notes || "";
-  const sameStudentTemplates = selectedRecord
-    ? records.filter((record) => record.id !== selectedRecord.id && record.studentId === selectedRecord.studentId && record.notes).slice(0, 5)
+  const draftNotes = selectedRecord ? copySource?.notes || selectedRecord.notes || buildBlankJournalTemplate(selectedRecord) : "";
+  const lastThreeStudentJournals = selectedRecord
+    ? records.filter((record) => record.id !== selectedRecord.id && record.studentId === selectedRecord.studentId && record.notes).slice(0, 3)
     : [];
   const recentTemplates = selectedRecord
     ? records.filter((record) => record.id !== selectedRecord.id && record.notes && record.studentId !== selectedRecord.studentId).slice(0, 5)
@@ -322,13 +359,27 @@ export default async function TeacherJournalPage({
           <Card className="p-5">
             <div className="flex items-center gap-3">
               <NotebookPen className="h-5 w-5 text-lead-blue" />
-              <h2 className="font-heading text-xl font-bold text-lead-navy">Recent Classes</h2>
+              <h2 className="font-heading text-xl font-bold text-lead-navy">Classes Needing Journal</h2>
             </div>
+            <p className="mt-1 text-sm text-lead-gray">
+              Select the class first, then complete the guided report.
+            </p>
             <div className="mt-4 grid max-h-[760px] gap-3 overflow-y-auto pr-1">
-              {records.map((record) => (
+              {journalQueue.map((record) => (
                 <JournalRecordCard key={record.id} record={record} selected={selectedRecord?.id === record.id} search={search} />
               ))}
-              {!records.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance records found for your teacher account yet.</p> : null}
+              {!journalQueue.length ? <p className="rounded-lg bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">No unfinished journals found. All clean.</p> : null}
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <h2 className="font-heading text-xl font-bold text-lead-navy">Completed Journals</h2>
+            <p className="mt-1 text-sm text-lead-gray">Open an older class if you need to edit it.</p>
+            <div className="mt-4 grid max-h-[420px] gap-3 overflow-y-auto pr-1">
+              {completedRecords.map((record) => (
+                <JournalRecordCard key={record.id} record={record} selected={selectedRecord?.id === record.id} search={search} />
+              ))}
+              {!completedRecords.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No completed journals yet.</p> : null}
             </div>
           </Card>
         </div>
@@ -364,27 +415,27 @@ export default async function TeacherJournalPage({
               <ActionFeedbackForm action={updateTeacherJournal} successMessage="Journal saved successfully." className="mt-5 grid gap-4">
                 <input type="hidden" name="attendanceId" value={selectedRecord.id} />
                 <label className="grid gap-2 text-sm font-bold text-lead-navy">
-                  Parent journal notes
+                  Guided journal report
                   <textarea
                     name="notes"
-                    rows={12}
+                    rows={24}
                     defaultValue={draftNotes}
-                    placeholder="Example: Today we practiced past tense speaking. The student answered with more confidence and should review the homework sentence patterns before the next class."
-                    className="focus-ring resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-lead-navy"
+                    placeholder="Complete the guided journal report for this class."
+                    className="focus-ring min-h-[640px] resize-y rounded-xl border border-slate-200 bg-white px-4 py-4 font-mono text-sm leading-7 text-lead-navy"
                   />
                 </label>
                 <div className="grid gap-3 rounded-xl border border-yellow-100 bg-yellow-50/70 p-4 text-sm text-lead-navy md:grid-cols-3">
                   <div>
-                    <p className="font-bold">1. What we practiced</p>
-                    <p className="mt-1 text-lead-gray">Topic, grammar, vocabulary, speaking activity.</p>
+                    <p className="font-bold">Keep the headings</p>
+                    <p className="mt-1 text-lead-gray">Parents can scan quickly when every journal follows the same structure.</p>
                   </div>
                   <div>
-                    <p className="font-bold">2. How the student did</p>
-                    <p className="mt-1 text-lead-gray">Confidence, pronunciation, fluency, participation.</p>
+                    <p className="font-bold">Write specific progress</p>
+                    <p className="mt-1 text-lead-gray">Mention topic, performance score, problem, and next practice.</p>
                   </div>
                   <div>
-                    <p className="font-bold">3. Next step</p>
-                    <p className="mt-1 text-lead-gray">Homework, review target, or what to prepare.</p>
+                    <p className="font-bold">Parent note matters</p>
+                    <p className="mt-1 text-lead-gray">Use simple language so parents know what happened and what to support.</p>
                   </div>
                 </div>
                 <Button type="submit" className="w-full sm:w-fit">
@@ -402,13 +453,13 @@ export default async function TeacherJournalPage({
           {selectedRecord ? (
             <section className="grid gap-6 lg:grid-cols-2">
               <Card className="p-5">
-                <h3 className="font-heading text-xl font-bold text-lead-navy">Reuse Same Student Journal</h3>
-                <p className="mt-1 text-sm text-lead-gray">Best for ongoing classes where today is similar to the previous lesson.</p>
+                <h3 className="font-heading text-xl font-bold text-lead-navy">Last 3 Journals For This Student</h3>
+                <p className="mt-1 text-sm text-lead-gray">Copy one when today continues from the previous class.</p>
                 <div className="mt-4 grid gap-3">
-                  {sameStudentTemplates.map((record) => (
+                  {lastThreeStudentJournals.map((record) => (
                     <TemplateCard key={record.id} record={record} selectedRecordId={selectedRecord.id} search={search} />
                   ))}
-                  {!sameStudentTemplates.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No previous journal notes for this student yet.</p> : null}
+                  {!lastThreeStudentJournals.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No previous journal notes for this student yet.</p> : null}
                 </div>
               </Card>
 
