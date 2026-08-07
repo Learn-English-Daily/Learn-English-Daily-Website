@@ -1,10 +1,11 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
-import { ArrowLeft, BookOpenText, Copy, LogOut, NotebookPen, Search } from "lucide-react";
+import { BookOpenText, Copy, LogOut, NotebookPen, Search } from "lucide-react";
 import { ObjectId, type WithId } from "mongodb";
 import { logoutTeacher, updateTeacherJournal } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
+import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -320,12 +321,6 @@ export default async function TeacherJournalPage({
             <p className="mt-3 text-sm font-semibold text-lead-gray">Signed in as <span className="text-lead-navy">{teacher.name}</span></p>
           </div>
           <div className="flex flex-wrap gap-3 lg:pt-2">
-            <Button asChild variant="secondary">
-              <a href="/teacher">
-                <ArrowLeft className="h-4 w-4" />
-                Dashboard
-              </a>
-            </Button>
             <form action={logoutTeacher}>
               <Button type="submit" variant="secondary">
                 <LogOut className="h-4 w-4" />
@@ -334,9 +329,10 @@ export default async function TeacherJournalPage({
             </form>
           </div>
         </div>
+        <TeacherPortalTabs active="journal" />
       </header>
 
-      <section className="container-shell grid gap-6 py-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="container-shell grid gap-6 py-8 xl:grid-cols-[280px_minmax(0,1fr)]">
         <div className="grid gap-5 content-start">
           <Card className="p-5">
             <form action="/teacher/journals" className="grid gap-3">
