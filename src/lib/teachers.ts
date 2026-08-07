@@ -1,101 +1,100 @@
 import { ObjectId, type Db } from "mongodb";
 import { getEmployeeOnboardingCollectionName } from "@/lib/employee-onboarding";
 
-export type TeacherDocument = {
-  _id: string;
-  name: string;
-  active: boolean;
-  createdAt?: Date;
-};
-
 export type EmployeeTeacherDocument = {
   _id: ObjectId;
   fullName?: string;
   preferredName?: string;
+  email?: string;
   role?: string;
   status?: string;
+  employeeStatus?: string;
+  teacherUsername?: string;
+  createdAt?: Date;
 };
 
 export type TeacherOption = {
   id: string;
   name: string;
-  source: "teachers" | "employee-onboarding";
+  username: string;
+  source: "employee-onboarding";
 };
 
-export const defaultTeachers = [
-  { id: "eva-yulia", name: "Ms Eva Yulia" },
-  { id: "adam", name: "Mr Adam" }
-] as const;
-
-export function getTeachersCollectionName() {
-  return process.env.MONGODB_TEACHERS_COLLECTION || "teachers";
-}
-
-export async function ensureDefaultTeachers(db: Db) {
-  const collection = db.collection<TeacherDocument>(getTeachersCollectionName());
-  const now = new Date();
-
-  await collection.bulkWrite(
-    defaultTeachers.map((teacher) => ({
-      updateOne: {
-        filter: { _id: teacher.id },
-        update: {
-          $set: { name: teacher.name },
-          $setOnInsert: { active: true, createdAt: now }
-        },
-        upsert: true
-      }
-    }))
-  );
-}
-
-function normalizeTeacherName(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function employeeTeacherId(id: ObjectId | string) {
+export function employeeTeacherId(id: ObjectId | string) {
   return `employee:${id.toString()}`;
 }
 
+export function normalizeTeacherUsername(value = "") {
+  return value.trim().toLowerCase();
+}
+
+function isActiveEmployeeTeacher(teacher: EmployeeTeacherDocument) {
+  const employeeStatus = (teacher.employeeStatus || "Active").toLowerCase();
+  const submissionStatus = (teacher.status || "submitted").toLowerCase();
+
+  return (
+    teacher.role === "Teacher" &&
+    employeeStatus !== "inactive" &&
+    !["inactive", "archived", "rejected"].includes(submissionStatus)
+  );
+}
+
+function mapEmployeeTeacher(teacher: EmployeeTeacherDocument): TeacherOption | null {
+  if (!isActiveEmployeeTeacher(teacher)) return null;
+
+  const name = teacher.preferredName || teacher.fullName || "";
+  if (!name) return null;
+
+  return {
+    id: employeeTeacherId(teacher._id),
+    name,
+    username: normalizeTeacherUsername(teacher.teacherUsername || ""),
+    source: "employee-onboarding"
+  };
+}
+
 export async function getAvailableTeachers(db: Db): Promise<TeacherOption[]> {
-  await ensureDefaultTeachers(db);
+  const docs = await db
+    .collection<EmployeeTeacherDocument>(getEmployeeOnboardingCollectionName())
+    .find({
+      role: "Teacher",
+      employeeStatus: { $ne: "Inactive" },
+      status: { $nin: ["inactive", "archived", "rejected"] }
+    })
+    .sort({ fullName: 1, preferredName: 1 })
+    .toArray();
 
-  const [teacherDocs, employeeTeacherDocs] = await Promise.all([
-    db.collection<TeacherDocument>(getTeachersCollectionName()).find({ active: true }).sort({ name: 1 }).toArray(),
-    db
-      .collection<EmployeeTeacherDocument>(getEmployeeOnboardingCollectionName())
-      .find({
-        role: "Teacher",
-        status: { $nin: ["inactive", "archived", "rejected"] }
-      })
-      .sort({ fullName: 1, preferredName: 1 })
-      .toArray()
-  ]);
+  return docs
+    .map(mapEmployeeTeacher)
+    .filter((teacher): teacher is TeacherOption => Boolean(teacher))
+    .sort((first, second) => first.name.localeCompare(second.name));
+}
 
-  const teachers = new Map<string, TeacherOption>();
+export async function getEmployeeTeacherById(db: Db, teacherId: string): Promise<TeacherOption | null> {
+  const rawId = teacherId.startsWith("employee:") ? teacherId.slice("employee:".length) : teacherId;
+  if (!ObjectId.isValid(rawId)) return null;
 
-  for (const teacher of teacherDocs) {
-    if (!teacher._id || !teacher.name) continue;
-    teachers.set(normalizeTeacherName(teacher.name), {
-      id: teacher._id,
-      name: teacher.name,
-      source: "teachers"
-    });
-  }
+  const teacher = await db.collection<EmployeeTeacherDocument>(getEmployeeOnboardingCollectionName()).findOne({
+    _id: new ObjectId(rawId),
+    role: "Teacher"
+  });
 
-  for (const employee of employeeTeacherDocs) {
-    const name = employee.preferredName || employee.fullName || "";
-    if (!name) continue;
-    const normalizedName = normalizeTeacherName(name);
-    if (teachers.has(normalizedName)) continue;
-    teachers.set(normalizedName, {
-      id: employeeTeacherId(employee._id),
-      name,
-      source: "employee-onboarding"
-    });
-  }
+  return teacher ? mapEmployeeTeacher(teacher) : null;
+}
 
-  return [...teachers.values()].sort((first, second) => first.name.localeCompare(second.name));
+export async function getEmployeeTeacherByUsername(db: Db, username: string): Promise<TeacherOption | null> {
+  const normalizedUsername = normalizeTeacherUsername(username);
+  if (!normalizedUsername) return null;
+
+  const teacher = await db.collection<EmployeeTeacherDocument>(getEmployeeOnboardingCollectionName()).findOne({
+    role: "Teacher",
+    $or: [
+      { teacherUsername: normalizedUsername },
+      { email: normalizedUsername }
+    ]
+  });
+
+  return teacher ? mapEmployeeTeacher(teacher) : null;
 }
 
 export async function resolveAvailableTeachers(db: Db, teacherIds: string[]) {
@@ -111,8 +110,7 @@ export async function resolveAvailableTeachers(db: Db, teacherIds: string[]) {
 }
 
 export async function resolveAvailableTeacher(db: Db, teacherId: string) {
-  const teachers = await getAvailableTeachers(db);
-  const teacher = teachers.find((item) => item.id === teacherId);
+  const teacher = await getEmployeeTeacherById(db, teacherId);
 
   if (!teacher) {
     throw new Error("Select a valid teacher");

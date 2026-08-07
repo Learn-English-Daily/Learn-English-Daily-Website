@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   employeeEmploymentTypeOptions,
   employeeRoleOptions,
+  employeeStatusOptions,
   employeeWorkModeOptions
 } from "@/lib/employee-onboarding";
 
@@ -34,6 +35,8 @@ export function EmployeeOnboardingForm() {
       cityCountry: String(formData.get("cityCountry") || ""),
       dateOfBirth: String(formData.get("dateOfBirth") || ""),
       role: String(formData.get("role") || ""),
+      employeeStatus: String(formData.get("employeeStatus") || ""),
+      teacherUsername: String(formData.get("teacherUsername") || ""),
       employmentType: String(formData.get("employmentType") || ""),
       workMode: String(formData.get("workMode") || ""),
       expectedStartDate: String(formData.get("expectedStartDate") || ""),
@@ -98,6 +101,8 @@ export function EmployeeOnboardingForm() {
         description="Helps LEAD prepare access, schedules, and onboarding tasks."
       >
         <SelectField name="role" label="Role joining as" options={employeeRoleOptions} required />
+        <SelectField name="employeeStatus" label="Employee status" options={employeeStatusOptions} defaultValue="Active" required />
+        <TextField name="teacherUsername" label="Teacher portal username" placeholder="Example: eva.yulia" />
         <SelectField name="employmentType" label="Employment type" options={employeeEmploymentTypeOptions} required />
         <SelectField name="workMode" label="Work mode" options={employeeWorkModeOptions} required />
         <TextField name="expectedStartDate" label="Expected start date" type="date" required />
@@ -226,19 +231,21 @@ function SelectField({
   name,
   label,
   options,
-  required
+  required,
+  defaultValue = ""
 }: {
   name: string;
   label: string;
   options: readonly string[];
   required?: boolean;
+  defaultValue?: string;
 }) {
   return (
     <label className="grid gap-2 text-sm font-bold text-lead-navy">
       <span>
         {label} {required ? <span className="text-lead-blue">*</span> : null}
       </span>
-      <select required={required} name={name} defaultValue="" className={inputClass}>
+      <select required={required} name={name} defaultValue={defaultValue} className={inputClass}>
         <option value="" disabled>
           Choose an option
         </option>

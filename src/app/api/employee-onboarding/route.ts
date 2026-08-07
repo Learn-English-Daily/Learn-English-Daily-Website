@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { getEmployeeOnboardingCollectionName, isEmployeeEmploymentType, isEmployeeRole, isEmployeeWorkMode } from "@/lib/employee-onboarding";
+import {
+  getEmployeeOnboardingCollectionName,
+  isEmployeeEmploymentType,
+  isEmployeeRole,
+  isEmployeeStatus,
+  isEmployeeWorkMode
+} from "@/lib/employee-onboarding";
+import { normalizeTeacherUsername } from "@/lib/teachers";
 import { getMongoDb } from "@/lib/mongodb";
 
 export const runtime = "nodejs";
@@ -13,6 +20,8 @@ type EmployeeOnboardingPayload = {
   cityCountry?: string;
   dateOfBirth?: string;
   role?: string;
+  employeeStatus?: string;
+  teacherUsername?: string;
   employmentType?: string;
   workMode?: string;
   expectedStartDate?: string;
@@ -60,6 +69,10 @@ function isValidDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function isValidTeacherUsername(value: string) {
+  return /^[a-z0-9._-]{3,40}$/.test(value);
+}
+
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as EmployeeOnboardingPayload | null;
   if (!payload) {
@@ -76,6 +89,8 @@ export async function POST(request: Request) {
     cityCountry: clean(payload.cityCountry),
     dateOfBirth: clean(payload.dateOfBirth),
     role: clean(payload.role),
+    employeeStatus: clean(payload.employeeStatus) || "Active",
+    teacherUsername: normalizeTeacherUsername(clean(payload.teacherUsername)),
     employmentType: clean(payload.employmentType),
     workMode: clean(payload.workMode),
     expectedStartDate: clean(payload.expectedStartDate),
@@ -107,6 +122,7 @@ export async function POST(request: Request) {
     !isReasonableText(employee.cityCountry, 2, 120) ||
     !isValidDate(employee.dateOfBirth) ||
     !isEmployeeRole(employee.role) ||
+    !isEmployeeStatus(employee.employeeStatus) ||
     !isEmployeeEmploymentType(employee.employmentType) ||
     !isEmployeeWorkMode(employee.workMode) ||
     !isValidDate(employee.expectedStartDate) ||
@@ -116,6 +132,10 @@ export async function POST(request: Request) {
     !isReasonableText(employee.emergencyContactPhone, 6, 40)
   ) {
     return NextResponse.json({ ok: false, error: "Please complete all required fields correctly." }, { status: 400 });
+  }
+
+  if (employee.role === "Teacher" && !isValidTeacherUsername(employee.teacherUsername)) {
+    return NextResponse.json({ ok: false, error: "Teacher username must be 3-40 characters using letters, numbers, dot, dash, or underscore." }, { status: 400 });
   }
 
   if (
@@ -142,6 +162,18 @@ export async function POST(request: Request) {
   try {
     const db = await getMongoDb();
     const now = new Date();
+    if (employee.role === "Teacher") {
+      const existingTeacher = await db.collection(getEmployeeOnboardingCollectionName()).findOne({
+        role: "Teacher",
+        teacherUsername: employee.teacherUsername,
+        status: { $nin: ["archived", "rejected"] }
+      });
+
+      if (existingTeacher) {
+        return NextResponse.json({ ok: false, error: "This teacher username is already used." }, { status: 409 });
+      }
+    }
+
     const result = await db.collection(getEmployeeOnboardingCollectionName()).insertOne({
       ...employee,
       status: "submitted",

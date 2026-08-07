@@ -60,7 +60,7 @@ import { getMongoDb } from "@/lib/mongodb";
 import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
-import { getTeachersCollectionName, type TeacherDocument } from "@/lib/teachers";
+import { getAvailableTeachers } from "@/lib/teachers";
 
 export const dynamic = "force-dynamic";
 
@@ -417,7 +417,7 @@ async function getFinanceData(searchParams: SearchParams) {
     db.collection<ProfitDistributionDocument>(getFinanceProfitDistributionsCollectionName()).find({}).sort({ distributionDate: -1 }).limit(10000).toArray() as Promise<WithId<ProfitDistributionDocument>[]>,
     db.collection<BudgetDocument>(getFinanceBudgetsCollectionName()).find({}).sort({ year: -1 }).limit(1000).toArray() as Promise<WithId<BudgetDocument>[]>,
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).sort({ createdAt: -1 }).limit(50000).toArray() as Promise<WithId<StudentDocument>[]>,
-    db.collection<TeacherDocument>(getTeachersCollectionName()).find({ active: true }).sort({ name: 1 }).toArray()
+    getAvailableTeachers(db)
   ]);
 
   const activeStudentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));

@@ -38,7 +38,7 @@ import {
   TEACHER_ID_COOKIE,
   TEACHER_SESSION_COOKIE
 } from "@/lib/teacher-auth";
-import { ensureDefaultTeachers, getTeachersCollectionName, type TeacherDocument } from "@/lib/teachers";
+import { getEmployeeTeacherById, getEmployeeTeacherByUsername, normalizeTeacherUsername, type TeacherOption } from "@/lib/teachers";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -80,14 +80,14 @@ async function getCurrentTeacher() {
   const teacherId = cookieStore.get(TEACHER_ID_COOKIE)?.value || "";
   const session = cookieStore.get(TEACHER_SESSION_COOKIE)?.value || "";
 
-  if (!isValidTeacherSession(teacherId, session)) {
+  const db = await getMongoDb();
+  const teacher = await getEmployeeTeacherById(db, teacherId);
+
+  if (!teacher?.username || !isValidTeacherSession(teacher.id, teacher.username, session)) {
     return null;
   }
 
-  const db = await getMongoDb();
-  await ensureDefaultTeachers(db);
-  const teacher = await db.collection<TeacherDocument>(getTeachersCollectionName()).findOne({ _id: teacherId, active: true });
-  return teacher || null;
+  return teacher;
 }
 
 async function assertTeacher() {
@@ -176,18 +176,21 @@ async function syncPaymentFromTeacherAttendance({
 }
 
 export async function loginTeacher(_: unknown, formData: FormData) {
-  const teacherId = (clean(formData.get("username")) || clean(formData.get("teacherId"))).toLowerCase();
+  const username = normalizeTeacherUsername(clean(formData.get("username")) || clean(formData.get("teacherId")));
   const password = clean(formData.get("password"));
 
   const db = await getMongoDb();
-  await ensureDefaultTeachers(db);
-  const teacher = await db.collection<TeacherDocument>(getTeachersCollectionName()).findOne({ _id: teacherId, active: true });
+  const teacher = await getEmployeeTeacherByUsername(db, username);
 
   if (!teacher) {
     return { error: "Select a valid teacher." };
   }
 
-  const teacherPassword = getTeacherPassword(teacherId);
+  if (!teacher.username) {
+    return { error: "This teacher does not have a portal username configured yet." };
+  }
+
+  const teacherPassword = getTeacherPassword(teacher.username);
   if (!teacherPassword) {
     return { error: "This teacher password is not configured yet." };
   }
@@ -205,8 +208,8 @@ export async function loginTeacher(_: unknown, formData: FormData) {
     path: "/teacher"
   };
 
-  cookieStore.set(TEACHER_ID_COOKIE, teacherId, cookieOptions);
-  cookieStore.set(TEACHER_SESSION_COOKIE, createTeacherSessionToken(teacherId), cookieOptions);
+  cookieStore.set(TEACHER_ID_COOKIE, teacher.id, cookieOptions);
+  cookieStore.set(TEACHER_SESSION_COOKIE, createTeacherSessionToken(teacher.id, teacher.username), cookieOptions);
 
   redirect("/teacher");
 }
@@ -233,7 +236,7 @@ export async function saveTeacherAttendance(formData: FormData) {
   const db = await getMongoDb();
   const session = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({ _id: new ObjectId(classSessionId) });
 
-  if (!session?.studentId || !session.meetingNumber || !session.sessionDate || !session.teacherIds?.includes(teacher._id)) {
+  if (!session?.studentId || !session.meetingNumber || !session.sessionDate || !session.teacherIds?.includes(teacher.id)) {
     throw new Error("Class session not found for this teacher");
   }
 
@@ -275,7 +278,7 @@ export async function saveTeacherAttendance(formData: FormData) {
         billingPeriod: period.billingPeriod,
         status,
         notes,
-        teacherIds: [teacher._id],
+        teacherIds: [teacher.id],
         teacherNames: [teacher.name],
         updatedAt: new Date()
       },
@@ -322,7 +325,7 @@ export async function generateTeacherGamesLink(formData: FormData) {
   const db = await getMongoDb();
   const classSession = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({ _id: new ObjectId(classSessionId) });
 
-  if (!classSession?.teacherIds?.includes(teacher._id)) {
+  if (!classSession?.teacherIds?.includes(teacher.id)) {
     throw new Error("Class session not found for this teacher");
   }
 
@@ -366,7 +369,7 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
 
   const db = await getMongoDb();
   const [batch, student] = await Promise.all([
-    db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), teacherId: teacher._id }),
+    db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), teacherId: teacher.id }),
     db.collection(getStudentRegistrationCollectionName()).findOne({
       studentId,
       ...getBasicGroupStudentFilter()
@@ -439,7 +442,7 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
         batchId: batch._id.toString(),
         batchName: batch.batchName || "",
         program: batch.program || "",
-        teacherId: teacher._id,
+        teacherId: teacher.id,
         teacherName: teacher.name,
         month,
         year,

@@ -33,7 +33,7 @@ import {
   TEACHER_ID_COOKIE,
   TEACHER_SESSION_COOKIE
 } from "@/lib/teacher-auth";
-import { ensureDefaultTeachers, getTeachersCollectionName, type TeacherDocument } from "@/lib/teachers";
+import { getEmployeeTeacherById } from "@/lib/teachers";
 
 export const dynamic = "force-dynamic";
 
@@ -309,14 +309,14 @@ async function getAuthenticatedTeacher() {
   const teacherId = cookieStore.get(TEACHER_ID_COOKIE)?.value || "";
   const session = cookieStore.get(TEACHER_SESSION_COOKIE)?.value || "";
 
-  if (!isValidTeacherSession(teacherId, session)) {
+  const db = await getMongoDb();
+  const teacher = await getEmployeeTeacherById(db, teacherId);
+
+  if (!teacher?.username || !isValidTeacherSession(teacher.id, teacher.username, session)) {
     return null;
   }
 
-  const db = await getMongoDb();
-  await ensureDefaultTeachers(db);
-  const teacher = await db.collection<TeacherDocument>(getTeachersCollectionName()).findOne({ _id: teacherId, active: true });
-  return teacher ? { id: teacher._id, name: teacher.name } : null;
+  return { id: teacher.id, name: teacher.name };
 }
 
 async function getTeacherPortalData(teacherId: string, month: number, year: number) {
