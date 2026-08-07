@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import {
   getEmployeeOnboardingCollectionName,
   isEmployeeEmploymentType,
+  isEmployeeGender,
   isEmployeeRole,
   isEmployeeStatus,
-  isEmployeeTitle,
   isEmployeeWorkMode
 } from "@/lib/employee-onboarding";
 import { normalizeTeacherUsername } from "@/lib/teachers";
@@ -20,9 +20,9 @@ type EmployeeOnboardingPayload = {
   address?: string;
   cityCountry?: string;
   dateOfBirth?: string;
+  gender?: string;
   role?: string;
   employeeStatus?: string;
-  employeeTitle?: string;
   teacherUsername?: string;
   employmentType?: string;
   workMode?: string;
@@ -90,9 +90,9 @@ export async function POST(request: Request) {
     address: clean(payload.address),
     cityCountry: clean(payload.cityCountry),
     dateOfBirth: clean(payload.dateOfBirth),
+    gender: clean(payload.gender),
     role: clean(payload.role),
     employeeStatus: clean(payload.employeeStatus) || "Active",
-    employeeTitle: clean(payload.employeeTitle),
     teacherUsername: normalizeTeacherUsername(clean(payload.teacherUsername)),
     employmentType: clean(payload.employmentType),
     workMode: clean(payload.workMode),
@@ -124,6 +124,7 @@ export async function POST(request: Request) {
     !isReasonableText(employee.address, 5, 300) ||
     !isReasonableText(employee.cityCountry, 2, 120) ||
     !isValidDate(employee.dateOfBirth) ||
+    !isEmployeeGender(employee.gender) ||
     !isEmployeeRole(employee.role) ||
     !isEmployeeStatus(employee.employeeStatus) ||
     !isEmployeeEmploymentType(employee.employmentType) ||
@@ -139,10 +140,6 @@ export async function POST(request: Request) {
 
   if (employee.role === "Teacher" && !isValidTeacherUsername(employee.teacherUsername)) {
     return NextResponse.json({ ok: false, error: "Teacher username must be 3-40 characters using letters, numbers, dot, dash, or underscore." }, { status: 400 });
-  }
-
-  if (employee.role === "Teacher" && !isEmployeeTitle(employee.employeeTitle)) {
-    return NextResponse.json({ ok: false, error: "Please select Ms or Mr. for teacher title." }, { status: 400 });
   }
 
   if (

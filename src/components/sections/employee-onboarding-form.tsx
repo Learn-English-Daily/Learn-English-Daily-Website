@@ -5,9 +5,9 @@ import { CheckCircle2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   employeeEmploymentTypeOptions,
+  employeeGenderOptions,
   employeeRoleOptions,
   employeeStatusOptions,
-  employeeTitleOptions,
   employeeWorkModeOptions
 } from "@/lib/employee-onboarding";
 
@@ -35,9 +35,9 @@ export function EmployeeOnboardingForm() {
       address: String(formData.get("address") || ""),
       cityCountry: String(formData.get("cityCountry") || ""),
       dateOfBirth: String(formData.get("dateOfBirth") || ""),
+      gender: String(formData.get("gender") || ""),
       role: String(formData.get("role") || ""),
       employeeStatus: String(formData.get("employeeStatus") || ""),
-      employeeTitle: String(formData.get("employeeTitle") || ""),
       teacherUsername: String(formData.get("teacherUsername") || ""),
       employmentType: String(formData.get("employmentType") || ""),
       workMode: String(formData.get("workMode") || ""),
@@ -95,6 +95,7 @@ export function EmployeeOnboardingForm() {
         <TextArea name="address" label="Full address" rows={3} required />
         <TextField name="cityCountry" label="City / country" placeholder="Example: Jakarta, Indonesia" required />
         <TextField name="dateOfBirth" label="Date of birth" type="date" required />
+        <SelectField name="gender" label="Gender" options={employeeGenderOptions} required />
       </FormSection>
 
       <FormSection
@@ -104,7 +105,6 @@ export function EmployeeOnboardingForm() {
       >
         <SelectField name="role" label="Role joining as" options={employeeRoleOptions} required />
         <SelectField name="employeeStatus" label="Employee status" options={employeeStatusOptions} defaultValue="Active" required />
-        <SelectField name="employeeTitle" label="Teacher title" options={employeeTitleOptions} />
         <TextField name="teacherUsername" label="Teacher portal username" placeholder="Example: eva.yulia" />
         <SelectField name="employmentType" label="Employment type" options={employeeEmploymentTypeOptions} required />
         <SelectField name="workMode" label="Work mode" options={employeeWorkModeOptions} required />

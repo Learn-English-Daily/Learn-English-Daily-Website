@@ -10,7 +10,6 @@ export type EmployeeTeacherDocument = {
   status?: string;
   employeeStatus?: string;
   employeeTitle?: string;
-  title?: string;
   gender?: string;
   teacherUsername?: string;
   createdAt?: Date;
@@ -61,12 +60,12 @@ function stripTeacherTitle(name: string) {
 }
 
 function inferTeacherTitle(name: string, teacher: EmployeeTeacherDocument) {
-  const title = (teacher.employeeTitle || teacher.title || "").trim();
-  if (title === "Ms" || title === "Mr.") return title;
-
   const gender = (teacher.gender || "").trim().toLowerCase();
-  if (["female", "f", "woman"].includes(gender)) return "Ms";
-  if (["male", "m", "man"].includes(gender)) return "Mr.";
+  if (gender === "female") return "Ms";
+  if (gender === "male") return "Mr.";
+
+  const oldTitle = (teacher.employeeTitle || "").trim();
+  if (oldTitle === "Ms" || oldTitle === "Mr.") return oldTitle;
 
   const lookupValue = `${name} ${teacher.teacherUsername || ""} ${teacher.email || ""}`.toLowerCase();
   if (/\b(eva|yulia|fiana)\b/.test(lookupValue)) return "Ms";
