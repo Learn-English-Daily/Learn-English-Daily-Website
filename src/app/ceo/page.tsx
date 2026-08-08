@@ -18,6 +18,7 @@ import { CeoLoginForm } from "@/app/ceo/login-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getStudentAttendanceCollectionName, type AttendanceStatus } from "@/lib/attendance";
+import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
 import { CEO_SESSION_COOKIE, isCeoConfigured, isValidCeoSession } from "@/lib/ceo-auth";
 import {
   getClassSessionsCollectionName,
@@ -196,6 +197,7 @@ async function getDashboardData(period: Period) {
     db.collection<ReviewDocument>(getReviewCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({}).sort({ scheduledAt: -1 }).limit(5000).toArray()
   ]);
+  const closedBillingPeriodKeys = await getClosedBillingPeriodKeys(db);
   const studentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
   const attendanceKeys = new Set(attendance.map((record) => `${record.studentId || ""}:${record.meetingNumber || 0}`));
 
@@ -236,7 +238,17 @@ async function getDashboardData(period: Period) {
   }
   const outstandingStudents = [...outstandingByStudent.values()].sort((a, b) => b.amount - a.amount);
   const pendingReceipts = payments.filter(
-    (payment) => payment.status === "Paid" && payment.receiptUploadedToDrive !== true
+    (payment) => {
+      const billingPeriod = getRecordBillingPeriod(payment).billingPeriod;
+      const isClosed = billingPeriod ? closedBillingPeriodKeys.has(billingPeriod) : false;
+
+      return (
+        payment.status === "Paid" &&
+        payment.receiptUploadedToDrive !== true &&
+        !isClosed &&
+        isInRange(payment.paidDate || payment.meetingDate || "", range)
+      );
+    }
   );
   const newStudents = students.filter((student) => student.createdAt && isInRange(jakartaDateKey(new Date(student.createdAt)), range));
   const newLeads = leads.filter((lead) => lead.createdAt && isInRange(jakartaDateKey(new Date(lead.createdAt)), range));
