@@ -301,6 +301,43 @@ async function getDashboardData(period: Period) {
     .map(([name, meetings]) => ({ name, meetings }))
     .sort((a, b) => b.meetings - a.meetings);
 
+  const studentMeetingCounts = new Map<
+    string,
+    {
+      studentId: string;
+      name: string;
+      course: string;
+      classMode: string;
+      completed: number;
+      recorded: number;
+      absent: number;
+    }
+  >();
+  for (const record of periodAttendance) {
+    if (record.status === "Cancelled") continue;
+
+    const studentId = record.studentId || "";
+    const student = studentsById.get(studentId);
+    const key = studentId || record.studentName || "Unknown";
+    const current = studentMeetingCounts.get(key) || {
+      studentId,
+      name: student?.studentName || record.studentName || studentId || "Unknown student",
+      course: student?.courseJoined || "Course not set",
+      classMode: student?.classMode || "Mode not set",
+      completed: 0,
+      recorded: 0,
+      absent: 0
+    };
+
+    current.recorded += 1;
+    if (record.status === "Present" || record.status === "Late") current.completed += 1;
+    if (record.status === "Absent") current.absent += 1;
+    studentMeetingCounts.set(key, current);
+  }
+  const studentMeetings = [...studentMeetingCounts.values()].sort(
+    (left, right) => right.completed - left.completed || right.recorded - left.recorded || left.name.localeCompare(right.name)
+  );
+
   const studentAttendance = new Map<string, { name: string; attended: number; counted: number }>();
   for (const record of attendance) {
     if (record.status === "Cancelled") continue;
@@ -359,6 +396,7 @@ async function getDashboardData(period: Period) {
     todaySessions,
     courses,
     teachers,
+    studentMeetings,
     outstandingStudents,
     trendMonths,
     recent: {
@@ -489,6 +527,49 @@ export default async function CeoDashboardPage({
             ))}
             {!data.todaySessions.length ? <Empty text="No class sessions scheduled for today." /> : null}
           </div>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+                <CalendarCheck className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Meetings completed by student</h2>
+                <p className="mt-1 text-sm text-lead-gray">Present and late classes during {data.range.label.toLowerCase()}. Cancelled classes are excluded.</p>
+              </div>
+            </div>
+            <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">
+              {plural(data.studentMeetings.length, "student")}
+            </span>
+          </div>
+          {data.studentMeetings.length ? (
+            <div className="max-h-[520px] overflow-y-auto p-4 sm:p-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {data.studentMeetings.map((student) => (
+                  <div key={student.studentId || student.name} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-heading font-bold text-lead-navy">{student.name}</p>
+                        <p className="mt-1 truncate text-xs text-lead-gray">{student.course} / {student.classMode}</p>
+                      </div>
+                      <span className="shrink-0 rounded-lg bg-blue-50 px-3 py-1 text-sm font-extrabold text-lead-blue">
+                        {student.completed}
+                      </span>
+                    </div>
+                    <p className="mt-4 text-sm font-bold text-lead-navy">{plural(student.completed, "meeting")} completed</p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+                      <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">{student.recorded} recorded</span>
+                      <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-600">{student.absent} absent</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="p-5"><Empty text={`No student meetings recorded in ${data.range.label.toLowerCase()}.`} /></div>
+          )}
         </Card>
 
         <details className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
