@@ -529,46 +529,32 @@ export default async function CeoDashboardPage({
           </div>
         </Card>
 
-        <Card className="overflow-hidden">
-          <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-                <CalendarCheck className="h-5 w-5" />
-              </span>
-              <div>
-                <h2 className="font-heading text-xl font-bold text-lead-navy">Meetings completed by student</h2>
-                <p className="mt-1 text-sm text-lead-gray">Present and late classes during {data.range.label.toLowerCase()}. Cancelled classes are excluded.</p>
-              </div>
+        <Card className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-heading text-xl font-bold text-lead-navy">Meetings by student</h2>
+              <p className="mt-1 text-sm text-lead-gray">Completed meetings in {data.range.label.toLowerCase()}.</p>
             </div>
-            <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">
-              {plural(data.studentMeetings.length, "student")}
+            <span className="shrink-0 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">
+              {data.studentMeetings.length}
             </span>
           </div>
           {data.studentMeetings.length ? (
-            <div className="max-h-[520px] overflow-y-auto p-4 sm:p-5">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {data.studentMeetings.map((student) => (
-                  <div key={student.studentId || student.name} className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-heading font-bold text-lead-navy">{student.name}</p>
-                        <p className="mt-1 truncate text-xs text-lead-gray">{student.course} / {student.classMode}</p>
-                      </div>
-                      <span className="shrink-0 rounded-lg bg-blue-50 px-3 py-1 text-sm font-extrabold text-lead-blue">
-                        {student.completed}
-                      </span>
-                    </div>
-                    <p className="mt-4 text-sm font-bold text-lead-navy">{plural(student.completed, "meeting")} completed</p>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                      <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">{student.recorded} recorded</span>
-                      <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-600">{student.absent} absent</span>
-                    </div>
+            <div className="mt-4 max-h-72 divide-y divide-slate-100 overflow-y-auto pr-2">
+              {data.studentMeetings.map((student) => (
+                <div key={student.studentId || student.name} className="flex items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-lead-navy">{student.name}</p>
+                    <p className="mt-1 truncate text-xs text-lead-gray">{student.course} / {student.classMode} / {student.absent} absent</p>
                   </div>
-                ))}
-              </div>
+                  <span className="shrink-0 text-sm font-bold text-lead-blue">
+                    {student.completed}/{student.recorded} meetings
+                  </span>
+                </div>
+              ))}
             </div>
           ) : (
-            <div className="p-5"><Empty text={`No student meetings recorded in ${data.range.label.toLowerCase()}.`} /></div>
+            <div className="mt-4"><Empty text={`No student meetings recorded in ${data.range.label.toLowerCase()}.`} /></div>
           )}
         </Card>
 
