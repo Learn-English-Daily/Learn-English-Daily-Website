@@ -128,6 +128,19 @@ type FinancePaymentSummary = {
   totalUnpaid: number;
 };
 
+type PendingReceiptStudent = {
+  studentId: string;
+  studentName: string;
+  courseJoined: string;
+  classMode: string;
+  pendingCount: number;
+};
+
+type FinancePaymentOverview = {
+  summary: FinancePaymentSummary;
+  pendingReceiptStudents: PendingReceiptStudent[];
+};
+
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -321,7 +334,7 @@ async function getGroupPaymentContext(studentId = "", isGroupStudent = false): P
   };
 }
 
-async function getFinancePaymentSummary(closedPeriodKeys = new Set<string>()): Promise<FinancePaymentSummary> {
+async function getFinancePaymentOverview(closedPeriodKeys = new Set<string>()): Promise<FinancePaymentOverview> {
   const db = await getMongoDb();
   const [paymentDocs, studentDocs] = await Promise.all([
     db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({}).limit(50000).toArray() as Promise<WithId<PaymentDocument>[]>,
@@ -335,13 +348,42 @@ async function getFinancePaymentSummary(closedPeriodKeys = new Set<string>()): P
   const paidPayments = activePayments.filter((payment) => payment.status === "Paid");
   const unpaidPayments = activePayments.filter((payment) => payment.status !== "Paid");
 
+  const pendingReceiptStudents = Array.from(
+    paidPayments
+      .filter((payment) => payment.receiptUploadedToDrive !== true)
+      .reduce((students, payment) => {
+        const studentId = payment.studentId || "";
+        const student = studentsById.get(studentId);
+        const key = studentId || normalizePaymentName(payment.studentName || "Unknown student");
+        const existing = students.get(key);
+
+        if (existing) {
+          existing.pendingCount += 1;
+        } else {
+          students.set(key, {
+            studentId,
+            studentName: student?.studentName || payment.studentName || "Unknown student",
+            courseJoined: student?.courseJoined || payment.courseJoined || "Course not set",
+            classMode: student?.classMode || payment.classMode || "Mode not set",
+            pendingCount: 1
+          });
+        }
+
+        return students;
+      }, new Map<string, PendingReceiptStudent>())
+      .values()
+  ).sort((left, right) => right.pendingCount - left.pendingCount || left.studentName.localeCompare(right.studentName));
+
   return {
-    paidCount: paidPayments.length,
-    unpaidCount: unpaidPayments.length,
-    activeRecordCount: activePayments.length,
-    receiptPendingCount: paidPayments.filter((payment) => payment.receiptUploadedToDrive !== true).length,
-    totalPaid: paidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0),
-    totalUnpaid: unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0)
+    summary: {
+      paidCount: paidPayments.length,
+      unpaidCount: unpaidPayments.length,
+      activeRecordCount: activePayments.length,
+      receiptPendingCount: paidPayments.filter((payment) => payment.receiptUploadedToDrive !== true).length,
+      totalPaid: paidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0),
+      totalUnpaid: unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0)
+    },
+    pendingReceiptStudents
   };
 }
 
@@ -391,11 +433,12 @@ export default async function FinancePaymentsPage({
   }
 
   const closedPeriodKeys = await getClosedBillingPeriodKeys(await getMongoDb());
-  const [students, selectedStudent, financeSummary] = await Promise.all([
+  const [students, selectedStudent, financeOverview] = await Promise.all([
     getStudents(searchQuery),
     getSelectedStudent(selectedStudentId),
-    getFinancePaymentSummary(closedPeriodKeys)
+    getFinancePaymentOverview(closedPeriodKeys)
   ]);
+  const { summary: financeSummary, pendingReceiptStudents } = financeOverview;
   const isGroupStudent = selectedStudent?.classType === "Basic Group";
   const [payments, groupPaymentContext] = await Promise.all([
     selectedStudent ? getPayments(selectedStudent, showArchived, closedPeriodKeys) : [],
@@ -414,6 +457,47 @@ export default async function FinancePaymentsPage({
       />
 
       <section className="container-shell grid gap-6 py-8">
+        {pendingReceiptStudents.length ? (
+          <Card className="overflow-hidden border-blue-200 bg-blue-50/70">
+            <div className="flex flex-col gap-4 border-b border-blue-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-lead-blue text-white">
+                  <UploadCloud className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="font-heading text-xl font-bold text-lead-navy">Receipts need uploading</h2>
+                  <p className="mt-1 text-sm leading-6 text-lead-gray">
+                    {financeSummary.receiptPendingCount} paid receipt{financeSummary.receiptPendingCount === 1 ? "" : "s"} for {pendingReceiptStudents.length} student{pendingReceiptStudents.length === 1 ? "" : "s"} still need to be uploaded and marked complete.
+                  </p>
+                </div>
+              </div>
+              <Button asChild className="shrink-0">
+                <a href={paymentReceiptsDriveUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                  Open Google Drive
+                </a>
+              </Button>
+            </div>
+            <div className="grid max-h-72 gap-2 overflow-y-auto p-4 sm:grid-cols-2 xl:grid-cols-3">
+              {pendingReceiptStudents.map((student) => (
+                <a
+                  key={student.studentId || student.studentName}
+                  href={student.studentId ? `/finance/payments?studentId=${encodeURIComponent(student.studentId)}#payment-history` : "/finance/payments"}
+                  className="focus-ring flex items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white px-4 py-3 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-sm"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold text-lead-navy">{student.studentName}</span>
+                    <span className="mt-1 block truncate text-xs text-lead-gray">{student.courseJoined} / {student.classMode}</span>
+                  </span>
+                  <span className="shrink-0 rounded-lg bg-yellow-100 px-2.5 py-1 text-xs font-extrabold text-yellow-800">
+                    {student.pendingCount} pending
+                  </span>
+                </a>
+              ))}
+            </div>
+          </Card>
+        ) : null}
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <FinanceKpi icon={CheckCircle2} label="Paid active payments" value={formatRupiah(financeSummary.totalPaid)} detail={`${financeSummary.paidCount} paid record${financeSummary.paidCount === 1 ? "" : "s"}`} tone="green" />
           <FinanceKpi icon={AlertCircle} label="Unpaid dues" value={formatRupiah(financeSummary.totalUnpaid)} detail={`${financeSummary.unpaidCount} unpaid record${financeSummary.unpaidCount === 1 ? "" : "s"}`} tone="yellow" />
@@ -488,7 +572,7 @@ export default async function FinancePaymentsPage({
         <div className="grid gap-6">
           {selectedStudent ? (
             <>
-              <Card className="p-5">
+              <Card id="payment-history" className="scroll-mt-6 p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
