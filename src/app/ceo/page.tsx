@@ -18,7 +18,6 @@ import { CeoLoginForm } from "@/app/ceo/login-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getStudentAttendanceCollectionName, type AttendanceStatus } from "@/lib/attendance";
-import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
 import { CEO_SESSION_COOKIE, isCeoConfigured, isValidCeoSession } from "@/lib/ceo-auth";
 import {
   getClassSessionsCollectionName,
@@ -197,11 +196,11 @@ async function getDashboardData(period: Period) {
     db.collection<ReviewDocument>(getReviewCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({}).sort({ scheduledAt: -1 }).limit(5000).toArray()
   ]);
-  const closedBillingPeriodKeys = await getClosedBillingPeriodKeys(db);
   const studentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
   const attendanceKeys = new Set(attendance.map((record) => `${record.studentId || ""}:${record.meetingNumber || 0}`));
+  const matchesRange = (value: string) => period === "all" || isInRange(value, range);
 
-  const periodAttendance = attendance.filter((record) => isInRange(record.meetingDate || "", range));
+  const periodAttendance = attendance.filter((record) => matchesRange(record.meetingDate || ""));
   const present = periodAttendance.filter((record) => record.status === "Present").length;
   const late = periodAttendance.filter((record) => record.status === "Late").length;
   const absent = periodAttendance.filter((record) => record.status === "Absent").length;
@@ -209,10 +208,12 @@ async function getDashboardData(period: Period) {
   const attendanceRate = percentage(present + late, countedAttendance);
 
   const paidInPeriod = payments.filter(
-    (payment) => payment.status === "Paid" && isInRange(payment.paidDate || payment.meetingDate || "", range)
+    (payment) => payment.status === "Paid" && matchesRange(payment.paidDate || payment.meetingDate || "")
   );
   const revenue = paidInPeriod.reduce((sum, payment) => sum + (payment.amountDue || 0), 0);
-  const unpaidPayments = payments.filter((payment) => payment.status === "Unpaid");
+  const unpaidPayments = payments.filter(
+    (payment) => payment.status === "Unpaid" && matchesRange(payment.meetingDate || payment.createdAt?.toISOString() || "")
+  );
   const outstandingAmount = unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0);
   const outstandingByStudent = new Map<
     string,
@@ -238,31 +239,24 @@ async function getDashboardData(period: Period) {
   }
   const outstandingStudents = [...outstandingByStudent.values()].sort((a, b) => b.amount - a.amount);
   const pendingReceipts = payments.filter(
-    (payment) => {
-      const billingPeriod = getRecordBillingPeriod(payment).billingPeriod;
-      const isClosed = billingPeriod ? closedBillingPeriodKeys.has(billingPeriod) : false;
-
-      return (
-        payment.status === "Paid" &&
-        payment.receiptUploadedToDrive !== true &&
-        !isClosed &&
-        isInRange(payment.paidDate || payment.meetingDate || "", range)
-      );
-    }
+    (payment) =>
+      payment.status === "Paid" &&
+      payment.receiptUploadedToDrive !== true &&
+      matchesRange(payment.paidDate || payment.meetingDate || payment.createdAt?.toISOString() || "")
   );
-  const newStudents = students.filter((student) => student.createdAt && isInRange(jakartaDateKey(new Date(student.createdAt)), range));
-  const newLeads = leads.filter((lead) => lead.createdAt && isInRange(jakartaDateKey(new Date(lead.createdAt)), range));
-  const approvedReviews = reviews.filter((review) => review.status === "approved" && typeof review.rating === "number");
+  const periodStudents = students.filter((student) => matchesRange(student.createdAt ? jakartaDateKey(new Date(student.createdAt)) : ""));
+  const periodLeads = leads.filter((lead) => matchesRange(lead.createdAt ? jakartaDateKey(new Date(lead.createdAt)) : ""));
+  const periodReviews = reviews.filter((review) => matchesRange(review.createdAt ? jakartaDateKey(new Date(review.createdAt)) : ""));
+  const approvedReviews = periodReviews.filter((review) => review.status === "approved" && typeof review.rating === "number");
   const averageRating = approvedReviews.length
     ? approvedReviews.reduce((sum, review) => sum + (review.rating || 0), 0) / approvedReviews.length
     : 0;
-  const pendingReviews = reviews.filter((review) => review.status === "pending");
+  const pendingReviews = periodReviews.filter((review) => review.status === "pending");
   const missingClassDetails = periodAttendance.filter(
     (record) => !record.teacherNames?.length || !record.notes?.trim()
   );
-  const today = jakartaDateKey(new Date());
-  const todaySessions = classSessions
-    .filter((session) => session.sessionDate === today)
+  const scheduledInPeriod = classSessions.filter((session) => matchesRange(session.sessionDate || ""));
+  const periodSessions = scheduledInPeriod
     .map((session) => {
       const studentId = session.studentId || "";
       const meetingNumber = session.meetingNumber || 0;
@@ -282,9 +276,8 @@ async function getDashboardData(period: Period) {
         })
       };
     })
-    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
-  const scheduledInPeriod = classSessions.filter((session) => isInRange(session.sessionDate || "", range));
-  const sessionsNeedingAttendance = classSessions.filter(
+    .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
+  const sessionsNeedingAttendance = scheduledInPeriod.filter(
     (session) =>
       getComputedClassSessionStatus({
         status: session.status,
@@ -295,7 +288,7 @@ async function getDashboardData(period: Period) {
   );
 
   const courseCounts = new Map<string, number>();
-  for (const student of students) {
+  for (const student of periodStudents) {
     const course = student.courseJoined || "Not assigned";
     courseCounts.set(course, (courseCounts.get(course) || 0) + 1);
   }
@@ -351,7 +344,7 @@ async function getDashboardData(period: Period) {
   );
 
   const studentAttendance = new Map<string, { name: string; attended: number; counted: number }>();
-  for (const record of attendance) {
+  for (const record of periodAttendance) {
     if (record.status === "Cancelled") continue;
     const key = record.studentId || record.studentName || "Unknown";
     const current = studentAttendance.get(key) || { name: record.studentName || key, attended: 0, counted: 0 };
@@ -387,9 +380,9 @@ async function getDashboardData(period: Period) {
   return {
     range,
     kpis: {
-      registeredStudents: students.length,
-      newStudents: newStudents.length,
-      inquiries: newLeads.length,
+      registeredStudents: periodStudents.length,
+      newStudents: periodStudents.length,
+      inquiries: periodLeads.length,
       classes: periodAttendance.length,
       scheduledClasses: scheduledInPeriod.length,
       attendanceRate,
@@ -405,19 +398,19 @@ async function getDashboardData(period: Period) {
       sessionsNeedingAttendance: sessionsNeedingAttendance.length,
       lowAttendance
     },
-    todaySessions,
+    periodSessions: periodSessions.slice(0, 20),
     courses,
     teachers,
     studentMeetings,
     outstandingStudents,
     trendMonths,
     recent: {
-      students: students.slice(0, 5),
-      payments: payments.slice(0, 5).map((payment) => ({
+      students: periodStudents.slice(0, 5),
+      payments: payments.filter((payment) => matchesRange(payment.paidDate || payment.meetingDate || payment.createdAt?.toISOString() || "")).slice(0, 5).map((payment) => ({
         ...payment,
         amountDue: payment.status === "Paid" ? payment.amountDue || 0 : getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || ""))
       })),
-      leads: leads.slice(0, 5)
+      leads: periodLeads.slice(0, 5)
     }
   };
 }
@@ -502,7 +495,7 @@ export default async function CeoDashboardPage({
         </Card>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Kpi icon={Users} label="Registered students" value={String(data.kpis.registeredStudents)} detail={`${plural(data.kpis.newStudents, "new registration")} in period`} color="text-blue-600" />
+          <Kpi icon={Users} label="Student registrations" value={String(data.kpis.registeredStudents)} detail={data.range.label} color="text-blue-600" />
           <Kpi icon={UserPlus} label="New inquiries" value={String(data.kpis.inquiries)} detail={data.range.label} color="text-violet-600" />
           <Kpi icon={CalendarCheck} label="Classes recorded" value={String(data.kpis.classes)} detail={`${data.kpis.attendanceRate}% attendance rate`} color="text-emerald-600" />
           <Kpi icon={Clock} label="Classes scheduled" value={String(data.kpis.scheduledClasses)} detail={`${data.actions.sessionsNeedingAttendance} need attendance`} color="text-blue-600" />
@@ -514,13 +507,13 @@ export default async function CeoDashboardPage({
         <Card className="p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-heading text-xl font-bold text-lead-navy">Today&apos;s scheduled classes</h2>
-              <p className="mt-1 text-sm text-lead-gray">Read-only view of class sessions and attendance status for today.</p>
+              <h2 className="font-heading text-xl font-bold text-lead-navy">Scheduled classes</h2>
+              <p className="mt-1 text-sm text-lead-gray">Latest class sessions and attendance status in {data.range.label.toLowerCase()}.</p>
             </div>
-            <span className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue">{plural(data.todaySessions.length, "class", "classes")}</span>
+            <span className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue">{plural(data.kpis.scheduledClasses, "class", "classes")}</span>
           </div>
-          <div className="mt-5 grid gap-3">
-            {data.todaySessions.map((session) => (
+          <div className="mt-5 grid max-h-[420px] gap-3 overflow-y-auto pr-2">
+            {data.periodSessions.map((session) => (
               <div key={session.id} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[1fr_auto] md:items-center">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -537,7 +530,7 @@ export default async function CeoDashboardPage({
                 </Button>
               </div>
             ))}
-            {!data.todaySessions.length ? <Empty text="No class sessions scheduled for today." /> : null}
+            {!data.periodSessions.length ? <Empty text={`No class sessions scheduled in ${data.range.label.toLowerCase()}.`} /> : null}
           </div>
         </Card>
 
