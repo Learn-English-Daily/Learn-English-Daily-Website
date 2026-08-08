@@ -509,7 +509,16 @@ export default async function FinancePaymentsPage({
         <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">
           <Card className="p-5">
             <h2 className="font-heading text-xl font-bold text-lead-navy">Monthly close</h2>
-            <p className="mt-2 text-sm leading-6 text-lead-gray">Close a finished month to hide its payments and attendance from the active view.</p>
+            <p className="mt-2 text-sm leading-6 text-lead-gray">Close a finished month after every operational and payment record is complete.</p>
+            <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-lead-gray">
+              <p className="font-bold text-lead-navy">Before closing, the system checks:</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5">
+                <li>It is the last day of the month or later.</li>
+                <li>Every paid receipt is marked uploaded to Google Drive.</li>
+                <li>Every meeting payment is marked Paid.</li>
+                <li>Every scheduled class has an attendance record.</li>
+              </ol>
+            </div>
             <ActionFeedbackForm action={closeMonthlyBalance} successMessage="Month closed successfully." className="mt-4 grid gap-3">
               <input name="billingMonth" type="month" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
               <input name="notes" placeholder="Optional closing note" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />

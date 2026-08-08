@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import { getMonthlyAssessmentsCollectionName } from "@/lib/assessments";
+import { getStudentAttendanceCollectionName } from "@/lib/attendance";
 import {
   getBillingPeriodFromDate,
   getBillingPeriodFromMonthInput,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/billing-periods";
 import { FINANCE_ID_COOKIE, FINANCE_SESSION_COOKIE, isValidFinanceSession } from "@/lib/finance-auth";
 import { getFinanceEmployeeById } from "@/lib/finance-employees";
+import { getClassSessionsCollectionName, type ClassSessionDocument } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import {
@@ -221,12 +223,17 @@ export async function closeMonthlyBalance(formData: FormData) {
   const period = getBillingPeriodFromMonthInput(billingMonthValue);
 
   if (!period.billingPeriod) {
-    throw new Error("Select a valid month to close");
+    return { success: false, message: "Select a valid month to close." };
   }
 
   const db = await getMongoDb();
+  if (await isBillingPeriodClosed(db, period)) {
+    return { success: false, message: `${period.billingPeriod} is already closed.` };
+  }
+
   const payments = await db.collection<{
     studentId?: string;
+    studentName?: string;
     billingMonth?: number;
     billingYear?: number;
     meetingDate?: string;
@@ -234,6 +241,7 @@ export async function closeMonthlyBalance(formData: FormData) {
     amountDue?: number;
     source?: string;
     meetingNumber?: number;
+    receiptUploadedToDrive?: boolean;
   }>(getStudentPaymentsCollectionName()).find({}).limit(50000).toArray();
   const students = await db.collection<{
     studentId?: string;
@@ -252,6 +260,69 @@ export async function closeMonthlyBalance(formData: FormData) {
   });
   const paidPayments = monthPayments.filter((payment) => payment.status === "Paid");
   const unpaidPayments = monthPayments.filter((payment) => payment.status !== "Paid");
+  const receiptsPending = paidPayments.filter((payment) => payment.receiptUploadedToDrive !== true);
+  const monthStart = `${period.billingPeriod}-01`;
+  const nextMonthDate = new Date(Date.UTC(period.billingYear, period.billingMonth, 1));
+  const nextMonthStart = `${nextMonthDate.getUTCFullYear()}-${String(nextMonthDate.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(Date.UTC(period.billingYear, period.billingMonth, 0)).getUTCDate();
+  const closeAvailableDate = `${period.billingPeriod}-${String(lastDay).padStart(2, "0")}`;
+  const jakartaToday = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date());
+
+  const [monthSessions, monthAttendance] = await Promise.all([
+    db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({
+      $or: [
+        { billingMonth: period.billingMonth, billingYear: period.billingYear },
+        { sessionDate: { $gte: monthStart, $lt: nextMonthStart } }
+      ]
+    }).limit(50000).toArray(),
+    db.collection<{
+      studentId?: string;
+      meetingNumber?: number;
+      meetingDate?: string;
+    }>(getStudentAttendanceCollectionName()).find({
+      $or: [
+        { billingMonth: period.billingMonth, billingYear: period.billingYear },
+        { meetingDate: { $gte: monthStart, $lt: nextMonthStart } }
+      ]
+    }).limit(50000).toArray()
+  ]);
+  const attendanceKeys = new Set(
+    monthAttendance.map((record) => `${record.studentId || ""}:${record.meetingNumber || 0}:${record.meetingDate || ""}`)
+  );
+  const sessionsMissingAttendance = monthSessions.filter(
+    (session) => !attendanceKeys.has(`${session.studentId || ""}:${session.meetingNumber || 0}:${session.sessionDate || ""}`)
+  );
+  const reasons: string[] = [];
+
+  if (jakartaToday < closeAvailableDate) {
+    reasons.push(`This month can only be closed on or after ${closeAvailableDate} (Indonesia time).`);
+  }
+  if (unpaidPayments.length) {
+    reasons.push(`${unpaidPayments.length} meeting payment${unpaidPayments.length === 1 ? " is" : "s are"} still unpaid.`);
+  }
+  if (receiptsPending.length) {
+    reasons.push(`${receiptsPending.length} paid receipt${receiptsPending.length === 1 ? " has" : "s have"} not been marked uploaded to Google Drive.`);
+  }
+  if (sessionsMissingAttendance.length) {
+    const affectedStudents = [...new Set(sessionsMissingAttendance.map((session) => session.studentName || session.studentId || "Unknown student"))];
+    const studentSummary = affectedStudents.slice(0, 4).join(", ");
+    reasons.push(
+      `${sessionsMissingAttendance.length} scheduled class${sessionsMissingAttendance.length === 1 ? " is" : "es are"} missing attendance${studentSummary ? ` (${studentSummary}${affectedStudents.length > 4 ? ", and others" : ""})` : ""}.`
+    );
+  }
+
+  if (reasons.length) {
+    return {
+      success: false,
+      message: `Month cannot be closed:\n${reasons.map((reason) => `- ${reason}`).join("\n")}`
+    };
+  }
+
   const now = new Date();
 
   await db.collection(getClosedBillingPeriodsCollectionName()).updateOne(
@@ -279,4 +350,7 @@ export async function closeMonthlyBalance(formData: FormData) {
   revalidatePath("/finance/payments");
   revalidatePath("/admin/attendance");
   revalidatePath("/ceo/finance");
+  revalidatePath("/ceo");
+
+  return { success: true };
 }
