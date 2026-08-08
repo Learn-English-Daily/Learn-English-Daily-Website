@@ -8,6 +8,7 @@ import {
   createClassSession,
   deleteClassSession,
   generateGamesLink,
+  rescheduleClassSession,
   updateClassSession
 } from "@/app/admin/sessions/actions";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
@@ -448,6 +449,30 @@ export default async function AdminSessionsPage() {
                           </Button>
                         </ActionFeedbackForm>
                       </div>
+                    <details className="mt-4 rounded-lg border border-blue-200 bg-blue-50/60">
+                      <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-bold text-lead-blue [&::-webkit-details-marker]:hidden">
+                        <CalendarClock className="h-4 w-4" />
+                        Reschedule class
+                      </summary>
+                      <ActionFeedbackForm action={rescheduleClassSession} successMessage="Class rescheduled successfully." className="grid gap-4 border-t border-blue-200 p-4 sm:grid-cols-2">
+                        <input type="hidden" name="id" value={session.id} />
+                        <Field label="New Class Date (Indonesia)">
+                          <input name="sessionDate" type="date" min={today} required defaultValue={session.sessionDate} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+                        </Field>
+                        <div className="hidden sm:block" />
+                        <Field label="New From Time (WIB)">
+                          <input name="startTime" type="time" required defaultValue={session.startTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+                        </Field>
+                        <Field label="New To Time (WIB)">
+                          <input name="endTime" type="time" required defaultValue={session.endTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+                        </Field>
+                        <p className="text-xs leading-5 text-lead-gray sm:col-span-2">Student, meeting number, teachers, class mode, and course stay unchanged.</p>
+                        <Button type="submit" size="sm" className="sm:col-span-2 sm:w-fit">
+                          <CalendarClock className="h-4 w-4" />
+                          Confirm Reschedule
+                        </Button>
+                      </ActionFeedbackForm>
+                    </details>
                     <details className="mt-4 rounded-lg border border-slate-200 bg-slate-50">
                       <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-bold text-lead-blue [&::-webkit-details-marker]:hidden">
                         <Pencil className="h-4 w-4" />

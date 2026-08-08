@@ -193,6 +193,94 @@ export async function updateClassSession(formData: FormData) {
   revalidatePath("/ceo");
 }
 
+export async function rescheduleClassSession(formData: FormData) {
+  await assertAdmin();
+
+  const id = clean(formData.get("id"));
+  const sessionDate = clean(formData.get("sessionDate"));
+  const { startTime, endTime } = resolveSessionTimes(formData);
+
+  if (!ObjectId.isValid(id) || !sessionDate || !startTime || !endTime) {
+    return { success: false, message: "Select a valid new class date and time." };
+  }
+
+  if (endTime <= startTime) {
+    return { success: false, message: "The class end time must be later than the start time." };
+  }
+
+  const jakartaToday = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date());
+
+  if (sessionDate < jakartaToday) {
+    return { success: false, message: "A class can only be rescheduled to today or a future date (Indonesia time)." };
+  }
+
+  const db = await getMongoDb();
+  const recordId = new ObjectId(id);
+  const existingSession = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({ _id: recordId });
+
+  if (!existingSession?.studentId || !existingSession.meetingNumber) {
+    return { success: false, message: "This class session could not be found. Refresh the page and try again." };
+  }
+
+  const currentPeriod = getBillingPeriodFromDate(existingSession.sessionDate || "");
+  const newPeriod = getBillingPeriodFromDate(sessionDate);
+
+  if (!newPeriod.billingPeriod) {
+    return { success: false, message: "Select a valid reschedule date." };
+  }
+
+  if (await isBillingPeriodClosed(db, currentPeriod)) {
+    return { success: false, message: "The class cannot be rescheduled because its current month is already closed." };
+  }
+
+  if (await isBillingPeriodClosed(db, newPeriod)) {
+    return { success: false, message: "The selected month is already closed. Choose an open month." };
+  }
+
+  const duplicateSession = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({
+    _id: { $ne: recordId },
+    studentId: existingSession.studentId,
+    meetingNumber: existingSession.meetingNumber,
+    billingMonth: newPeriod.billingMonth,
+    billingYear: newPeriod.billingYear
+  });
+
+  if (duplicateSession) {
+    return { success: false, message: `Meeting ${existingSession.meetingNumber} is already scheduled for this student in the selected month.` };
+  }
+
+  await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
+    { _id: recordId },
+    {
+      $set: {
+        sessionDate,
+        billingMonth: newPeriod.billingMonth,
+        billingYear: newPeriod.billingYear,
+        billingPeriod: newPeriod.billingPeriod,
+        sessionTime: startTime,
+        startTime,
+        endTime,
+        scheduledAt: getScheduledAt(sessionDate, startTime),
+        endsAt: getSessionEndAt(sessionDate, endTime),
+        status: "Scheduled",
+        updatedAt: new Date()
+      }
+    }
+  );
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/sessions");
+  revalidatePath("/teacher");
+  revalidatePath("/ceo");
+
+  return { success: true };
+}
+
 export async function markClassSessionCompletedByAttendance({
   studentId,
   meetingNumber,
