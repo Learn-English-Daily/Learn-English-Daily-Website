@@ -175,7 +175,6 @@ export async function saveStudentAttendance(formData: FormData) {
   const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
   const meetingDate = clean(formData.get("meetingDate"));
   const status = clean(formData.get("status")) as AttendanceStatus;
-  const notes = clean(formData.get("notes"));
 
   if (!studentId || !studentName || !courseJoined || !classType || !isClassMode(classMode) || !meetingNumber || !meetingDate || !isAttendanceStatus(status)) {
     throw new Error("Invalid attendance record");
@@ -210,12 +209,12 @@ export async function saveStudentAttendance(formData: FormData) {
         billingYear: period.billingYear,
         billingPeriod: period.billingPeriod,
         status,
-        notes,
         teacherIds,
         teacherNames,
         updatedAt: now
       },
       $setOnInsert: {
+        notes: "",
         createdAt: now
       }
     },
@@ -240,6 +239,8 @@ export async function saveStudentAttendance(formData: FormData) {
   revalidatePath("/admin/attendance");
   revalidatePath("/finance/payments");
   revalidatePath("/admin/sessions");
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/journals");
 }
 
 export async function updateStudentAttendance(formData: FormData) {
@@ -249,7 +250,6 @@ export async function updateStudentAttendance(formData: FormData) {
   const meetingDate = clean(formData.get("meetingDate"));
   const classMode = clean(formData.get("classMode"));
   const status = clean(formData.get("status")) as AttendanceStatus;
-  const notes = clean(formData.get("notes"));
 
   if (!ObjectId.isValid(id) || !meetingDate || !isClassMode(classMode) || !isAttendanceStatus(status)) {
     throw new Error("Invalid attendance update");
@@ -306,7 +306,6 @@ export async function updateStudentAttendance(formData: FormData) {
         classType,
         classMode,
         status,
-        notes,
         teacherIds,
         teacherNames,
         updatedAt: new Date()
@@ -333,4 +332,6 @@ export async function updateStudentAttendance(formData: FormData) {
   revalidatePath("/admin/attendance");
   revalidatePath("/finance/payments");
   revalidatePath("/admin/sessions");
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/journals");
 }

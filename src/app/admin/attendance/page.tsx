@@ -62,7 +62,6 @@ type AttendanceDocument = {
   billingYear?: number;
   billingPeriod?: string;
   status?: AttendanceStatus;
-  notes?: string;
   teacherIds?: string[];
   teacherNames?: string[];
   createdAt?: Date;
@@ -75,7 +74,6 @@ type Attendance = {
   billingPeriod: string;
   status: AttendanceStatus;
   classMode: string;
-  notes: string;
   teacherIds: string[];
   teacherNames: string[];
   createdAt: string;
@@ -189,7 +187,6 @@ async function getAttendance(studentId = "", showArchived = false, closedPeriodK
     billingPeriod: getRecordBillingPeriod(doc).billingPeriod,
     status: doc.status || "Present",
     classMode: doc.classMode || "Online",
-    notes: doc.notes || "",
     teacherIds: doc.teacherIds || [],
     teacherNames: doc.teacherNames || [],
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
@@ -445,10 +442,6 @@ export default async function AdminAttendancePage({
                     </select>
                   </Field>
                   <TeacherSelector teachers={teachers} selectedTeacherIds={prefillTeacherIds} />
-                  <label className="grid gap-2 text-sm font-semibold text-lead-navy md:col-span-2">
-                    Journal Notes
-                    <textarea name="notes" rows={8} className="focus-ring resize-y rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal leading-7 text-lead-navy" />
-                  </label>
                   <Button type="submit" size="lg" className="md:col-span-2">
                     <CalendarCheck className="h-4 w-4" />
                     Save Attendance
@@ -486,7 +479,6 @@ export default async function AdminAttendancePage({
                             {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                           </select>
                           <TeacherSelector teachers={teachers} selectedTeacherIds={record.teacherIds} compact />
-                          <textarea name="notes" rows={5} defaultValue={record.notes} placeholder="Journal notes" className="focus-ring resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-lead-navy sm:col-span-2" />
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
                         </ActionFeedbackForm>
                         ) : null}
