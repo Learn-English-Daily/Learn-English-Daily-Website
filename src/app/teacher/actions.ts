@@ -29,6 +29,7 @@ import {
   type AttendanceStatus
 } from "@/lib/attendance";
 import { getMongoDb } from "@/lib/mongodb";
+import { recordEmployeeLogin } from "@/lib/employee-login-audit";
 import { getStudentPaymentsCollectionName, getSuggestedPerMeetingPrice } from "@/lib/payments";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, isClassMode } from "@/lib/student-registration";
 import {
@@ -198,6 +199,8 @@ export async function loginTeacher(_: unknown, formData: FormData) {
   if (password !== teacherPassword) {
     return { error: "Invalid password." };
   }
+
+  await recordEmployeeLogin(db, teacher.id, "Teacher");
 
   const cookieStore = await cookies();
   const cookieOptions = {

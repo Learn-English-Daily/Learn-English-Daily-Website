@@ -10,6 +10,7 @@ import {
   getFinancePassword
 } from "@/lib/finance-auth";
 import { getFinanceEmployeeByUsername } from "@/lib/finance-employees";
+import { recordEmployeeLogin } from "@/lib/employee-login-audit";
 import { normalizeEmployeeUsername } from "@/lib/teachers";
 
 function clean(value: unknown) {
@@ -35,6 +36,8 @@ export async function loginFinance(_: unknown, formData: FormData) {
   if (password !== financePassword) {
     return { error: "Invalid password." };
   }
+
+  await recordEmployeeLogin(db, employee.id, "Finance");
 
   const cookieStore = await cookies();
   const cookieOptions = {

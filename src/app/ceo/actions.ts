@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { CEO_SESSION_COOKIE, createCeoSessionToken, createMasterCeoSessionToken, getCeoPassword } from "@/lib/ceo-auth";
 import { getMasterEmployeeByUsername, getMasterPassword } from "@/lib/master-auth";
+import { recordEmployeeLogin } from "@/lib/employee-login-audit";
 import { getMongoDb } from "@/lib/mongodb";
 import { normalizeEmployeeUsername } from "@/lib/teachers";
 
@@ -31,6 +32,8 @@ export async function loginCeo(_: unknown, formData: FormData) {
     if (password !== masterPassword) {
       return { error: "Invalid password." };
     }
+
+    await recordEmployeeLogin(db, master.id, "CEO");
 
     const cookieStore = await cookies();
     cookieStore.set(CEO_SESSION_COOKIE, createMasterCeoSessionToken(master.id, master.username), {

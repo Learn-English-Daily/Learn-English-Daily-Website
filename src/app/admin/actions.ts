@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_ID_COOKIE, ADMIN_SESSION_COOKIE, createAdminSessionToken, getAdminPassword } from "@/lib/admin-auth";
 import { getAdminEmployeeByUsername } from "@/lib/admin-employees";
+import { recordEmployeeLogin } from "@/lib/employee-login-audit";
 import { getMongoDb } from "@/lib/mongodb";
 import { normalizeEmployeeUsername } from "@/lib/teachers";
 
@@ -29,6 +30,8 @@ export async function loginAdmin(_: unknown, formData: FormData) {
   if (password !== adminPassword) {
     return { error: "Invalid password." };
   }
+
+  await recordEmployeeLogin(db, admin.id, "Admin");
 
   const cookieStore = await cookies();
   const cookieOptions = {
