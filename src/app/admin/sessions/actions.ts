@@ -150,37 +150,45 @@ export async function updateClassSession(formData: FormData) {
 
   const id = clean(formData.get("id"));
   const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
-  const sessionDate = clean(formData.get("sessionDate"));
   const classMode = clean(formData.get("classMode"));
-  const { startTime, endTime } = resolveSessionTimes(formData);
 
-  if (!ObjectId.isValid(id) || !meetingNumber || !sessionDate || !startTime || !endTime || !isClassMode(classMode)) {
+  if (!ObjectId.isValid(id) || !meetingNumber || !isClassMode(classMode)) {
     throw new Error("Invalid class session update");
   }
 
   const db = await getMongoDb();
+  const recordId = new ObjectId(id);
+  const existingSession = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({ _id: recordId });
+
+  if (!existingSession?.studentId || !existingSession.sessionDate) {
+    throw new Error("Class session not found");
+  }
+
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
-  const period = getBillingPeriodFromDate(sessionDate);
+  const period = getBillingPeriodFromDate(existingSession.sessionDate);
 
   if (await isBillingPeriodClosed(db, period)) {
     throw new Error("This month is closed. Finalized class sessions cannot be changed.");
   }
 
+  const duplicateSession = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({
+    _id: { $ne: recordId },
+    studentId: existingSession.studentId,
+    meetingNumber,
+    billingMonth: period.billingMonth,
+    billingYear: period.billingYear
+  });
+
+  if (duplicateSession) {
+    throw new Error(`Meeting ${meetingNumber} is already scheduled for this student in this month.`);
+  }
+
   await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
-    { _id: new ObjectId(id) },
+    { _id: recordId },
     {
       $set: {
         meetingNumber,
-        sessionDate,
-        billingMonth: period.billingMonth,
-        billingYear: period.billingYear,
-        billingPeriod: period.billingPeriod,
         classMode,
-        sessionTime: startTime,
-        startTime,
-        endTime,
-        scheduledAt: getScheduledAt(sessionDate, startTime),
-        endsAt: getSessionEndAt(sessionDate, endTime),
         teacherIds,
         teacherNames,
         updatedAt: new Date()
@@ -188,8 +196,14 @@ export async function updateClassSession(formData: FormData) {
     }
   );
 
+  await db.collection<GameSessionDocument>(getGameSessionsCollectionName()).updateMany(
+    { classSessionId: id },
+    { $set: { meetingNumber, updatedAt: new Date() } }
+  );
+
   revalidatePath("/admin");
   revalidatePath("/admin/sessions");
+  revalidatePath("/teacher");
   revalidatePath("/ceo");
 }
 

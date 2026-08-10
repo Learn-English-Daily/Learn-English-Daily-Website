@@ -495,21 +495,12 @@ export default async function AdminSessionsPage() {
                     <details className="mt-4 rounded-lg border border-slate-200 bg-slate-50">
                       <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-bold text-lead-blue [&::-webkit-details-marker]:hidden">
                         <Pencil className="h-4 w-4" />
-                        Edit class session
+                        Edit class details
                       </summary>
                       <ActionFeedbackForm action={updateClassSession} successMessage="Class session updated successfully." className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2">
                         <input type="hidden" name="id" value={session.id} />
                         <Field label="Meeting Number">
                           <input name="meetingNumber" type="number" min="1" required defaultValue={session.meetingNumber} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
-                        </Field>
-                        <Field label="Class Date (Indonesia)">
-                          <input name="sessionDate" type="date" required defaultValue={session.sessionDate} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
-                        </Field>
-                        <Field label="From Time (WIB)">
-                          <input name="startTime" type="time" required defaultValue={session.startTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
-                        </Field>
-                        <Field label="To Time (WIB)">
-                          <input name="endTime" type="time" required defaultValue={session.endTime} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
                         </Field>
                         <Field label="Class Mode">
                           <select name="classMode" required defaultValue={session.classMode} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy">
@@ -517,7 +508,8 @@ export default async function AdminSessionsPage() {
                           </select>
                         </Field>
                         <TeacherSelector teachers={teachers} selectedTeacherIds={session.teacherIds} compact />
-                        <Button type="submit" size="sm" className="sm:col-span-2">Update Class Session</Button>
+                        <p className="text-xs leading-5 text-lead-gray sm:col-span-2">To change the class date or time, use Reschedule class above so the change is tracked.</p>
+                        <Button type="submit" size="sm" className="sm:col-span-2 sm:w-fit">Update Class Details</Button>
                       </ActionFeedbackForm>
                     </details>
                   </div>
