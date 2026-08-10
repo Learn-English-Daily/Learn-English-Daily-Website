@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import type { WithId } from "mongodb";
-import { CalendarCheck, CircleHelp } from "lucide-react";
+import { CalendarCheck, ChevronDown, CircleHelp, History } from "lucide-react";
 import { TranslateJournalButton } from "@/components/parent/translate-journal-button";
 import { Card } from "@/components/ui/card";
 import { getMonthlyAssessmentsCollectionName, type AssessmentGrade } from "@/lib/assessments";
@@ -147,6 +147,26 @@ function currentJakartaMonth() {
   };
 }
 
+function jakartaDateKey(value = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(value);
+}
+
+function journalTopic(notes: string) {
+  const topicLine = notes
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => /^topic\s*:/i.test(line));
+
+  if (topicLine) return topicLine.replace(/^topic\s*:\s*/i, "") || "Journal notes";
+  const firstLine = notes.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "Journal notes";
+  return firstLine.length > 72 ? `${firstLine.slice(0, 69)}...` : firstLine;
+}
+
 function getCurrentPhaseAttendance(records: WithId<AttendanceDocument>[]) {
   const latestResetRecord = records.find((record) => record.meetingNumber === 1 && record.meetingDate);
 
@@ -243,6 +263,13 @@ export default async function ParentAttendancePortalPage({
   const cancelledCount = countStatus(attendance, "Cancelled");
   const countedMeetings = presentCount + lateCount + absentCount;
   const attendanceRate = countedMeetings ? Math.round(((presentCount + lateCount) / countedMeetings) * 100) : null;
+  const sevenDaysAgo = new Date(`${jakartaDateKey()}T00:00:00+07:00`);
+  sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 6);
+  const sevenDaysAgoKey = jakartaDateKey(sevenDaysAgo);
+  const todayKey = jakartaDateKey();
+  const previousWeekJournals = attendance
+    .slice(1)
+    .filter((record) => record.notes.trim() && record.meetingDate >= sevenDaysAgoKey && record.meetingDate <= todayKey);
 
   return (
     <main className="min-h-screen bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#fff7d6_100%)] px-4 py-8">
@@ -297,42 +324,74 @@ export default async function ParentAttendancePortalPage({
               </div>
             </div>
             {latestAttendance ? (
-              <article className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <div className="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-bold uppercase tracking-[0.12em] text-lead-gray">Meeting {latestAttendance.meetingNumber}</p>
-                      <p className="mt-2 font-heading text-2xl font-bold text-lead-navy">{formatDate(latestAttendance.meetingDate)}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className={`w-fit rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(latestAttendance.status)}`}>
-                        {latestAttendance.status}
-                      </span>
-                      <span className="w-fit rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">
-                        {latestAttendance.classMode}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm text-lead-gray">
-                    <span className="font-bold text-lead-navy">Teachers:</span> {latestAttendance.teacherNames.length ? latestAttendance.teacherNames.join(", ") : "Not assigned"}
-                  </p>
-                </div>
-                <div className="p-4 sm:p-5">
-                  <h3 className="font-heading text-lg font-bold text-lead-navy">Journal Notes</h3>
-                  {latestAttendance.notes ? (
-                    <>
-                      <p lang="en" className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-7 text-lead-gray">
-                        {latestAttendance.notes}
-                      </p>
-                      <div className="mt-5 border-t border-slate-100 pt-4">
-                        <TranslateJournalButton text={latestAttendance.notes} />
+              <div className="mt-5 grid gap-4">
+                <article className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                  <div className="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-[0.12em] text-lead-gray">Meeting {latestAttendance.meetingNumber}</p>
+                        <p className="mt-2 font-heading text-2xl font-bold text-lead-navy">{formatDate(latestAttendance.meetingDate)}</p>
                       </div>
-                    </>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`w-fit rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(latestAttendance.status)}`}>
+                          {latestAttendance.status}
+                        </span>
+                        <span className="w-fit rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">
+                          {latestAttendance.classMode}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm text-lead-gray">
+                      <span className="font-bold text-lead-navy">Teachers:</span> {latestAttendance.teacherNames.length ? latestAttendance.teacherNames.join(", ") : "Not assigned"}
+                    </p>
+                  </div>
+                  <div className="p-4 sm:p-5">
+                    <h3 className="font-heading text-lg font-bold text-lead-navy">Journal Notes</h3>
+                    {latestAttendance.notes ? (
+                      <>
+                        <p lang="en" className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-7 text-lead-gray">
+                          {latestAttendance.notes}
+                        </p>
+                        <div className="mt-5 border-t border-slate-100 pt-4">
+                          <TranslateJournalButton text={latestAttendance.notes} />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-3 text-sm text-lead-gray">No journal notes were added for this meeting.</p>
+                    )}
+                  </div>
+                </article>
+                <details className="group overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-lead-blue sm:p-5 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-lead-blue">
+                      <History className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <span>
+                      <span className="block font-heading text-base font-bold text-lead-navy">Previous Journals (Last 7 Days)</span>
+                      <span className="mt-0.5 block text-xs text-lead-gray">
+                        {previousWeekJournals.length
+                          ? `${previousWeekJournals.length} earlier ${previousWeekJournals.length === 1 ? "journal" : "journals"}`
+                          : "No earlier journals in this period"}
+                      </span>
+                    </span>
+                  </span>
+                  <ChevronDown className="h-5 w-5 shrink-0 text-lead-gray transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+
+                <div className="border-t border-slate-200 bg-slate-50/60 p-3 sm:p-4">
+                  {previousWeekJournals.length ? (
+                    <div className="grid gap-3">
+                      {previousWeekJournals.map((record, index) => (
+                        <PreviousJournal key={`${record.meetingDate}-${record.meetingNumber}-${index}`} attendance={record} />
+                      ))}
+                    </div>
                   ) : (
-                    <p className="mt-3 text-sm text-lead-gray">No journal notes were added for this meeting.</p>
+                    <p className="rounded-lg bg-white p-4 text-sm text-lead-gray">There are no previous journal notes from the last seven days.</p>
                   )}
                 </div>
-              </article>
+                </details>
+              </div>
             ) : (
               <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance has been marked yet.</p>
             )}
@@ -400,6 +459,30 @@ export default async function ParentAttendancePortalPage({
         </Card>
       </section>
     </main>
+  );
+}
+
+function PreviousJournal({ attendance }: { attendance: Attendance }) {
+  return (
+    <details className="group/journal overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-4 transition hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-lead-blue [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-heading text-sm font-extrabold text-lead-navy">Meeting {attendance.meetingNumber}</span>
+            <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${statusClassName(attendance.status)}`}>{attendance.status}</span>
+          </span>
+          <span className="mt-1 block text-xs font-semibold text-lead-gray">{formatDate(attendance.meetingDate)} / {attendance.teacherNames.join(", ") || "Teacher not assigned"}</span>
+          <span className="mt-2 block truncate text-sm text-lead-gray"><span className="font-bold text-lead-navy">Topic:</span> {journalTopic(attendance.notes)}</span>
+        </span>
+        <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-lead-gray transition-transform group-open/journal:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="border-t border-slate-100 p-4">
+        <p lang="en" className="whitespace-pre-wrap break-words text-[15px] leading-7 text-lead-gray">{attendance.notes}</p>
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <TranslateJournalButton text={attendance.notes} />
+        </div>
+      </div>
+    </details>
   );
 }
 
