@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import type { WithId } from "mongodb";
+import type { Filter, WithId } from "mongodb";
 import { CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookPen, Search, Users } from "lucide-react";
 import { generateTeacherGamesLink, logoutTeacher, saveTeacherAttendance, saveTeacherMonthlyAssessment } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
@@ -347,7 +347,7 @@ async function getAuthenticatedTeacher() {
 
 async function getTeacherPortalData(teacherId: string, month: number, year: number) {
   const db = await getMongoDb();
-  const [sessionDocs, attendanceDocs, gameSessionDocs, batchDocs, studentDocs, assessmentDocs] = await Promise.all([
+  const [sessionDocs, attendanceDocs, gameSessionDocs, batchDocs, studentDocs, assessmentDocs, journalMissingCount] = await Promise.all([
     db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
       .find({ teacherIds: teacherId })
@@ -388,7 +388,18 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
       .collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName())
       .find({ teacherId, month, year })
       .limit(2000)
-      .toArray() as Promise<WithId<AssessmentDocument>[]>
+      .toArray() as Promise<WithId<AssessmentDocument>[]>,
+    db
+      .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
+      .countDocuments({
+        teacherIds: teacherId,
+        $or: [
+          { notes: { $exists: false } },
+          { notes: null },
+          { notes: "" },
+          { notes: { $regex: "^\\s*$" } }
+        ]
+      } as Filter<AttendanceDocument>)
   ]);
   const attendanceKeys = new Set(
     attendanceDocs.map((doc) => {
@@ -485,6 +496,7 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
   return {
     sessions,
     recentAttendance,
+    journalMissingCount,
     students: Array.from(studentsById.values()).sort((a, b) => a.studentName.localeCompare(b.studentName)),
     batches: batchDocs.map((doc) => {
       const batchId = doc._id.toString();
@@ -633,10 +645,11 @@ export default async function TeacherPortalPage({
       </header>
 
       <section className="container-shell grid gap-6 py-8">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length} detail="Classes scheduled today" />
           <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={needsAttendance.length} detail="Today's classes waiting" tone="rose" />
           <TeacherKpi icon={CalendarCheck} label="Missed" value={missedSessions.length} detail="Past unmarked classes" tone="rose" />
+          <TeacherKpi icon={NotebookPen} label="Journal Missing" value={data.journalMissingCount} detail="Attendance records needing journal" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Recent Records" value={data.recentAttendance.length} detail="Your latest attendance entries" tone="blue" />
         </div>
 
