@@ -258,6 +258,12 @@ export async function rescheduleClassSession(formData: FormData) {
     { _id: recordId },
     {
       $set: {
+        originalSessionDate: existingSession.originalSessionDate || existingSession.sessionDate || "",
+        originalStartTime: existingSession.originalStartTime || existingSession.startTime || existingSession.sessionTime || "",
+        originalEndTime: existingSession.originalEndTime || existingSession.endTime || "",
+        rescheduledFromDate: existingSession.sessionDate || "",
+        rescheduledFromStartTime: existingSession.startTime || existingSession.sessionTime || "",
+        rescheduledFromEndTime: existingSession.endTime || "",
         sessionDate,
         billingMonth: newPeriod.billingMonth,
         billingYear: newPeriod.billingYear,
@@ -268,8 +274,10 @@ export async function rescheduleClassSession(formData: FormData) {
         scheduledAt: getScheduledAt(sessionDate, startTime),
         endsAt: getSessionEndAt(sessionDate, endTime),
         status: "Scheduled",
+        rescheduledAt: new Date(),
         updatedAt: new Date()
-      }
+      },
+      $inc: { rescheduleCount: 1 }
     }
   );
 

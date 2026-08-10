@@ -23,6 +23,14 @@ export type ClassSessionDocument = {
   teacherNames?: string[];
   status?: ClassSessionStatus;
   attendanceId?: string;
+  originalSessionDate?: string;
+  originalStartTime?: string;
+  originalEndTime?: string;
+  rescheduledFromDate?: string;
+  rescheduledFromStartTime?: string;
+  rescheduledFromEndTime?: string;
+  rescheduleCount?: number;
+  rescheduledAt?: Date;
   completedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;

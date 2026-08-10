@@ -89,6 +89,11 @@ type ClassSession = {
   teacherIds: string[];
   teacherNames: string[];
   status: ComputedClassSessionStatus;
+  rescheduled: boolean;
+  rescheduleCount: number;
+  rescheduledFromDate: string;
+  rescheduledFromStartTime: string;
+  rescheduledFromEndTime: string;
   gameLink: GameLink | null;
 };
 
@@ -189,6 +194,11 @@ async function getSessions(): Promise<ClassSession[]> {
       endsAt: doc.endsAt || "",
       teacherIds: doc.teacherIds || [],
       teacherNames: doc.teacherNames || [],
+      rescheduled: Boolean(doc.rescheduledAt || doc.rescheduleCount),
+      rescheduleCount: doc.rescheduleCount || 0,
+      rescheduledFromDate: doc.rescheduledFromDate || "",
+      rescheduledFromStartTime: doc.rescheduledFromStartTime || "",
+      rescheduledFromEndTime: doc.rescheduledFromEndTime || "",
       status: getComputedClassSessionStatus({
         status: doc.status,
         scheduledAt: doc.scheduledAt,
@@ -407,6 +417,9 @@ export default async function AdminSessionsPage() {
                         <h3 className="font-heading text-lg font-bold text-lead-navy">{session.studentName}</h3>
                         <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{session.studentId}</span>
                         <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(session.status)}`}>{session.status}</span>
+                        {session.rescheduled ? (
+                          <span className="rounded-lg bg-violet-50 px-3 py-1 text-xs font-bold uppercase text-violet-700">Rescheduled</span>
+                        ) : null}
                       </div>
                       <p className="mt-2 text-sm font-semibold text-lead-gray">
                         Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
@@ -415,6 +428,12 @@ export default async function AdminSessionsPage() {
                       <p className="mt-1 text-sm text-lead-gray">
                         <span className="font-bold text-lead-navy">Teachers:</span> {session.teacherNames.length ? session.teacherNames.join(", ") : "Not assigned"}
                       </p>
+                      {session.rescheduled ? (
+                        <p className="mt-2 rounded-lg bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700">
+                          Moved from {formatDate(session.rescheduledFromDate)} / {session.rescheduledFromStartTime || "Time not set"}{session.rescheduledFromEndTime ? ` - ${session.rescheduledFromEndTime}` : ""} WIB
+                          {session.rescheduleCount > 1 ? ` / Rescheduled ${session.rescheduleCount} times` : ""}
+                        </p>
+                      ) : null}
                       <div className="mt-4">
                         <GchatSessionMessage
                           studentName={session.studentName}
