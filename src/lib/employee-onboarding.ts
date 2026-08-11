@@ -14,6 +14,14 @@ export function getEmployeeOnboardingCollectionName() {
   return process.env.MONGODB_EMPLOYEE_ONBOARDING_COLLECTION || "employee_onboarding";
 }
 
+export function getEmployeeIdCountersCollectionName() {
+  return process.env.MONGODB_EMPLOYEE_ID_COUNTERS_COLLECTION || "employee_id_counters";
+}
+
+export function formatEmployeeId(sequence: number) {
+  return `EMP${String(sequence).padStart(3, "0")}`;
+}
+
 export function isEmployeeRole(value: string): value is EmployeeRole {
   return employeeRoleOptions.includes(value as EmployeeRole);
 }

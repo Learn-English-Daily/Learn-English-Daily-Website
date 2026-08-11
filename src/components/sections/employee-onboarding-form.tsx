@@ -17,6 +17,7 @@ const inputClass =
 export function EmployeeOnboardingForm() {
   const [sent, setSent] = useState(false);
   const [generatedUsername, setGeneratedUsername] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,6 +26,7 @@ export function EmployeeOnboardingForm() {
     const form = event.currentTarget;
     setSent(false);
     setGeneratedUsername("");
+    setEmployeeId("");
     setError("");
     setSubmitting(true);
 
@@ -67,13 +69,14 @@ export function EmployeeOnboardingForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const result = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; username?: string } | null;
+      const result = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; employeeId?: string; username?: string } | null;
 
       if (!response.ok || !result?.ok) {
         throw new Error(result?.error || "Unable to submit right now. Please try again.");
       }
 
       form.reset();
+      setEmployeeId(result.employeeId || "");
       setGeneratedUsername(result.username || "");
       setSent(true);
     } catch (submitError) {
@@ -156,6 +159,7 @@ export function EmployeeOnboardingForm() {
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             Thank you. Your employee onboarding form has been submitted to LEAD.
+            {employeeId ? <span className="block text-lead-navy">Your employee ID: {employeeId}</span> : null}
             {generatedUsername ? <span className="block text-lead-navy">Your username: {generatedUsername}</span> : null}
           </span>
         </p>

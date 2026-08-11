@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   getEmployeeOnboardingCollectionName,
+  getEmployeeIdCountersCollectionName,
+  formatEmployeeId,
   isEmployeeEmploymentType,
   isEmployeeGender,
   isEmployeeRole,
@@ -73,6 +75,16 @@ function isValidDate(value: string) {
 
 function isValidEmployeeUsername(value: string) {
   return /^[a-z0-9._-]{3,40}$/.test(value);
+}
+
+async function getNextEmployeeId(db: Awaited<ReturnType<typeof getMongoDb>>) {
+  const counter = await db.collection<{ _id: string; seq: number }>(getEmployeeIdCountersCollectionName()).findOneAndUpdate(
+    { _id: "EMP" },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: "after" }
+  );
+
+  return formatEmployeeId(counter?.seq || 1);
 }
 
 function slugifyUsername(value: string) {
@@ -200,15 +212,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Unable to generate a valid username. Please check the employee name." }, { status: 400 });
     }
 
-    const result = await db.collection(getEmployeeOnboardingCollectionName()).insertOne({
+    const collection = db.collection(getEmployeeOnboardingCollectionName());
+    await collection.createIndex({ employeeId: 1 }, { unique: true, sparse: true, name: "unique_employee_id" });
+    const employeeId = await getNextEmployeeId(db);
+
+    const result = await collection.insertOne({
       ...employee,
+      employeeId,
+      employeeIdAssignedAt: now,
       username,
       status: "submitted",
       createdAt: now,
       updatedAt: now
     });
 
-    return NextResponse.json({ ok: true, id: result.insertedId.toString(), username }, { status: 201 });
+    return NextResponse.json({ ok: true, id: result.insertedId.toString(), employeeId, username }, { status: 201 });
   } catch (error) {
     console.error("Employee onboarding insert failed", error);
     return NextResponse.json({ ok: false, error: "Unable to submit right now. Please try again." }, { status: 500 });
