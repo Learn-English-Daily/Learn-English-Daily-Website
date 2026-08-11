@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
+import { getClassSessionsCollectionName } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { refreshUnpaidStudentPaymentPricing } from "@/lib/payment-pricing";
 import { generateParentAccessToken } from "@/lib/parent-access";
@@ -138,15 +139,36 @@ export async function updateStudentRegistration(formData: FormData) {
     }
   );
 
+  const currentStudentId = upgradedStudentId || existingRegistration?.studentId || "";
+
   await refreshUnpaidStudentPaymentPricing(db, {
-    studentId: upgradedStudentId || existingRegistration?.studentId || "",
+    studentId: currentStudentId,
     studentName: registration.studentName,
     courseJoined: registration.courseJoined,
     classType: registration.classType,
     classMode: registration.classMode
   });
 
+  if (currentStudentId) {
+    const now = new Date();
+    await db.collection(getClassSessionsCollectionName()).updateMany(
+      { studentId: currentStudentId, status: { $ne: "Completed" } },
+      {
+        $set: {
+          studentName: registration.studentName,
+          courseJoined: registration.courseJoined,
+          classType: registration.classType,
+          classMode: registration.classMode,
+          studentProfileSyncedAt: now,
+          updatedAt: now
+        }
+      }
+    );
+  }
+
   revalidatePath("/admin/students");
+  revalidatePath("/admin/sessions");
+  revalidatePath("/teacher");
   revalidatePath("/admin/students/trials");
   revalidatePath("/finance/payments");
   revalidatePath("/ceo");
