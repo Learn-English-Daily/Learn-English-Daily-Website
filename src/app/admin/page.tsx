@@ -232,7 +232,7 @@ export default async function AdminDashboardPage() {
               <h2 className="font-heading text-xl font-extrabold text-lead-navy">Quick actions</h2>
               <div className="mt-4 grid gap-3">
                 <QuickAction href="/admin/sessions" label="Schedule class" icon={CalendarClock} />
-                <QuickAction href="/admin/attendance" label="Mark attendance" icon={CalendarCheck} />
+                <QuickAction href="/admin/attendance" label="Monitor attendance" icon={CalendarCheck} />
                 <QuickAction href="/admin/students" label="View students" icon={Users} />
                 <QuickAction href="/admin/inquiries" label="View inquiries" icon={Inbox} />
               </div>

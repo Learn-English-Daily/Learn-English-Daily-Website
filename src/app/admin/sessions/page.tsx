@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarClock, CalendarCheck, Gamepad2, Pencil, Trash2 } from "lucide-react";
+import { CalendarClock, Gamepad2, Pencil, Trash2 } from "lucide-react";
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -248,25 +248,6 @@ function statusClassName(status: ComputedClassSessionStatus) {
   return "bg-blue-50 text-lead-blue";
 }
 
-function attendanceHref(session: ClassSession) {
-  const params = new URLSearchParams({
-    studentId: session.studentId,
-    meetingNumber: String(session.meetingNumber),
-    meetingDate: session.sessionDate
-  });
-  params.set("classMode", session.classMode);
-
-  for (const teacherId of session.teacherIds) {
-    params.append("teacherIds", teacherId);
-  }
-
-  return `/admin/attendance?${params.toString()}`;
-}
-
-function canMarkAttendance(session: ClassSession, today: string) {
-  return Boolean(session.sessionDate) && session.sessionDate <= today;
-}
-
 function expiresAt(endsAt: string, scheduledAt: string) {
   const date = endsAt ? new Date(endsAt) : scheduledAt ? new Date(scheduledAt) : new Date();
   date.setHours(date.getHours() + 3);
@@ -407,8 +388,6 @@ export default async function AdminSessionsPage() {
 
           <div className="mt-5 grid gap-4">
             {sessions.map((session) => {
-              const attendanceAvailable = canMarkAttendance(session, today);
-
               return (
                 <div key={session.id} className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
@@ -447,13 +426,16 @@ export default async function AdminSessionsPage() {
                         <ClassGamePanel classSessionId={session.id} link={session.gameLink} />
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {attendanceAvailable ? (
-                          <Button asChild size="sm" variant="primary">
-                            <a href={attendanceHref(session)}>
-                              <CalendarCheck className="h-4 w-4" />
-                              Mark Attendance
-                            </a>
-                          </Button>
+                        {session.status === "Needs Attendance" ? (
+                          <span className="inline-flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">
+                            <CalendarClock className="h-4 w-4" />
+                            Waiting for teacher attendance
+                          </span>
+                        ) : session.sessionDate <= today ? (
+                          <span className="inline-flex items-center gap-2 rounded-lg border border-yellow-100 bg-yellow-50 px-3 py-2 text-sm font-bold text-yellow-800">
+                            <CalendarClock className="h-4 w-4" />
+                            Teacher attendance opens after class
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue">
                             <CalendarClock className="h-4 w-4" />
