@@ -19,6 +19,7 @@ import {
   getStudentRegistrationCollectionName,
   learningGoalOptions
 } from "@/lib/student-registration";
+import type { CourseHistoryEntry } from "@/lib/student-registration";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ type StudentRegistrationDocument = {
   learningGoal?: string;
   countryCity?: string;
   locale?: string;
+  courseHistory?: CourseHistoryEntry[];
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -67,6 +69,14 @@ type StudentRegistration = {
   locale: string;
   createdAt: string;
   updatedAt: string;
+  courseHistory: Array<{
+    fromCourse: string;
+    toCourse: string;
+    changedAt: string;
+    changedByName: string;
+    changedByUsername: string;
+    source: CourseHistoryEntry["source"];
+  }>;
 };
 
 async function getStudentRegistration(id: string): Promise<StudentRegistration | null> {
@@ -100,7 +110,17 @@ async function getStudentRegistration(id: string): Promise<StudentRegistration |
     countryCity: doc.countryCity || "",
     locale: doc.locale || "en",
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : "",
-    updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : ""
+    updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : "",
+    courseHistory: (doc.courseHistory || [])
+      .map((entry) => ({
+        fromCourse: entry.fromCourse || "",
+        toCourse: entry.toCourse || "",
+        changedAt: entry.changedAt ? new Date(entry.changedAt).toISOString() : "",
+        changedByName: entry.changedByName || "System",
+        changedByUsername: entry.changedByUsername || "",
+        source: entry.source || "data-backfill"
+      }))
+      .sort((a, b) => b.changedAt.localeCompare(a.changedAt))
   };
 }
 
@@ -281,6 +301,37 @@ export default async function EditStudentRegistrationPage({
               </Button>
             </div>
           </form>
+
+          <div className="mt-8 border-t border-slate-200 pt-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Course History</h2>
+                <p className="mt-1 text-sm text-lead-gray">Permanent record of course changes. This history cannot be edited from the form.</p>
+              </div>
+              <span className="w-fit rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">
+                {registration.courseHistory.length} change{registration.courseHistory.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {registration.courseHistory.map((entry, index) => (
+                <div key={`${entry.changedAt}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <p className="font-heading font-bold text-lead-navy">
+                      {entry.fromCourse || "Not set"} <span className="px-1 text-lead-blue">to</span> {entry.toCourse || "Not set"}
+                    </p>
+                    <span className="text-xs font-semibold text-lead-gray">{formatDate(entry.changedAt)} WIB</span>
+                  </div>
+                  <p className="mt-2 text-xs text-lead-gray">
+                    Changed by <span className="font-bold text-lead-navy">{entry.changedByName}</span>
+                    {entry.changedByUsername ? ` (${entry.changedByUsername})` : ""}
+                  </p>
+                </div>
+              ))}
+              {!registration.courseHistory.length ? (
+                <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No course changes recorded yet.</p>
+              ) : null}
+            </div>
+          </div>
         </Card>
       </section>
     </main>

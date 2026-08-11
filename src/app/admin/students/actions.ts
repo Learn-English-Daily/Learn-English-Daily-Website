@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
-import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isValidAdminSession } from "@/lib/admin-auth";
 import { getClassSessionsCollectionName } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { refreshUnpaidStudentPaymentPricing } from "@/lib/payment-pricing";
@@ -17,8 +17,17 @@ import {
   isCourseJoined,
   isEnglishLevel,
   isLearningGoal,
-  isTrialCourse
+  isTrialCourse,
+  type CourseHistoryEntry
 } from "@/lib/student-registration";
+
+type EditableStudentDocument = {
+  studentId?: string;
+  studentIdType?: string;
+  courseJoined?: string;
+  courseHistory?: CourseHistoryEntry[];
+  [key: string]: unknown;
+};
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -54,14 +63,17 @@ async function getNextStudentId(prefix: "STU" | "TR") {
 async function assertAdmin() {
   const cookieStore = await cookies();
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const admin = isAuthenticated ? await getAuthenticatedAdmin() : null;
 
-  if (!isAuthenticated) {
+  if (!admin) {
     throw new Error("Unauthorized");
   }
+
+  return admin;
 }
 
 export async function updateStudentRegistration(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
 
   const id = clean(formData.get("id"));
   const registration = {
@@ -104,11 +116,7 @@ export async function updateStudentRegistration(formData: FormData) {
   }
 
   const db = await getMongoDb();
-  const collection = db.collection<{
-    studentId?: string;
-    studentIdType?: string;
-    courseJoined?: string;
-  }>(getStudentRegistrationCollectionName());
+  const collection = db.collection<EditableStudentDocument>(getStudentRegistrationCollectionName());
   const existingRegistration = await collection.findOne({ _id: new ObjectId(id) });
   const isJoiningCourse = !isTrialCourse(registration.courseJoined);
   const wasTrial =
@@ -116,11 +124,27 @@ export async function updateStudentRegistration(formData: FormData) {
     existingRegistration?.courseJoined === "Trial Class" ||
     /^TR/i.test(existingRegistration?.studentId || "");
   const upgradedStudentId = wasTrial && isJoiningCourse ? await getNextStudentId("STU") : "";
+  const courseChanged = Boolean(
+    existingRegistration?.courseJoined && existingRegistration.courseJoined !== registration.courseJoined
+  );
+  const now = new Date();
+  const courseHistoryEntry: CourseHistoryEntry | null = courseChanged
+    ? {
+        fromCourse: existingRegistration?.courseJoined || "",
+        toCourse: registration.courseJoined,
+        changedAt: now,
+        changedByEmployeeId: admin.id,
+        changedByName: admin.name,
+        changedByUsername: admin.username,
+        source: "admin-update"
+      }
+    : null;
 
-  await db.collection(getStudentRegistrationCollectionName()).updateOne(
+  await collection.updateOne(
     { _id: new ObjectId(id) },
-    {
-      $set: {
+    [
+      {
+        $set: {
         ...registration,
         ...(upgradedStudentId
           ? {
@@ -129,14 +153,18 @@ export async function updateStudentRegistration(formData: FormData) {
               previousStudentId: existingRegistration?.studentId || "",
               upgradedToStudentId: upgradedStudentId,
               upgradedFromTrial: true,
-              upgradedAt: new Date()
+              upgradedAt: now
             }
           : {
               studentIdType: isJoiningCourse ? "student" : existingRegistration?.studentIdType || "trial"
             }),
-        updatedAt: new Date()
+          updatedAt: now,
+          ...(courseHistoryEntry
+            ? { courseHistory: { $concatArrays: [{ $ifNull: ["$courseHistory", []] }, [courseHistoryEntry]] } }
+            : {})
+        }
       }
-    }
+    ]
   );
 
   const currentStudentId = upgradedStudentId || existingRegistration?.studentId || "";
@@ -150,7 +178,6 @@ export async function updateStudentRegistration(formData: FormData) {
   });
 
   if (currentStudentId) {
-    const now = new Date();
     await db.collection(getClassSessionsCollectionName()).updateMany(
       { studentId: currentStudentId, status: { $ne: "Completed" } },
       {

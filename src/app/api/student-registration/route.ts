@@ -11,7 +11,8 @@ import {
   isCourseJoined,
   isEnglishLevel,
   isLearningGoal,
-  isTrialCourse
+  isTrialCourse,
+  type CourseHistoryEntry
 } from "@/lib/student-registration";
 
 export const runtime = "nodejs";
@@ -36,8 +37,11 @@ type StudentRegistrationPayload = {
 };
 
 type ExistingTrialRegistration = {
-  _id: ObjectId;
+  _id?: ObjectId;
   studentId?: string;
+  courseJoined?: string;
+  courseHistory?: CourseHistoryEntry[];
+  [key: string]: unknown;
 };
 
 function clean(value: unknown) {
@@ -137,7 +141,7 @@ export async function POST(request: Request) {
 
   try {
     const db = await getMongoDb();
-    const collection = db.collection(getStudentRegistrationCollectionName());
+    const collection = db.collection<ExistingTrialRegistration>(getStudentRegistrationCollectionName());
     const now = new Date();
     const joinedStudent = !isTrialCourse(registration.courseJoined);
     const studentId = await getNextStudentId(joinedStudent ? "STU" : "TR");
@@ -158,17 +162,29 @@ export async function POST(request: Request) {
     };
 
     if (existingTrial) {
+      const courseHistoryEntry: CourseHistoryEntry = {
+        fromCourse: existingTrial.courseJoined || "Trial Class",
+        toCourse: registration.courseJoined,
+        changedAt: now,
+        changedByEmployeeId: "",
+        changedByName: "Student registration",
+        changedByUsername: "self-service",
+        source: "trial-upgrade"
+      };
       await collection.updateOne(
         { _id: existingTrial._id },
-        {
-          $set: {
-            ...savedRegistration,
-            previousStudentId: existingTrial.studentId || "",
-            upgradedToStudentId: studentId,
-            upgradedFromTrial: true,
-            upgradedAt: now
+        [
+          {
+            $set: {
+              ...savedRegistration,
+              previousStudentId: existingTrial.studentId || "",
+              upgradedToStudentId: studentId,
+              upgradedFromTrial: true,
+              upgradedAt: now,
+              courseHistory: { $concatArrays: [{ $ifNull: ["$courseHistory", []] }, [courseHistoryEntry]] }
+            }
           }
-        }
+        ]
       );
       await notifyNewStudentRegistration(savedRegistration).catch((notificationError) => {
         console.error("Student registration admin notification failed", notificationError);

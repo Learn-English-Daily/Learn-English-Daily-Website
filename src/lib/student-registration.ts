@@ -10,6 +10,16 @@ export type ClassMode = (typeof classModeOptions)[number];
 export type EnglishLevel = (typeof englishLevelOptions)[number];
 export type LearningGoal = (typeof learningGoalOptions)[number];
 
+export type CourseHistoryEntry = {
+  fromCourse: string;
+  toCourse: string;
+  changedAt: Date;
+  changedByEmployeeId: string;
+  changedByName: string;
+  changedByUsername: string;
+  source: "admin-update" | "trial-upgrade" | "data-backfill";
+};
+
 export function getStudentRegistrationCollectionName() {
   return process.env.MONGODB_STUDENTS_COLLECTION || "student_registrations";
 }
