@@ -1,6 +1,7 @@
 import {
   CalendarCheck,
   CalendarClock,
+  Layers3,
   Gauge,
   Inbox,
   MessageSquareText,
@@ -22,6 +23,7 @@ const adminNavItems: Array<{
   { key: "sessions", label: "Sessions", href: "/admin/sessions", helper: "Class schedule", icon: CalendarClock },
   { key: "attendance", label: "Attendance", href: "/admin/attendance", helper: "Meeting records", icon: CalendarCheck },
   { key: "students", label: "Students", href: "/admin/students", helper: "Registrations", icon: Users },
+  { key: "batches", label: "Batches", href: "/admin/batches", helper: "Group classes", icon: Layers3 },
   { key: "reviews", label: "Reviews", href: "/admin/reviews", helper: "Testimonials", icon: Star }
 ];
 
@@ -64,7 +66,7 @@ export function AdminPageHeader({
           </form>
         </div>
 
-        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Admin navigation">
+        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7" aria-label="Admin navigation">
           {adminNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;
