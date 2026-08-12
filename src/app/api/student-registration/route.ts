@@ -3,6 +3,7 @@ import type { ObjectId } from "mongodb";
 import { notifyNewStudentRegistration } from "@/lib/admin-notifications";
 import { getMongoDb } from "@/lib/mongodb";
 import { generateParentAccessToken } from "@/lib/parent-access";
+import { isValidDateOfBirth } from "@/lib/student-age";
 import {
   getStudentIdCountersCollectionName,
   getStudentRegistrationCollectionName,
@@ -22,7 +23,7 @@ type StudentRegistrationPayload = {
   whatsapp?: string;
   email?: string;
   parentName?: string;
-  age?: string;
+  dateOfBirth?: string;
   grade?: string;
   preferredSchedule?: string;
   preferredTime?: string;
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
     email: clean(payload.email).toLowerCase(),
     normalizedWhatsapp: normalizeWhatsapp(clean(payload.whatsapp)),
     parentName: clean(payload.parentName),
-    age: clean(payload.age),
+    dateOfBirth: clean(payload.dateOfBirth),
     grade: clean(payload.grade),
     preferredSchedule: clean(payload.preferredSchedule),
     preferredTime: clean(payload.preferredTime),
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
     !isReasonableShortText(registration.whatsapp) ||
     !isValidEmail(registration.email) ||
     !isReasonableShortText(registration.parentName) ||
-    !isReasonableShortText(registration.age, 20) ||
+    !isValidDateOfBirth(registration.dateOfBirth) ||
     !isReasonableShortText(registration.grade, 60) ||
     !isReasonableShortText(registration.preferredSchedule) ||
     !isReasonableShortText(registration.preferredTime)

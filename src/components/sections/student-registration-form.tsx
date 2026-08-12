@@ -5,6 +5,7 @@ import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/content";
 import { classModeOptions, classTypeOptions, courseJoinedOptions, englishLevelOptions, learningGoalOptions } from "@/lib/student-registration";
+import { getTodayInJakarta } from "@/lib/student-age";
 
 const copy = {
   en: {
@@ -19,7 +20,7 @@ const copy = {
       whatsapp: "WhatsApp Number",
       email: "Email Address",
       parentName: "Parent Name",
-      age: "Age",
+      dateOfBirth: "Date of Birth",
       grade: "Grade",
       preferredSchedule: "Preferred Schedule",
       preferredTime: "Preferred Time",
@@ -51,7 +52,7 @@ const copy = {
       whatsapp: "Nomor WhatsApp",
       email: "Alamat Email",
       parentName: "Nama Orang Tua",
-      age: "Usia",
+      dateOfBirth: "Tanggal Lahir",
       grade: "Kelas",
       preferredSchedule: "Jadwal yang Diinginkan",
       preferredTime: "Waktu yang Diinginkan",
@@ -92,7 +93,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
       whatsapp: String(formData.get("whatsapp") || ""),
       email: String(formData.get("email") || ""),
       parentName: String(formData.get("parentName") || ""),
-      age: String(formData.get("age") || ""),
+      dateOfBirth: String(formData.get("dateOfBirth") || ""),
       grade: String(formData.get("grade") || ""),
       preferredSchedule: String(formData.get("preferredSchedule") || ""),
       preferredTime: String(formData.get("preferredTime") || ""),
@@ -134,7 +135,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
         <TextField name="whatsapp" label={text.fields.whatsapp} requiredText={text.required} placeholder={text.placeholders.whatsapp} required />
         <TextField name="email" label={text.fields.email} requiredText={text.required} placeholder={text.placeholders.email} type="email" required />
         <TextField name="parentName" label={text.fields.parentName} requiredText={text.required} required />
-        <TextField name="age" label={text.fields.age} requiredText={text.required} inputMode="numeric" required />
+        <TextField name="dateOfBirth" label={text.fields.dateOfBirth} requiredText={text.required} type="date" max={getTodayInJakarta()} required />
         <TextField name="grade" label={text.fields.grade} requiredText={text.required} placeholder={text.placeholders.grade} required />
         <TextField name="preferredSchedule" label={text.fields.preferredSchedule} requiredText={text.required} placeholder={text.placeholders.preferredSchedule} required />
         <TextField name="preferredTime" label={text.fields.preferredTime} requiredText={text.required} placeholder={text.placeholders.preferredTime} required />
@@ -170,7 +171,7 @@ function TextField({
   required,
   requiredText,
   placeholder,
-  inputMode,
+  max,
   type = "text"
 }: {
   name: string;
@@ -178,8 +179,8 @@ function TextField({
   required?: boolean;
   requiredText?: string;
   placeholder?: string;
-  inputMode?: "numeric";
-  type?: "email" | "text";
+  max?: string;
+  type?: "date" | "email" | "text";
 }) {
   return (
     <label className="grid gap-2 text-sm font-semibold text-lead-navy">
@@ -191,7 +192,7 @@ function TextField({
         name={name}
         type={type}
         placeholder={placeholder}
-        inputMode={inputMode}
+        max={max}
         className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy"
       />
     </label>

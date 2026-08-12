@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { getStudentAgeLabel } from "@/lib/student-age";
 import { getClassSessionsCollectionName } from "@/lib/class-sessions";
 import { getAttendanceReminders } from "@/lib/attendance-reminders";
 import { getStudentAttendanceCollectionName } from "@/lib/attendance";
@@ -39,6 +40,7 @@ type StudentRegistrationDocument = {
   email?: string;
   parentName?: string;
   age?: string;
+  dateOfBirth?: string;
   grade?: string;
   preferredSchedule?: string;
   preferredTime?: string;
@@ -66,6 +68,7 @@ type StudentRegistration = {
   email: string;
   parentName: string;
   age: string;
+  dateOfBirth: string;
   grade: string;
   preferredSchedule: string;
   preferredTime: string;
@@ -118,6 +121,7 @@ async function getStudentRegistration(id: string): Promise<StudentRegistration |
     email: doc.email || "",
     parentName: doc.parentName || "",
     age: doc.age || "",
+    dateOfBirth: doc.dateOfBirth || "",
     grade: doc.grade || "",
     preferredSchedule: doc.preferredSchedule || "",
     preferredTime: doc.preferredTime || "",
@@ -306,8 +310,11 @@ export default async function EditStudentRegistrationPage({
             <Field label="Parent Name">
               <input name="parentName" required defaultValue={registration.parentName} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
             </Field>
-            <Field label="Age">
-              <input name="age" required defaultValue={registration.age} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+            <Field label="Date of Birth">
+              <input name="dateOfBirth" type="date" max={todayWib} defaultValue={registration.dateOfBirth} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+              <span className="text-xs font-medium text-lead-gray">
+                Current age: {getStudentAgeLabel(registration.dateOfBirth, registration.age)}{!registration.dateOfBirth ? ". Add DOB when available; the stored legacy age is preserved." : ""}
+              </span>
             </Field>
             <Field label="Grade">
               <input name="grade" required defaultValue={registration.grade} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />

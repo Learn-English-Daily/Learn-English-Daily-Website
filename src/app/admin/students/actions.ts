@@ -9,6 +9,7 @@ import { getClassSessionsCollectionName } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { refreshUnpaidStudentPaymentPricing } from "@/lib/payment-pricing";
 import { generateParentAccessToken } from "@/lib/parent-access";
+import { isValidDateOfBirth } from "@/lib/student-age";
 import {
   getStudentIdCountersCollectionName,
   getStudentRegistrationCollectionName,
@@ -87,7 +88,7 @@ export async function updateStudentRegistration(formData: FormData) {
     email: clean(formData.get("email")).toLowerCase(),
     normalizedWhatsapp: normalizeWhatsapp(clean(formData.get("whatsapp"))),
     parentName: clean(formData.get("parentName")),
-    age: clean(formData.get("age")),
+    dateOfBirth: clean(formData.get("dateOfBirth")),
     grade: clean(formData.get("grade")),
     preferredSchedule: clean(formData.get("preferredSchedule")),
     preferredTime: clean(formData.get("preferredTime")),
@@ -106,7 +107,7 @@ export async function updateStudentRegistration(formData: FormData) {
     !isReasonableShortText(registration.whatsapp) ||
     !isValidEmail(registration.email) ||
     !isReasonableShortText(registration.parentName) ||
-    !isReasonableShortText(registration.age, 20) ||
+    (registration.dateOfBirth !== "" && !isValidDateOfBirth(registration.dateOfBirth)) ||
     !isReasonableShortText(registration.grade, 60) ||
     !isReasonableShortText(registration.preferredSchedule) ||
     !isReasonableShortText(registration.preferredTime) ||

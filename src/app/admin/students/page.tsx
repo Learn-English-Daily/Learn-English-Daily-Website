@@ -9,6 +9,7 @@ import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { getStudentAgeLabel } from "@/lib/student-age";
 import {
   getActiveStudentFilter,
   getInactiveStudentFilter,
@@ -29,6 +30,7 @@ type StudentRegistrationDocument = {
   normalizedWhatsapp?: string;
   parentName?: string;
   age?: string;
+  dateOfBirth?: string;
   grade?: string;
   preferredSchedule?: string;
   preferredTime?: string;
@@ -54,6 +56,7 @@ type StudentRegistration = {
   email: string;
   parentName: string;
   age: string;
+  dateOfBirth: string;
   grade: string;
   preferredSchedule: string;
   preferredTime: string;
@@ -90,6 +93,7 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode): 
           "normalizedWhatsapp",
           "parentName",
           "age",
+          "dateOfBirth",
           "grade",
           "preferredSchedule",
           "preferredTime",
@@ -124,6 +128,7 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode): 
     email: doc.email || "",
     parentName: doc.parentName || "",
     age: doc.age || "",
+    dateOfBirth: doc.dateOfBirth || "",
     grade: doc.grade || "",
     preferredSchedule: doc.preferredSchedule || "",
     preferredTime: doc.preferredTime || "",
@@ -331,7 +336,8 @@ export default async function AdminStudentsPage({
                   </div>
                 </div>
                 <div className="mt-5 grid gap-3 text-sm text-lead-gray md:grid-cols-2 lg:grid-cols-4">
-                  <p><span className="font-bold text-lead-navy">Age:</span> {registration.age}</p>
+                  <p><span className="font-bold text-lead-navy">Date of Birth:</span> {registration.dateOfBirth || "Not recorded"}</p>
+                  <p><span className="font-bold text-lead-navy">Age:</span> {getStudentAgeLabel(registration.dateOfBirth, registration.age)}</p>
                   <p><span className="font-bold text-lead-navy">Grade:</span> {registration.grade}</p>
                   <p><span className="font-bold text-lead-navy">Schedule:</span> {registration.preferredSchedule}</p>
                   <p><span className="font-bold text-lead-navy">Time:</span> {registration.preferredTime}</p>
