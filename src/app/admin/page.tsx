@@ -49,6 +49,7 @@ type DashboardData = {
     meetingNumber: number;
     scheduledAt: string;
     status: string;
+    teacherNames: string[];
   }>;
   needsAttendance: number;
   newInquiries: number;
@@ -113,6 +114,7 @@ async function getDashboardData(): Promise<DashboardData> {
       studentName: doc.studentName || "Unknown",
       meetingNumber: doc.meetingNumber || 0,
       scheduledAt: doc.scheduledAt || "",
+      teacherNames: doc.teacherNames || [],
       status: getComputedClassSessionStatus({
         status: doc.status,
         scheduledAt: doc.scheduledAt,
@@ -221,6 +223,9 @@ export default async function AdminDashboardPage() {
                     <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">{session.status}</span>
                   </div>
                   <p className="mt-2 text-sm text-lead-gray">{formatDateTime(session.scheduledAt)}</p>
+                  <p className="mt-1 text-sm text-lead-gray">
+                    <span className="font-bold text-lead-navy">Teachers:</span> {session.teacherNames.length ? session.teacherNames.join(", ") : "Not assigned"}
+                  </p>
                 </a>
               ))}
               {!data.todaySessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No classes scheduled for today.</p> : null}
