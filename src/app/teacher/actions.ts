@@ -507,6 +507,7 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
   );
 
   revalidatePath("/teacher");
+  revalidatePath("/teacher/assessments");
   revalidatePath("/admin/batches");
   revalidatePath("/parent");
 }

@@ -102,6 +102,7 @@ type AssessmentRatings = {
 
 type AssessmentDocument = {
   studentId?: string;
+  teacherId?: string;
   batchId?: string;
   batchName?: string;
   month?: number;
@@ -117,6 +118,7 @@ type AssessmentDocument = {
   overall?: { score?: number; grade?: AssessmentGrade };
   ratings?: AssessmentRatings;
   teacherComments?: { en?: string; id?: string };
+  updatedAt?: Date;
 };
 
 type TeacherSession = {
@@ -322,7 +324,7 @@ async function getAuthenticatedTeacher() {
 
 async function getTeacherPortalData(teacherId: string, month: number, year: number) {
   const db = await getMongoDb();
-  const [sessionDocs, attendanceDocs, gameSessionDocs, batchDocs, studentDocs, assessmentDocs] = await Promise.all([
+  const [sessionDocs, attendanceDocs, gameSessionDocs, batchDocs, studentDocs] = await Promise.all([
     db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
       .find({ teacherIds: teacherId })
@@ -358,13 +360,18 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
       })
       .sort({ studentName: 1 })
       .limit(1000)
-      .toArray() as Promise<WithId<StudentDocument>[]>,
-    db
-      .collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName())
-      .find({ teacherId, month, year })
-      .limit(2000)
-      .toArray() as Promise<WithId<AssessmentDocument>[]>
+      .toArray() as Promise<WithId<StudentDocument>[]>
   ]);
+  const assignedBatchIds = batchDocs.map((batch) => batch._id.toString());
+  const savedAssessmentDocs = assignedBatchIds.length
+    ? await db
+        .collection<AssessmentDocument>(getMonthlyAssessmentsCollectionName())
+        .find({ batchId: { $in: assignedBatchIds } })
+        .sort({ year: -1, month: -1, updatedAt: -1 })
+        .limit(5000)
+        .toArray() as WithId<AssessmentDocument>[]
+    : [];
+  const assessmentDocs = savedAssessmentDocs.filter((assessment) => assessment.month === month && assessment.year === year);
   const attendanceKeys = new Set(
     attendanceDocs.map((doc) => {
       const period = getRecordBillingPeriod(doc);
@@ -472,6 +479,19 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
       ratings: defaultRatingsFromAssessment(assessment),
       teacherCommentEn: assessment.teacherComments?.en || "",
       teacherCommentId: assessment.teacherComments?.id || ""
+    })),
+    savedAssessments: savedAssessmentDocs.map((assessment) => ({
+      id: assessment._id.toString(),
+      studentId: assessment.studentId || "",
+      batchId: assessment.batchId || "",
+      batchName: assessment.batchName || "",
+      month: assessment.month || month,
+      year: assessment.year || year,
+      status: assessment.status || "Not started",
+      meetings: assessment.meetings || [],
+      ratings: defaultRatingsFromAssessment(assessment),
+      teacherCommentEn: assessment.teacherComments?.en || "",
+      teacherCommentId: assessment.teacherComments?.id || ""
     }))
   };
 }
@@ -480,6 +500,7 @@ export default async function TeacherPortalPage({
   searchParams
 }: {
   searchParams?: Promise<{
+    assessmentId?: string | string[];
     assessmentBatchId?: string | string[];
     assessmentStudentId?: string | string[];
     assessmentMonth?: string | string[];
@@ -504,11 +525,15 @@ export default async function TeacherPortalPage({
   }
 
   const currentPeriod = currentJakartaMonth();
-  const selectedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, currentPeriod.month);
-  const selectedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, currentPeriod.year);
-  const selectedAssessmentBatchId = firstParam(resolvedSearchParams?.assessmentBatchId);
-  const selectedAssessmentStudentId = firstParam(resolvedSearchParams?.assessmentStudentId);
-  const data = await getTeacherPortalData(teacher.id, selectedAssessmentMonth, selectedAssessmentYear);
+  const requestedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, currentPeriod.month);
+  const requestedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, currentPeriod.year);
+  const data = await getTeacherPortalData(teacher.id, requestedAssessmentMonth, requestedAssessmentYear);
+  const selectedAssessmentId = firstParam(resolvedSearchParams?.assessmentId);
+  const assessmentFromSavedRecord = data.savedAssessments.find((assessment) => assessment.id === selectedAssessmentId);
+  const selectedAssessmentMonth = assessmentFromSavedRecord?.month || requestedAssessmentMonth;
+  const selectedAssessmentYear = assessmentFromSavedRecord?.year || requestedAssessmentYear;
+  const selectedAssessmentBatchId = assessmentFromSavedRecord?.batchId || firstParam(resolvedSearchParams?.assessmentBatchId);
+  const selectedAssessmentStudentId = assessmentFromSavedRecord?.studentId || firstParam(resolvedSearchParams?.assessmentStudentId);
   const today = getTodayJakarta();
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
   const missedSessions = data.sessions.filter((session) => session.sessionDate < today);
@@ -516,7 +541,7 @@ export default async function TeacherPortalPage({
   const attendanceNeededSessions = data.sessions.filter((session) => session.status === "Needs Attendance");
   const selectedBatch = data.batches.find((batch) => batch.id === selectedAssessmentBatchId);
   const selectedStudent = selectedBatch?.students.find((student) => student.studentId === selectedAssessmentStudentId);
-  const selectedAssessment = data.assessments.find(
+  const selectedAssessment = assessmentFromSavedRecord || data.savedAssessments.find(
     (assessment) =>
       assessment.studentId === selectedAssessmentStudentId &&
       assessment.batchId === selectedAssessmentBatchId &&
@@ -630,6 +655,50 @@ export default async function TeacherPortalPage({
                 Monthly assessment for your assigned group students. The system calculates grades automatically.
               </p>
 
+              {selectedAssessment ? (
+                <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm font-bold text-lead-blue">
+                  Loaded saved marks for {selectedStudent?.studentName || selectedAssessment.studentId} / {monthName(selectedAssessment.month, selectedAssessment.year)}.
+                </p>
+              ) : selectedAssessmentStudentId ? (
+                <p className="mt-4 rounded-lg bg-yellow-50 p-3 text-sm font-bold text-yellow-800">
+                  No saved assessment found for this student and month yet. Saving will create it.
+                </p>
+              ) : null}
+
+              <form action="/teacher/assessments#batch-assessment" className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
+                <div className="grid gap-3">
+                  <AssessmentSelect
+                    label="Open Saved Assessment"
+                    name="assessmentId"
+                    defaultValue={selectedAssessment?.id || ""}
+                    options={data.savedAssessments.map((assessment) => ({
+                      label: `${data.batches.flatMap((batch) => batch.students).find((student) => student.studentId === assessment.studentId)?.studentName || assessment.studentId} - ${monthName(assessment.month, assessment.year)} - ${assessment.batchName || "Batch"}`,
+                      value: assessment.id
+                    }))}
+                  />
+                  <div className="grid gap-3 border-t border-blue-100 pt-4 sm:grid-cols-2">
+                    <AssessmentSelect label="Batch" name="assessmentBatchId" defaultValue={selectedAssessmentBatchId} options={data.batches.map((batch) => ({ label: batch.batchName, value: batch.id }))} />
+                    <AssessmentSelect
+                      label="Student"
+                      name="assessmentStudentId"
+                      defaultValue={selectedAssessmentStudentId}
+                      options={data.batches.flatMap((batch) => batch.students.map((student) => ({ label: `${student.studentId} - ${student.studentName}`, value: student.studentId })))}
+                    />
+                    <AssessmentSelect
+                      label="Month"
+                      name="assessmentMonth"
+                      defaultValue={String(selectedAssessmentMonth)}
+                      options={Array.from({ length: 12 }, (_, index) => ({ label: monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, ""), value: String(index + 1) }))}
+                    />
+                    <label className="grid gap-2 text-sm font-bold text-lead-navy">
+                      Year
+                      <input name="assessmentYear" type="number" min={2020} max={2100} defaultValue={selectedAssessmentYear} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
+                    </label>
+                  </div>
+                  <Button type="submit" variant="secondary">Load Assessment</Button>
+                </div>
+              </form>
+
               {isAssessmentReadyToEdit ? (
                 <ActionFeedbackForm action={saveTeacherMonthlyAssessment} successMessage="Monthly assessment saved." className="mt-5 grid gap-4">
                   <input type="hidden" name="batchId" value={selectedAssessmentBatchId} />
@@ -701,7 +770,7 @@ export default async function TeacherPortalPage({
                 </ActionFeedbackForm>
               ) : (
                 <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">
-                  Select a student from your assigned batch list above to open the assessment form.
+                  Choose a saved assessment above, or select batch, student, month, and year, then click Load Assessment.
                 </p>
               )}
             </Card>
@@ -872,6 +941,30 @@ function TeacherSessionCard({ session }: { session: TeacherSession }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function AssessmentSelect({
+  label,
+  name,
+  options,
+  defaultValue
+}: {
+  label: string;
+  name: string;
+  options: Array<{ label: string; value: string }>;
+  defaultValue?: string;
+}) {
+  return (
+    <label className="grid gap-2 text-sm font-bold text-lead-navy">
+      {label}
+      <select name={name} defaultValue={defaultValue || ""} className="focus-ring min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
+        <option value="">Select</option>
+        {options.map((option) => (
+          <option key={`${name}-${option.value}`} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
