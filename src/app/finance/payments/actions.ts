@@ -23,7 +23,7 @@ import {
   isPaymentStatus,
   type PaymentStatus
 } from "@/lib/payments";
-import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getActiveStudentFilter, getCourseStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -89,7 +89,7 @@ export async function updateStudentPaymentStatus(formData: FormData) {
         classType?: string;
         classMode?: string;
       }>(getStudentRegistrationCollectionName()).findOne({
-        $and: [{ studentId: existingPayment.studentId }, getActiveStudentFilter()]
+        $and: [{ studentId: existingPayment.studentId }, getCourseStudentFilter()]
       })
     : null;
   const amountDue = getEffectivePaymentAmountDue(existingPayment || {}, student);
@@ -249,7 +249,7 @@ export async function closeMonthlyBalance(formData: FormData) {
     courseJoined?: string;
     classType?: string;
     classMode?: string;
-  }>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).limit(50000).toArray();
+  }>(getStudentRegistrationCollectionName()).find(getCourseStudentFilter()).limit(50000).toArray();
   const studentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
 
   const monthPayments = payments.filter((payment) => {

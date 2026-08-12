@@ -22,7 +22,7 @@ import {
   paymentStatuses,
   type PaymentStatus
 } from "@/lib/payments";
-import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getCourseStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
 export const dynamic = "force-dynamic";
 
@@ -221,7 +221,7 @@ async function getStudents(query = ""): Promise<Student[]> {
         }))
       }
     : {};
-  const filter = search ? { $and: [getActiveStudentFilter(), searchFilter] } : getActiveStudentFilter();
+  const filter = search ? { $and: [getCourseStudentFilter(), searchFilter] } : getCourseStudentFilter();
 
   const docs = (await db
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
@@ -248,7 +248,7 @@ async function getSelectedStudent(studentId = "") {
 
   const db = await getMongoDb();
   const doc = await db.collection<StudentDocument>(getStudentRegistrationCollectionName()).findOne({
-    $and: [{ studentId }, getActiveStudentFilter()]
+    $and: [{ studentId }, getCourseStudentFilter()]
   });
   if (!doc) return null;
 
@@ -338,7 +338,7 @@ async function getFinancePaymentOverview(closedPeriodKeys = new Set<string>()): 
   const db = await getMongoDb();
   const [paymentDocs, studentDocs] = await Promise.all([
     db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({}).limit(50000).toArray() as Promise<WithId<PaymentDocument>[]>,
-    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getActiveStudentFilter()).limit(50000).toArray() as Promise<WithId<StudentDocument>[]>
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getCourseStudentFilter()).limit(50000).toArray() as Promise<WithId<StudentDocument>[]>
   ]);
   const studentsById = new Map(studentDocs.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
   const activePayments = paymentDocs.filter((payment) => {

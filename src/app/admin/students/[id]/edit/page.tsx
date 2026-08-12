@@ -1,23 +1,30 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, UserRoundCheck } from "lucide-react";
 import { ObjectId, type WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
-import { updateStudentRegistration } from "@/app/admin/students/actions";
+import { changeStudentStatus, updateStudentRegistration } from "@/app/admin/students/actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { getClassSessionsCollectionName } from "@/lib/class-sessions";
+import { getAttendanceReminders } from "@/lib/attendance-reminders";
+import { getStudentAttendanceCollectionName } from "@/lib/attendance";
+import { getStudentPaymentsCollectionName } from "@/lib/payments";
 import {
   classTypeOptions,
   classModeOptions,
   courseJoinedOptions,
   englishLevelOptions,
   getStudentRegistrationCollectionName,
-  learningGoalOptions
+  learningGoalOptions,
+  studentStatusOptions,
+  type StudentStatus,
+  type StudentStatusHistoryEntry
 } from "@/lib/student-registration";
 import type { CourseHistoryEntry } from "@/lib/student-registration";
 
@@ -43,6 +50,8 @@ type StudentRegistrationDocument = {
   countryCity?: string;
   locale?: string;
   courseHistory?: CourseHistoryEntry[];
+  studentStatus?: StudentStatus;
+  statusHistory?: StudentStatusHistoryEntry[];
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -76,6 +85,16 @@ type StudentRegistration = {
     changedByName: string;
     changedByUsername: string;
     source: CourseHistoryEntry["source"];
+  }>;
+  studentStatus: StudentStatus;
+  statusHistory: Array<{
+    fromStatus: StudentStatus;
+    toStatus: StudentStatus;
+    effectiveDate: string;
+    note: string;
+    changedAt: string;
+    changedByName: string;
+    changedByUsername: string;
   }>;
 };
 
@@ -120,8 +139,36 @@ async function getStudentRegistration(id: string): Promise<StudentRegistration |
         changedByUsername: entry.changedByUsername || "",
         source: entry.source || "data-backfill"
       }))
+      .sort((a, b) => b.changedAt.localeCompare(a.changedAt)),
+    studentStatus: doc.studentStatus || "Active",
+    statusHistory: (doc.statusHistory || [])
+      .map((entry) => ({
+        fromStatus: entry.fromStatus || "Active",
+        toStatus: entry.toStatus || "Inactive",
+        effectiveDate: entry.effectiveDate || "",
+        note: entry.note || "",
+        changedAt: entry.changedAt ? new Date(entry.changedAt).toISOString() : "",
+        changedByName: entry.changedByName || "System",
+        changedByUsername: entry.changedByUsername || ""
+      }))
       .sort((a, b) => b.changedAt.localeCompare(a.changedAt))
   };
+}
+
+async function getLifecycleWarnings(studentId: string) {
+  if (!studentId) return { futureSessions: 0, unpaidPayments: 0, attendanceNeeded: 0, missingJournals: 0 };
+  const db = await getMongoDb();
+  const [futureSessions, unpaidPayments, reminders, missingJournals] = await Promise.all([
+    db.collection(getClassSessionsCollectionName()).countDocuments({ studentId, status: { $ne: "Completed" } }),
+    db.collection(getStudentPaymentsCollectionName()).countDocuments({ studentId, status: "Unpaid" }),
+    getAttendanceReminders(db),
+    db.collection(getStudentAttendanceCollectionName()).countDocuments({
+      studentId,
+      status: { $in: ["Present", "Late"] },
+      $or: [{ notes: { $exists: false } }, { notes: null }, { notes: "" }, { notes: { $regex: "^\\s*$" } }]
+    })
+  ]);
+  return { futureSessions, unpaidPayments, attendanceNeeded: reminders.filter((record) => record.studentId === studentId).length, missingJournals };
 }
 
 function formatDate(value: string) {
@@ -138,7 +185,7 @@ export default async function EditStudentRegistrationPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ updated?: string | string[] }>;
+  searchParams?: Promise<{ updated?: string | string[]; statusUpdated?: string | string[] }>;
 }) {
   noStore();
   const cookieStore = await cookies();
@@ -148,6 +195,9 @@ export default async function EditStudentRegistrationPage({
   const updated = Array.isArray(resolvedSearchParams?.updated)
     ? resolvedSearchParams?.updated[0] === "1"
     : resolvedSearchParams?.updated === "1";
+  const statusUpdated = Array.isArray(resolvedSearchParams?.statusUpdated)
+    ? resolvedSearchParams.statusUpdated[0] === "1"
+    : resolvedSearchParams?.statusUpdated === "1";
 
   if (!isAdminConfigured()) {
     return (
@@ -182,6 +232,13 @@ export default async function EditStudentRegistrationPage({
   if (!registration) {
     notFound();
   }
+  const lifecycleWarnings = await getLifecycleWarnings(registration.studentId);
+  const todayWib = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date());
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -220,12 +277,16 @@ export default async function EditStudentRegistrationPage({
                     Upgraded from {registration.previousStudentId}
                   </span>
                 ) : null}
+                <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${registration.studentStatus === "Active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
+                  {registration.studentStatus}
+                </span>
               </div>
               <p className="mt-2 text-sm text-lead-gray">Created: {formatDate(registration.createdAt)} / Updated: {formatDate(registration.updatedAt)}</p>
             </div>
             {updated ? (
               <p className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">Saved successfully</p>
             ) : null}
+            {statusUpdated ? <p className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">Student status updated</p> : null}
           </div>
 
           <form action={updateStudentRegistration} className="mt-6 grid gap-5 md:grid-cols-2">
@@ -303,6 +364,60 @@ export default async function EditStudentRegistrationPage({
           </form>
 
           <div className="mt-8 border-t border-slate-200 pt-6">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-lead-blue"><UserRoundCheck className="h-5 w-5" /></span>
+              <div>
+                <h2 className="font-heading text-xl font-bold text-lead-navy">Student Lifecycle</h2>
+                <p className="mt-1 text-sm text-lead-gray">Pause, complete, withdraw, deactivate, or reactivate this student without deleting their records.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <p className={`rounded-lg p-3 text-sm font-semibold ${lifecycleWarnings.futureSessions ? "bg-yellow-50 text-yellow-800" : "bg-slate-50 text-lead-gray"}`}>
+                {lifecycleWarnings.futureSessions} unfinished scheduled class{lifecycleWarnings.futureSessions === 1 ? "" : "es"}
+              </p>
+              <p className={`rounded-lg p-3 text-sm font-semibold ${lifecycleWarnings.unpaidPayments ? "bg-yellow-50 text-yellow-800" : "bg-slate-50 text-lead-gray"}`}>
+                {lifecycleWarnings.unpaidPayments} unpaid payment{lifecycleWarnings.unpaidPayments === 1 ? "" : "s"} (kept visible to Finance)
+              </p>
+              <p className={`rounded-lg p-3 text-sm font-semibold ${lifecycleWarnings.attendanceNeeded ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-lead-gray"}`}>
+                {lifecycleWarnings.attendanceNeeded} overdue attendance record{lifecycleWarnings.attendanceNeeded === 1 ? "" : "s"}
+              </p>
+              <p className={`rounded-lg p-3 text-sm font-semibold ${lifecycleWarnings.missingJournals ? "bg-yellow-50 text-yellow-800" : "bg-slate-50 text-lead-gray"}`}>
+                {lifecycleWarnings.missingJournals} missing journal{lifecycleWarnings.missingJournals === 1 ? "" : "s"}
+              </p>
+            </div>
+            <form action={changeStudentStatus} className="mt-4 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+              <input type="hidden" name="id" value={registration.id} />
+              <Field label="New Status">
+                <select name="studentStatus" required defaultValue={registration.studentStatus === "Active" ? "Completed" : "Active"} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
+                  {studentStatusOptions.filter((status) => status !== registration.studentStatus).map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </Field>
+              <Field label="Effective Date (WIB)">
+                <input name="effectiveDate" type="date" required defaultValue={todayWib} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+              </Field>
+              <label className="grid gap-2 text-sm font-semibold text-lead-navy md:col-span-2">
+                Reason / Note
+                <textarea name="statusNote" rows={3} placeholder="Example: Completed Fluent English course" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" />
+              </label>
+              <p className="text-xs leading-5 text-lead-gray md:col-span-2">Changing away from Active closes unfinished scheduled classes but preserves attendance, journals, payments, receipts, Parent QR access, and Student ID.</p>
+              <Button type="submit" className="md:col-span-2 md:w-fit">Update Student Status</Button>
+            </form>
+            <div className="mt-4 grid gap-3">
+              {registration.statusHistory.map((entry, index) => (
+                <div key={`${entry.changedAt}-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <p className="font-heading font-bold text-lead-navy">{entry.fromStatus} <span className="px-1 text-lead-blue">to</span> {entry.toStatus}</p>
+                    <span className="text-xs font-semibold text-lead-gray">Effective {formatDateOnly(entry.effectiveDate)} / recorded {formatDate(entry.changedAt)} WIB</span>
+                  </div>
+                  <p className="mt-2 text-sm text-lead-gray">{entry.note || "No note"}</p>
+                  <p className="mt-1 text-xs text-lead-gray">Changed by {entry.changedByName}{entry.changedByUsername ? ` (${entry.changedByUsername})` : ""}</p>
+                </div>
+              ))}
+              {!registration.statusHistory.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No status changes recorded yet.</p> : null}
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-slate-200 pt-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="font-heading text-xl font-bold text-lead-navy">Course History</h2>
@@ -336,6 +451,11 @@ export default async function EditStudentRegistrationPage({
       </section>
     </main>
   );
+}
+
+function formatDateOnly(value: string) {
+  if (!value) return "Unknown";
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "Asia/Jakarta" }).format(new Date(`${value}T00:00:00+07:00`));
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

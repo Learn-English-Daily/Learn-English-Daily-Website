@@ -3,12 +3,25 @@ export const classTypeOptions = ["Basic Group", "Standard/Buddy", "Premium 1-to-
 export const classModeOptions = ["Online", "Offline"] as const;
 export const englishLevelOptions = ["Beginner", "Elementary", "Intermediate", "Not sure"] as const;
 export const learningGoalOptions = ["Speaking confidence", "School English", "Grammar", "Vocabulary", "Daily conversation"] as const;
+export const studentStatusOptions = ["Active", "Completed", "Paused", "Withdrawn", "Inactive"] as const;
 
 export type CourseJoined = (typeof courseJoinedOptions)[number];
 export type ClassType = (typeof classTypeOptions)[number];
 export type ClassMode = (typeof classModeOptions)[number];
 export type EnglishLevel = (typeof englishLevelOptions)[number];
 export type LearningGoal = (typeof learningGoalOptions)[number];
+export type StudentStatus = (typeof studentStatusOptions)[number];
+
+export type StudentStatusHistoryEntry = {
+  fromStatus: StudentStatus;
+  toStatus: StudentStatus;
+  effectiveDate: string;
+  note: string;
+  changedAt: Date;
+  changedByEmployeeId: string;
+  changedByName: string;
+  changedByUsername: string;
+};
 
 export type CourseHistoryEntry = {
   fromCourse: string;
@@ -47,8 +60,25 @@ export function getActiveStudentFilter() {
     $and: [
       { courseJoined: { $ne: "Trial Class" } },
       { studentIdType: { $ne: "trial" } },
+      { studentId: { $not: { $regex: "^TR", $options: "i" } } },
+      { $or: [{ studentStatus: "Active" }, { studentStatus: { $exists: false } }, { studentStatus: "" }] }
+    ]
+  };
+}
+
+export function getCourseStudentFilter() {
+  return {
+    $and: [
+      { courseJoined: { $ne: "Trial Class" } },
+      { studentIdType: { $ne: "trial" } },
       { studentId: { $not: { $regex: "^TR", $options: "i" } } }
     ]
+  };
+}
+
+export function getInactiveStudentFilter() {
+  return {
+    $and: [getCourseStudentFilter(), { studentStatus: { $in: ["Completed", "Paused", "Withdrawn", "Inactive"] } }]
   };
 }
 
@@ -70,4 +100,8 @@ export function isEnglishLevel(value: string): value is EnglishLevel {
 
 export function isLearningGoal(value: string): value is LearningGoal {
   return learningGoalOptions.includes(value as LearningGoal);
+}
+
+export function isStudentStatus(value: string): value is StudentStatus {
+  return studentStatusOptions.includes(value as StudentStatus);
 }

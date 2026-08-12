@@ -11,6 +11,7 @@ import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValid
 import { getMongoDb } from "@/lib/mongodb";
 import {
   getActiveStudentFilter,
+  getInactiveStudentFilter,
   getStudentRegistrationCollectionName,
   getTrialStudentFilter
 } from "@/lib/student-registration";
@@ -40,6 +41,7 @@ type StudentRegistrationDocument = {
   locale?: string;
   source?: string;
   createdAt?: Date;
+  studentStatus?: string;
 };
 
 type StudentRegistration = {
@@ -64,9 +66,10 @@ type StudentRegistration = {
   locale: string;
   source: string;
   createdAt: string;
+  studentStatus: string;
 };
 
-type RegistrationViewMode = "active" | "trial";
+type RegistrationViewMode = "active" | "trial" | "archived";
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -75,7 +78,7 @@ function escapeRegex(value: string) {
 async function getStudentRegistrations(query = "", mode: RegistrationViewMode): Promise<StudentRegistration[]> {
   const db = await getMongoDb();
   const search = query.trim();
-  const modeFilter = mode === "trial" ? getTrialStudentFilter() : getActiveStudentFilter();
+  const modeFilter = mode === "trial" ? getTrialStudentFilter() : mode === "archived" ? getInactiveStudentFilter() : getActiveStudentFilter();
   const searchFilter: Filter<StudentRegistrationDocument> = search
     ? {
         $or: [
@@ -132,7 +135,8 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode): 
     countryCity: doc.countryCity || "",
     locale: doc.locale || "en",
     source: doc.source || "student-registration",
-    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : "",
+    studentStatus: doc.studentStatus || "Active"
   }));
 }
 
@@ -156,7 +160,7 @@ export default async function AdminStudentsPage({
   const resolvedSearchParams = await searchParams;
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
   const view = Array.isArray(resolvedSearchParams?.view) ? resolvedSearchParams?.view[0] || "" : resolvedSearchParams?.view || "";
-  const mode: RegistrationViewMode = view === "trial" ? "trial" : "active";
+  const mode: RegistrationViewMode = view === "trial" ? "trial" : view === "archived" ? "archived" : "active";
 
   if (!isAdminConfigured()) {
     return (
@@ -188,10 +192,10 @@ export default async function AdminStudentsPage({
 
   const [registrations, admin] = await Promise.all([getStudentRegistrations(searchQuery, mode), getAuthenticatedAdmin()]);
   const isTrialView = mode === "trial";
-  const pagePath = isTrialView ? "/admin/students?view=trial" : "/admin/students";
-  const otherPath = isTrialView ? "/admin/students" : "/admin/students/trials";
-  const pageTitle = isTrialView ? "Trial class students" : "Current course students";
-  const emptyTitle = searchQuery ? "No matching registrations" : isTrialView ? "No trial students yet" : "No current students yet";
+  const isArchivedView = mode === "archived";
+  const pagePath = isTrialView ? "/admin/students?view=trial" : isArchivedView ? "/admin/students?view=archived" : "/admin/students";
+  const pageTitle = isTrialView ? "Trial class students" : isArchivedView ? "Archived students" : "Current course students";
+  const emptyTitle = searchQuery ? "No matching registrations" : isTrialView ? "No trial students yet" : isArchivedView ? "No archived students yet" : "No current students yet";
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -201,7 +205,7 @@ export default async function AdminStudentsPage({
         description={
           searchQuery
             ? `Showing ${registrations.length} result${registrations.length === 1 ? "" : "s"} for "${searchQuery}".`
-            : `Showing latest ${registrations.length} ${isTrialView ? "trial" : "current"} registrations.`
+            : `Showing latest ${registrations.length} ${isTrialView ? "trial" : isArchivedView ? "archived" : "current"} registrations.`
         }
         userName={admin?.name}
         logoutAction={logoutAdmin}
@@ -213,18 +217,20 @@ export default async function AdminStudentsPage({
             <div>
               <h2 className="font-heading text-lg font-bold text-lead-navy">Student list view</h2>
               <p className="mt-1 text-sm text-lead-gray">
-                {isTrialView ? "You are viewing trial class students." : "You are viewing current course students."}
+                {isTrialView ? "You are viewing trial class students." : isArchivedView ? "Completed, paused, withdrawn, and inactive students." : "You are viewing current course students."}
               </p>
             </div>
-            <Button asChild variant={isTrialView ? "primary" : "secondary"}>
-              <a href={otherPath}>{isTrialView ? "Current Students" : "Trial Students"}</a>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant={mode === "active" ? "primary" : "secondary"}><a href="/admin/students">Current</a></Button>
+              <Button asChild variant={isTrialView ? "primary" : "secondary"}><a href="/admin/students/trials">Trials</a></Button>
+              <Button asChild variant={isArchivedView ? "primary" : "secondary"}><a href="/admin/students?view=archived">Archived</a></Button>
+            </div>
           </div>
         </Card>
 
         <Card className="mb-6 p-4">
           <form action="/admin/students" className="flex flex-col gap-3 md:flex-row">
-            {isTrialView ? <input type="hidden" name="view" value="trial" /> : null}
+            {mode !== "active" ? <input type="hidden" name="view" value={mode} /> : null}
             <label className="relative flex-1">
               <span className="sr-only">Search registrations</span>
               <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
@@ -263,6 +269,7 @@ export default async function AdminStudentsPage({
                           Upgraded from {registration.previousStudentId}
                         </span>
                       ) : null}
+                      {!isTrialView ? <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${registration.studentStatus === "Active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>{registration.studentStatus}</span> : null}
                     </div>
                     <p className="mt-2 text-sm font-semibold text-lead-gray">Parent: {registration.parentName}</p>
                     {registration.whatsapp ? (

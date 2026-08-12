@@ -157,6 +157,7 @@ export async function POST(request: Request) {
       ...registration,
       studentId,
       studentIdType: joinedStudent ? "student" : "trial",
+      studentStatus: "Active",
       parentAccessToken: generateParentAccessToken(),
       updatedAt: now
     };

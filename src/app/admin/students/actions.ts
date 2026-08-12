@@ -17,8 +17,11 @@ import {
   isCourseJoined,
   isEnglishLevel,
   isLearningGoal,
+  isStudentStatus,
   isTrialCourse,
-  type CourseHistoryEntry
+  type CourseHistoryEntry,
+  type StudentStatus,
+  type StudentStatusHistoryEntry
 } from "@/lib/student-registration";
 
 type EditableStudentDocument = {
@@ -26,6 +29,8 @@ type EditableStudentDocument = {
   studentIdType?: string;
   courseJoined?: string;
   courseHistory?: CourseHistoryEntry[];
+  studentStatus?: StudentStatus;
+  statusHistory?: StudentStatusHistoryEntry[];
   [key: string]: unknown;
 };
 
@@ -230,4 +235,92 @@ export async function regenerateParentAccessToken(formData: FormData) {
   revalidatePath("/admin/students/trials");
   revalidatePath(`/admin/students/${id}/parent-qr`);
   redirect(`/admin/students/${id}/parent-qr?regenerated=1`);
+}
+
+export async function changeStudentStatus(formData: FormData) {
+  const admin = await assertAdmin();
+  const id = clean(formData.get("id"));
+  const toStatus = clean(formData.get("studentStatus")) as StudentStatus;
+  const effectiveDate = clean(formData.get("effectiveDate"));
+  const note = clean(formData.get("statusNote"));
+
+  if (!ObjectId.isValid(id) || !isStudentStatus(toStatus) || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+    throw new Error("Choose a valid student status and effective date.");
+  }
+  if (toStatus !== "Active" && note.length < 3) {
+    throw new Error("Add a short reason for changing the student's status.");
+  }
+  if (note.length > 500) {
+    throw new Error("Status note must be 500 characters or fewer.");
+  }
+
+  const db = await getMongoDb();
+  const collection = db.collection<EditableStudentDocument>(getStudentRegistrationCollectionName());
+  const recordId = new ObjectId(id);
+  const student = await collection.findOne({ _id: recordId });
+  if (!student?.studentId || isTrialCourse(String(student.courseJoined || ""))) {
+    throw new Error("Course student not found.");
+  }
+
+  const fromStatus = isStudentStatus(String(student.studentStatus || "")) ? student.studentStatus as StudentStatus : "Active";
+  if (fromStatus === toStatus) {
+    throw new Error(`Student is already ${toStatus.toLowerCase()}.`);
+  }
+
+  const now = new Date();
+  const historyEntry: StudentStatusHistoryEntry = {
+    fromStatus,
+    toStatus,
+    effectiveDate,
+    note,
+    changedAt: now,
+    changedByEmployeeId: admin.id,
+    changedByName: admin.name,
+    changedByUsername: admin.username
+  };
+
+  await collection.updateOne(
+    { _id: recordId },
+    [
+      {
+        $set: {
+          studentStatus: toStatus,
+          statusEffectiveDate: effectiveDate,
+          statusNote: note,
+          statusChangedAt: now,
+          statusChangedByEmployeeId: admin.id,
+          statusChangedByName: admin.name,
+          statusHistory: { $concatArrays: [{ $ifNull: ["$statusHistory", []] }, [historyEntry]] },
+          updatedAt: now
+        }
+      }
+    ]
+  );
+
+  if (toStatus !== "Active") {
+    await db.collection(getClassSessionsCollectionName()).updateMany(
+      { studentId: student.studentId, status: { $ne: "Completed" } },
+      {
+        $set: {
+          status: "Completed",
+          studentLifecycleClosed: true,
+          studentLifecycleStatus: toStatus,
+          studentLifecycleClosedAt: now,
+          studentLifecycleClosedBy: admin.name,
+          updatedAt: now
+        }
+      }
+    );
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/sessions");
+  revalidatePath("/admin/attendance");
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/journals");
+  revalidatePath("/finance/payments");
+  revalidatePath("/ceo");
+  revalidatePath(`/admin/students/${id}/edit`);
+  redirect(`/admin/students/${id}/edit?statusUpdated=1`);
 }
