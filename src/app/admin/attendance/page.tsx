@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
+import { redirect } from "next/navigation";
 import { BookOpenCheck, CalendarCheck, CalendarClock, Search, UserRoundCheck } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -8,6 +9,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import { getAttendanceReminders, type AttendanceReminder } from "@/lib/attendance-reminders";
 import { getStudentAttendanceCollectionName, type AttendanceStatus } from "@/lib/attendance";
 import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
@@ -320,7 +322,8 @@ export default async function AdminAttendancePage({
 }) {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
+  const isAuthenticated = isValidAdminSession(session);
   const params = await searchParams;
   const query = firstParam(params?.q);
   const studentId = firstParam(params?.studentId);
@@ -352,6 +355,8 @@ export default async function AdminAttendancePage({
     );
   }
 
+  if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
+
   const db = await getMongoDb();
   const [students, selectedStudent, teachers, closedPeriods, operations, admin] = await Promise.all([
     getStudents(query),
@@ -373,6 +378,7 @@ export default async function AdminAttendancePage({
         title="Attendance monitoring"
         description="Read-only oversight of teacher attendance, missing journals, and student history. Teachers own attendance entry."
         userName={admin?.name}
+        username={admin?.username}
         logoutAction={logoutAdmin}
       />
 

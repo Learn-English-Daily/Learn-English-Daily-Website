@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
+import { redirect } from "next/navigation";
 import { CalendarClock, Gamepad2, Pencil, Trash2 } from "lucide-react";
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
@@ -20,6 +21,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import { getRecordBillingPeriod } from "@/lib/billing-periods";
 import {
   getClassSessionsCollectionName,
@@ -282,7 +284,8 @@ function ClassGamePanel({ classSessionId, link }: { classSessionId: string; link
 export default async function AdminSessionsPage() {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
+  const isAuthenticated = isValidAdminSession(session);
 
   if (!isAdminConfigured()) {
     return (
@@ -312,6 +315,8 @@ export default async function AdminSessionsPage() {
     );
   }
 
+  if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
+
   const [students, teachers, sessions, admin] = await Promise.all([getStudents(), getTeachers(), getSessions(), getAuthenticatedAdmin()]);
   const needsAttendance = sessions.filter((session) => session.status === "Needs Attendance");
   const today = getIndonesiaDateInput();
@@ -324,6 +329,7 @@ export default async function AdminSessionsPage() {
         title="Class sessions"
         description="Schedule classes first, then close them by marking attendance."
         userName={admin?.name}
+        username={admin?.username}
         logoutAction={logoutAdmin}
       />
 

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   AlertCircle,
   ArrowRight,
@@ -16,6 +17,7 @@ import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import {
   getClassSessionsCollectionName,
   getComputedClassSessionStatus,
@@ -150,7 +152,8 @@ async function getDashboardData(): Promise<DashboardData> {
 export default async function AdminDashboardPage() {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
+  const isAuthenticated = isValidAdminSession(session);
 
   if (!isAdminConfigured()) {
     return (
@@ -180,6 +183,8 @@ export default async function AdminDashboardPage() {
     );
   }
 
+  if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
+
   const [data, admin] = await Promise.all([getDashboardData(), getAuthenticatedAdmin()]);
 
   return (
@@ -189,6 +194,7 @@ export default async function AdminDashboardPage() {
         title="Admin dashboard"
         description="Start here after login: see today's classes, follow-ups, payments, inquiries, and reviews in one place."
         userName={admin?.name}
+        username={admin?.username}
         logoutAction={logoutAdmin}
       />
 

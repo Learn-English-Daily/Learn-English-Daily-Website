@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
+import { redirect } from "next/navigation";
 import { Mail, MessageCircle, Search } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import { getMongoDb } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
@@ -78,7 +80,8 @@ export default async function AdminPage({
 }) {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
+  const isAuthenticated = isValidAdminSession(session);
   const resolvedSearchParams = await searchParams;
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
 
@@ -110,6 +113,8 @@ export default async function AdminPage({
     );
   }
 
+  if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
+
   const [leads, admin] = await Promise.all([getLeads(searchQuery), getAuthenticatedAdmin()]);
 
   return (
@@ -123,6 +128,7 @@ export default async function AdminPage({
             : `Showing latest ${leads.length} form submissions.`
         }
         userName={admin?.name}
+        username={admin?.username}
         logoutAction={logoutAdmin}
       />
 

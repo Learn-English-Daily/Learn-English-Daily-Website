@@ -8,6 +8,7 @@ import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentAgeLabel } from "@/lib/student-age";
 import {
@@ -78,7 +79,7 @@ function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function getStudentRegistrations(query = "", mode: RegistrationViewMode): Promise<StudentRegistration[]> {
+async function getStudentRegistrations(query = "", mode: RegistrationViewMode, groupOnly = false): Promise<StudentRegistration[]> {
   const db = await getMongoDb();
   const search = query.trim();
   const modeFilter = mode === "trial" ? getTrialStudentFilter() : mode === "archived" ? getInactiveStudentFilter() : getActiveStudentFilter();
@@ -109,7 +110,8 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode): 
         }))
       }
     : {};
-  const filter = search ? { $and: [modeFilter, searchFilter] } : modeFilter;
+  const accessFilter = groupOnly ? { classType: "Basic Group" } : {};
+  const filter = search ? { $and: [modeFilter, accessFilter, searchFilter] } : { $and: [modeFilter, accessFilter] };
 
   const docs = (await db
     .collection<StudentRegistrationDocument>(getStudentRegistrationCollectionName())
@@ -161,11 +163,13 @@ export default async function AdminStudentsPage({
 }) {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
+  const isAuthenticated = isValidAdminSession(session);
+  const groupOnly = isGroupStudentAdminSession(session);
   const resolvedSearchParams = await searchParams;
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
   const view = Array.isArray(resolvedSearchParams?.view) ? resolvedSearchParams?.view[0] || "" : resolvedSearchParams?.view || "";
-  const mode: RegistrationViewMode = view === "trial" ? "trial" : view === "archived" ? "archived" : "active";
+  const mode: RegistrationViewMode = !groupOnly && view === "trial" ? "trial" : view === "archived" ? "archived" : "active";
 
   if (!isAdminConfigured()) {
     return (
@@ -195,7 +199,7 @@ export default async function AdminStudentsPage({
     );
   }
 
-  const [registrations, admin] = await Promise.all([getStudentRegistrations(searchQuery, mode), getAuthenticatedAdmin()]);
+  const [registrations, admin] = await Promise.all([getStudentRegistrations(searchQuery, mode, groupOnly), getAuthenticatedAdmin()]);
   const isTrialView = mode === "trial";
   const isArchivedView = mode === "archived";
   const pagePath = isTrialView ? "/admin/students?view=trial" : isArchivedView ? "/admin/students?view=archived" : "/admin/students";
@@ -213,6 +217,7 @@ export default async function AdminStudentsPage({
             : `Showing latest ${registrations.length} ${isTrialView ? "trial" : isArchivedView ? "archived" : "current"} registrations.`
         }
         userName={admin?.name}
+        username={admin?.username}
         logoutAction={logoutAdmin}
       />
 
@@ -227,7 +232,7 @@ export default async function AdminStudentsPage({
             </div>
             <div className="flex flex-wrap gap-2">
               <Button asChild variant={mode === "active" ? "primary" : "secondary"}><a href="/admin/students">Current</a></Button>
-              <Button asChild variant={isTrialView ? "primary" : "secondary"}><a href="/admin/students/trials">Trials</a></Button>
+              {!groupOnly ? <Button asChild variant={isTrialView ? "primary" : "secondary"}><a href="/admin/students/trials">Trials</a></Button> : null}
               <Button asChild variant={isArchivedView ? "primary" : "secondary"}><a href="/admin/students?view=archived">Archived</a></Button>
             </div>
           </div>
@@ -313,16 +318,16 @@ export default async function AdminStudentsPage({
                               Parent QR
                             </a>
                           </Button>
-                          <Button asChild variant="secondary" size="sm">
-                            <a href={`/admin/attendance?studentId=${encodeURIComponent(registration.studentId)}`}>
-                              Attendance
-                            </a>
-                          </Button>
-                          <Button asChild variant="secondary" size="sm">
-                            <a href={`/finance/payments?studentId=${encodeURIComponent(registration.studentId)}`}>
-                              Payments
-                            </a>
-                          </Button>
+                          {!groupOnly ? (
+                            <>
+                              <Button asChild variant="secondary" size="sm">
+                                <a href={`/admin/attendance?studentId=${encodeURIComponent(registration.studentId)}`}>Attendance</a>
+                              </Button>
+                              <Button asChild variant="secondary" size="sm">
+                                <a href={`/finance/payments?studentId=${encodeURIComponent(registration.studentId)}`}>Payments</a>
+                              </Button>
+                            </>
+                          ) : null}
                         </>
                       ) : null}
                     </div>

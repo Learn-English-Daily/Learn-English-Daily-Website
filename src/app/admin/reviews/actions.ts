@@ -1,19 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
-import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
+import { assertFullAdminAccess } from "@/lib/admin-permissions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getReviewCollectionName, isReviewStatus } from "@/lib/reviews";
 
 export async function updateReviewStatus(formData: FormData) {
-  const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
-
-  if (!isAuthenticated) {
-    throw new Error("Unauthorized");
-  }
+  await assertFullAdminAccess();
 
   const id = String(formData.get("id") || "");
   const status = String(formData.get("status") || "");

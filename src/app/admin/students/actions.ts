@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isValidAdminSession } from "@/lib/admin-auth";
+import { getAdminAccessForUsername } from "@/lib/admin-permissions";
 import { getClassSessionsCollectionName } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { refreshUnpaidStudentPaymentPricing } from "@/lib/payment-pricing";
@@ -101,6 +102,10 @@ export async function updateStudentRegistration(formData: FormData) {
     locale: clean(formData.get("locale")) || "en"
   };
 
+  if (getAdminAccessForUsername(admin.username) === "group-students" && registration.classType !== "Basic Group") {
+    throw new Error("You can only manage Basic Group students.");
+  }
+
   if (
     !ObjectId.isValid(id) ||
     !isReasonableShortText(registration.studentName) ||
@@ -124,6 +129,9 @@ export async function updateStudentRegistration(formData: FormData) {
   const db = await getMongoDb();
   const collection = db.collection<EditableStudentDocument>(getStudentRegistrationCollectionName());
   const existingRegistration = await collection.findOne({ _id: new ObjectId(id) });
+  if (getAdminAccessForUsername(admin.username) === "group-students" && existingRegistration?.classType !== "Basic Group") {
+    throw new Error("You can only manage Basic Group students.");
+  }
   const isJoiningCourse = !isTrialCourse(registration.courseJoined);
   const wasTrial =
     existingRegistration?.studentIdType === "trial" ||
@@ -211,7 +219,7 @@ export async function updateStudentRegistration(formData: FormData) {
 }
 
 export async function regenerateParentAccessToken(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
 
   const id = clean(formData.get("id"));
 
@@ -220,6 +228,10 @@ export async function regenerateParentAccessToken(formData: FormData) {
   }
 
   const db = await getMongoDb();
+  if (getAdminAccessForUsername(admin.username) === "group-students") {
+    const student = await db.collection<EditableStudentDocument>(getStudentRegistrationCollectionName()).findOne({ _id: new ObjectId(id) });
+    if (student?.classType !== "Basic Group") throw new Error("You can only manage Basic Group students.");
+  }
   const parentAccessToken = generateParentAccessToken();
   await db.collection(getStudentRegistrationCollectionName()).updateOne(
     { _id: new ObjectId(id) },
@@ -261,6 +273,9 @@ export async function changeStudentStatus(formData: FormData) {
   const student = await collection.findOne({ _id: recordId });
   if (!student?.studentId || isTrialCourse(String(student.courseJoined || ""))) {
     throw new Error("Course student not found.");
+  }
+  if (getAdminAccessForUsername(admin.username) === "group-students" && student.classType !== "Basic Group") {
+    throw new Error("You can only manage Basic Group students.");
   }
 
   const fromStatus = isStudentStatus(String(student.studentStatus || "")) ? student.studentStatus as StudentStatus : "Active";

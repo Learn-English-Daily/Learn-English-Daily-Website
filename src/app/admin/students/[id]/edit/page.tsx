@@ -10,6 +10,7 @@ import { changeStudentStatus, updateStudentRegistration } from "@/app/admin/stud
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentAgeLabel } from "@/lib/student-age";
 import { getClassSessionsCollectionName } from "@/lib/class-sessions";
@@ -193,7 +194,8 @@ export default async function EditStudentRegistrationPage({
 }) {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
+  const isAuthenticated = isValidAdminSession(session);
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
   const updated = Array.isArray(resolvedSearchParams?.updated)
@@ -236,7 +238,11 @@ export default async function EditStudentRegistrationPage({
   if (!registration) {
     notFound();
   }
+  if (isGroupStudentAdminSession(session) && registration.classType !== "Basic Group") {
+    notFound();
+  }
   const lifecycleWarnings = await getLifecycleWarnings(registration.studentId);
+  const groupOnly = isGroupStudentAdminSession(session);
   const todayWib = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -332,7 +338,7 @@ export default async function EditStudentRegistrationPage({
             </Field>
             <Field label="Class Type">
               <select name="classType" required defaultValue={registration.classType} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
-                {classTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                {(groupOnly ? ["Basic Group"] : classTypeOptions).map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             </Field>
             <Field label="Class Mode">

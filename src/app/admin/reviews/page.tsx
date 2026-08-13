@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
+import { redirect } from "next/navigation";
 import { Search, Star } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { updateReviewStatus } from "@/app/admin/reviews/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getReviewCollectionName, type ReviewDisplayOption, type ReviewRole, type ReviewStatus } from "@/lib/reviews";
 
@@ -104,7 +106,8 @@ export default async function AdminReviewsPage({
 }) {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
+  const isAuthenticated = isValidAdminSession(session);
   const resolvedSearchParams = await searchParams;
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
 
@@ -136,6 +139,8 @@ export default async function AdminReviewsPage({
     );
   }
 
+  if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
+
   const [reviews, admin] = await Promise.all([getReviews(searchQuery), getAuthenticatedAdmin()]);
 
   return (
@@ -149,6 +154,7 @@ export default async function AdminReviewsPage({
             : `Showing latest ${reviews.length} review submissions.`
         }
         userName={admin?.name}
+        username={admin?.username}
         logoutAction={logoutAdmin}
       />
 

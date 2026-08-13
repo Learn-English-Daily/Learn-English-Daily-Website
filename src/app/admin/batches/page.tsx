@@ -165,6 +165,7 @@ export default async function AdminBatchesPage() {
         title="Batch management"
         description="Create group batches, assign teachers, and manage student membership. Teachers complete assessments in their portal."
         userName={admin?.name}
+        username={admin?.username}
         logoutAction={logoutAdmin}
       />
 

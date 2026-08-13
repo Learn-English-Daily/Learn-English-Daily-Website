@@ -2,10 +2,9 @@
 
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import type { Db } from "mongodb";
-import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
+import { assertFullAdminAccess } from "@/lib/admin-permissions";
 import { getBillingPeriodFromDate, isBillingPeriodClosed } from "@/lib/billing-periods";
 import {
   getClassSessionsCollectionName,
@@ -49,12 +48,7 @@ function resolveSessionTimes(formData: FormData) {
 }
 
 async function assertAdmin() {
-  const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
-
-  if (!isAuthenticated) {
-    throw new Error("Unauthorized");
-  }
+  await assertFullAdminAccess();
 }
 
 async function resolveSelectedTeachers(db: Db, formData: FormData) {

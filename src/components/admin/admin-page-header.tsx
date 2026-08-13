@@ -8,6 +8,7 @@ import {
   Star,
   Users
 } from "lucide-react";
+import { getAdminAccessForUsername } from "@/lib/admin-permissions";
 
 type AdminPageKey = "dashboard" | "inquiries" | "sessions" | "attendance" | "students" | "batches" | "reviews";
 
@@ -32,14 +33,19 @@ export function AdminPageHeader({
   title,
   description,
   userName,
+  username,
   logoutAction
 }: {
   active: AdminPageKey;
   title: string;
   description: string;
   userName?: string;
+  username?: string;
   logoutAction: () => void | Promise<void>;
 }) {
+  const access = getAdminAccessForUsername(username || "");
+  const visibleNavItems = adminNavItems.filter((item) => access === "full" || ["students", "batches"].includes(item.key));
+
   return (
     <header className="border-b border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
       <div className="container-shell py-6">
@@ -66,8 +72,8 @@ export function AdminPageHeader({
           </form>
         </div>
 
-        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7" aria-label="Admin navigation">
-          {adminNavItems.map((item) => {
+        <nav className={`mt-6 grid gap-3 sm:grid-cols-2 ${access === "full" ? "lg:grid-cols-4 xl:grid-cols-7" : "max-w-xl"}`} aria-label="Admin navigation">
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;
 

@@ -10,6 +10,7 @@ import { ParentPortalTools } from "@/components/admin/parent-portal-tools";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import { getMongoDb } from "@/lib/mongodb";
 import { generateParentAccessToken, getParentPortalUrl, getQrCodeUrl } from "@/lib/parent-access";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
@@ -90,7 +91,8 @@ export default async function ParentQrPage({
 }) {
   noStore();
   const cookieStore = await cookies();
-  const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
+  const isAuthenticated = isValidAdminSession(session);
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
   const regenerated = Array.isArray(resolvedSearchParams?.regenerated)
@@ -126,6 +128,7 @@ export default async function ParentQrPage({
   }
 
   const student = await getStudentWithParentToken(resolvedParams.id);
+  if (student && isGroupStudentAdminSession(session) && student.classType !== "Basic Group") notFound();
   if (!student) {
     notFound();
   }
