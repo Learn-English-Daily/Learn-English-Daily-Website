@@ -6,6 +6,7 @@ import { BookOpenText, CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookP
 import { generateTeacherGamesLink, logoutTeacher, saveTeacherAttendance, saveTeacherMonthlyAssessment } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
+import { AssessmentStudentSelector } from "@/app/teacher/assessments/assessment-student-selector";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
@@ -324,25 +325,7 @@ async function getAuthenticatedTeacher() {
 
 async function getTeacherPortalData(teacherId: string, month: number, year: number) {
   const db = await getMongoDb();
-  const [sessionDocs, attendanceDocs, gameSessionDocs, batchDocs, studentDocs] = await Promise.all([
-    db
-      .collection<ClassSessionDocument>(getClassSessionsCollectionName())
-      .find({ teacherIds: teacherId })
-      .sort({ scheduledAt: 1, createdAt: 1 })
-      .limit(200)
-      .toArray() as Promise<WithId<ClassSessionDocument>[]>,
-    db
-      .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
-      .find({ teacherIds: teacherId })
-      .sort({ meetingDate: -1, updatedAt: -1 })
-      .limit(40)
-      .toArray() as Promise<WithId<AttendanceDocument>[]>,
-    db
-      .collection<GameSessionDocument>(getGameSessionsCollectionName())
-      .find({ gameType: "games-hub" })
-      .sort({ updatedAt: -1 })
-      .limit(500)
-      .toArray(),
+  const [batchDocs, studentDocs] = await Promise.all([
     db
       .collection<BatchDocument>(getBatchesCollectionName())
       .find({ teacherId, status: { $ne: "archived" } })
@@ -372,72 +355,10 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
         .toArray() as WithId<AssessmentDocument>[]
     : [];
   const assessmentDocs = savedAssessmentDocs.filter((assessment) => assessment.month === month && assessment.year === year);
-  const attendanceKeys = new Set(
-    attendanceDocs.map((doc) => {
-      const period = getRecordBillingPeriod(doc);
-      return `${doc.studentId || ""}:${doc.meetingNumber || 0}:${period.billingPeriod}`;
-    })
-  );
-  const gameSessionsByClassId = new Map(
-    gameSessionDocs
-      .filter((doc) => doc.classSessionId && doc.token && !isGameSessionExpired(doc.expiresAt))
-      .map((doc) => [
-        doc.classSessionId || "",
-        {
-          url: getGameSessionUrl(doc.token || ""),
-          expiresAt: doc.expiresAt ? new Date(doc.expiresAt).toISOString() : ""
-        }
-      ])
-  );
-
-  const sessions: TeacherSession[] = sessionDocs.flatMap((doc) => {
-    const studentId = doc.studentId || "";
-    const meetingNumber = doc.meetingNumber || 0;
-    const period = getRecordBillingPeriod(doc);
-    const attendanceKey = `${studentId}:${meetingNumber}:${period.billingPeriod}`;
-
-    if (doc.status === "Completed" || attendanceKeys.has(attendanceKey)) {
-      return [];
-    }
-
-    return [{
-      id: doc._id.toString(),
-      studentId,
-      studentName: doc.studentName || "Student",
-      courseJoined: doc.courseJoined || "",
-      classType: doc.classType || "",
-      classMode: doc.classMode || "Online",
-      meetingNumber,
-      sessionDate: doc.sessionDate || "",
-      scheduledAt: doc.scheduledAt || "",
-      endsAt: doc.endsAt || "",
-      status: getComputedClassSessionStatus({
-        status: doc.status,
-        scheduledAt: doc.scheduledAt,
-        endsAt: doc.endsAt,
-        hasAttendance: attendanceKeys.has(attendanceKey)
-      }),
-      gameLink: gameSessionsByClassId.get(doc._id.toString()) || null
-    }];
-  });
-
   const teacherBatchIds = new Set(batchDocs.map((doc) => doc._id.toString()));
   const assessmentByStudent = new Map(assessmentDocs.map((doc) => [doc.studentId || "", doc]));
 
   return {
-    sessions,
-    recentAttendance: attendanceDocs.map((doc) => ({
-      id: doc._id.toString(),
-      studentName: doc.studentName || "Student",
-      studentId: doc.studentId || "",
-      meetingNumber: doc.meetingNumber || 0,
-      meetingDate: doc.meetingDate || "",
-      status: doc.status || "Present",
-      notes: doc.notes || "",
-      courseJoined: doc.courseJoined || "",
-      classType: doc.classType || "",
-      classMode: doc.classMode || ""
-    })),
     batches: batchDocs.map((doc) => {
       const batchId = doc._id.toString();
       const students = studentDocs
@@ -500,7 +421,6 @@ export default async function TeacherPortalPage({
   searchParams
 }: {
   searchParams?: Promise<{
-    assessmentId?: string | string[];
     assessmentBatchId?: string | string[];
     assessmentStudentId?: string | string[];
     assessmentMonth?: string | string[];
@@ -528,20 +448,13 @@ export default async function TeacherPortalPage({
   const requestedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, currentPeriod.month);
   const requestedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, currentPeriod.year);
   const data = await getTeacherPortalData(teacher.id, requestedAssessmentMonth, requestedAssessmentYear);
-  const selectedAssessmentId = firstParam(resolvedSearchParams?.assessmentId);
-  const assessmentFromSavedRecord = data.savedAssessments.find((assessment) => assessment.id === selectedAssessmentId);
-  const selectedAssessmentMonth = assessmentFromSavedRecord?.month || requestedAssessmentMonth;
-  const selectedAssessmentYear = assessmentFromSavedRecord?.year || requestedAssessmentYear;
-  const selectedAssessmentBatchId = assessmentFromSavedRecord?.batchId || firstParam(resolvedSearchParams?.assessmentBatchId);
-  const selectedAssessmentStudentId = assessmentFromSavedRecord?.studentId || firstParam(resolvedSearchParams?.assessmentStudentId);
-  const today = getTodayJakarta();
-  const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
-  const missedSessions = data.sessions.filter((session) => session.sessionDate < today);
-  const needsAttendance = todaysSessions.filter((session) => session.status === "Needs Attendance");
-  const attendanceNeededSessions = data.sessions.filter((session) => session.status === "Needs Attendance");
+  const selectedAssessmentMonth = requestedAssessmentMonth;
+  const selectedAssessmentYear = requestedAssessmentYear;
+  const selectedAssessmentBatchId = firstParam(resolvedSearchParams?.assessmentBatchId) || data.batches[0]?.id || "";
+  const selectedAssessmentStudentId = firstParam(resolvedSearchParams?.assessmentStudentId);
   const selectedBatch = data.batches.find((batch) => batch.id === selectedAssessmentBatchId);
   const selectedStudent = selectedBatch?.students.find((student) => student.studentId === selectedAssessmentStudentId);
-  const selectedAssessment = assessmentFromSavedRecord || data.savedAssessments.find(
+  const selectedAssessment = data.savedAssessments.find(
     (assessment) =>
       assessment.studentId === selectedAssessmentStudentId &&
       assessment.batchId === selectedAssessmentBatchId &&
@@ -580,71 +493,15 @@ export default async function TeacherPortalPage({
         <TeacherPortalTabs active="assessments" />
       </header>
 
-      <section className="container-shell grid gap-6 py-8">
-        <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-          <div className="contents">
-            <Card className="p-5">
-              <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-lead-blue" />
-                <h2 className="font-heading text-xl font-bold text-lead-navy">Assigned Batches</h2>
-              </div>
-              <form action="/teacher/assessments" className="mt-4 grid gap-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-bold text-lead-navy">
-                  Assessment Month
-                  <select name="assessmentMonth" defaultValue={String(selectedAssessmentMonth)} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
-                    {Array.from({ length: 12 }, (_, index) => (
-                      <option key={index + 1} value={index + 1}>
-                        {monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, "")}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm font-bold text-lead-navy">
-                  Year
-                  <input name="assessmentYear" type="number" min={2020} max={2100} defaultValue={selectedAssessmentYear} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
-                </label>
-                <Button type="submit" variant="secondary" className="sm:col-span-2">Load Month</Button>
-              </form>
-              <div className="mt-4 grid gap-3">
-                {data.batches.map((batch) => (
-                  <div key={batch.id} className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-heading font-bold text-lead-navy">{batch.batchName}</p>
-                        <p className="mt-1 text-sm text-lead-gray">{batch.program}</p>
-                        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.1em] text-lead-gray">{batch.days} / {batch.time}</p>
-                      </div>
-                      <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold text-lead-blue">{batch.students.length} students</span>
-                    </div>
-                    <div className="mt-4 grid gap-2">
-                      {batch.students.map((student) => (
-                        <a
-                          key={student.studentId}
-                          href={`/teacher/assessments?assessmentBatchId=${encodeURIComponent(batch.id)}&assessmentStudentId=${encodeURIComponent(student.studentId)}&assessmentMonth=${selectedAssessmentMonth}&assessmentYear=${selectedAssessmentYear}#batch-assessment`}
-                          className={`focus-ring rounded-lg border p-3 transition hover:border-lead-blue hover:bg-blue-50 ${
-                            selectedAssessmentBatchId === batch.id && selectedAssessmentStudentId === student.studentId
-                              ? "border-lead-blue bg-blue-50"
-                              : "border-slate-100 bg-slate-50"
-                          }`}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-semibold text-lead-navy">{student.studentName}</p>
-                            <span className={`rounded-full px-2 py-1 text-xs font-bold uppercase ${gradeClassName(student.overallGrade)}`}>
-                              {student.overallGrade ? `Grade ${student.overallGrade}` : student.assessmentStatus}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-lead-gray">
-                            {student.studentId} / {student.classMode} / Attendance {student.attendancePercentage === null ? "-" : `${student.attendancePercentage}%`} / Stars {student.participationStars}/60
-                          </p>
-                        </a>
-                      ))}
-                      {!batch.students.length ? <p className="rounded-lg bg-slate-50 p-3 text-sm text-lead-gray">No students assigned to this batch yet.</p> : null}
-                    </div>
-                  </div>
-                ))}
-                {!data.batches.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No active batches assigned yet.</p> : null}
-              </div>
-            </Card>
+      <section className="container-shell py-8">
+        <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start">
+            <AssessmentStudentSelector
+              batches={data.batches}
+              selectedBatchId={selectedAssessmentBatchId}
+              selectedStudentId={selectedAssessmentStudentId}
+              month={selectedAssessmentMonth}
+              year={selectedAssessmentYear}
+            />
 
             <Card id="batch-assessment" className="scroll-mt-6 p-5">
               <div className="flex items-center gap-3">
@@ -655,49 +512,23 @@ export default async function TeacherPortalPage({
                 Monthly assessment for your assigned group students. The system calculates grades automatically.
               </p>
 
-              {selectedAssessment ? (
-                <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm font-bold text-lead-blue">
-                  Loaded saved marks for {selectedStudent?.studentName || selectedAssessment.studentId} / {monthName(selectedAssessment.month, selectedAssessment.year)}.
-                </p>
-              ) : selectedAssessmentStudentId ? (
-                <p className="mt-4 rounded-lg bg-yellow-50 p-3 text-sm font-bold text-yellow-800">
-                  No saved assessment found for this student and month yet. Saving will create it.
-                </p>
+              {selectedStudent ? (
+                <form action="/teacher/assessments#batch-assessment" className="mt-4 flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-end">
+                  <input type="hidden" name="assessmentBatchId" value={selectedAssessmentBatchId} />
+                  <input type="hidden" name="assessmentStudentId" value={selectedAssessmentStudentId} />
+                  <label className="grid flex-1 gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
+                    Month
+                    <select name="assessmentMonth" defaultValue={String(selectedAssessmentMonth)} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-lead-navy">
+                      {Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, "")}</option>)}
+                    </select>
+                  </label>
+                  <label className="grid flex-1 gap-1 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
+                    Year
+                    <input name="assessmentYear" type="number" min={2020} max={2100} defaultValue={selectedAssessmentYear} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-lead-navy" />
+                  </label>
+                  <Button type="submit" variant="secondary">Open Period</Button>
+                </form>
               ) : null}
-
-              <form action="/teacher/assessments#batch-assessment" className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
-                <div className="grid gap-3">
-                  <AssessmentSelect
-                    label="Open Saved Assessment"
-                    name="assessmentId"
-                    defaultValue={selectedAssessment?.id || ""}
-                    options={data.savedAssessments.map((assessment) => ({
-                      label: `${data.batches.flatMap((batch) => batch.students).find((student) => student.studentId === assessment.studentId)?.studentName || assessment.studentId} - ${monthName(assessment.month, assessment.year)} - ${assessment.batchName || "Batch"}`,
-                      value: assessment.id
-                    }))}
-                  />
-                  <div className="grid gap-3 border-t border-blue-100 pt-4 sm:grid-cols-2">
-                    <AssessmentSelect label="Batch" name="assessmentBatchId" defaultValue={selectedAssessmentBatchId} options={data.batches.map((batch) => ({ label: batch.batchName, value: batch.id }))} />
-                    <AssessmentSelect
-                      label="Student"
-                      name="assessmentStudentId"
-                      defaultValue={selectedAssessmentStudentId}
-                      options={data.batches.flatMap((batch) => batch.students.map((student) => ({ label: `${student.studentId} - ${student.studentName}`, value: student.studentId })))}
-                    />
-                    <AssessmentSelect
-                      label="Month"
-                      name="assessmentMonth"
-                      defaultValue={String(selectedAssessmentMonth)}
-                      options={Array.from({ length: 12 }, (_, index) => ({ label: monthName(index + 1, selectedAssessmentYear).replace(` ${selectedAssessmentYear}`, ""), value: String(index + 1) }))}
-                    />
-                    <label className="grid gap-2 text-sm font-bold text-lead-navy">
-                      Year
-                      <input name="assessmentYear" type="number" min={2020} max={2100} defaultValue={selectedAssessmentYear} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy" />
-                    </label>
-                  </div>
-                  <Button type="submit" variant="secondary">Load Assessment</Button>
-                </div>
-              </form>
 
               {isAssessmentReadyToEdit ? (
                 <ActionFeedbackForm action={saveTeacherMonthlyAssessment} successMessage="Monthly assessment saved." className="mt-5 grid gap-4">
@@ -770,13 +601,11 @@ export default async function TeacherPortalPage({
                 </ActionFeedbackForm>
               ) : (
                 <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">
-                  Choose a saved assessment above, or select batch, student, month, and year, then click Load Assessment.
+                  Select a student from the left to open their assessment.
                 </p>
               )}
             </Card>
-
-          </div>
-        </section>
+        </div>
       </section>
     </main>
   );
@@ -941,30 +770,6 @@ function TeacherSessionCard({ session }: { session: TeacherSession }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function AssessmentSelect({
-  label,
-  name,
-  options,
-  defaultValue
-}: {
-  label: string;
-  name: string;
-  options: Array<{ label: string; value: string }>;
-  defaultValue?: string;
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-bold text-lead-navy">
-      {label}
-      <select name={name} defaultValue={defaultValue || ""} className="focus-ring min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
-        <option value="">Select</option>
-        {options.map((option) => (
-          <option key={`${name}-${option.value}`} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-    </label>
   );
 }
 
