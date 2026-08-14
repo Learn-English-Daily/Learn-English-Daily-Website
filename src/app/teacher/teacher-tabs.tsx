@@ -1,13 +1,12 @@
-import { BookOpenText, CalendarCheck, ClipboardCheck, Users } from "lucide-react";
+import { BookOpenText, CalendarCheck, Users } from "lucide-react";
 
 const tabs = [
   { href: "/teacher", label: "Attendance", key: "attendance", icon: CalendarCheck },
-  { href: "/teacher/group-classes", label: "Group Classes", key: "group-classes", icon: Users },
   { href: "/teacher/journals", label: "Journal", key: "journal", icon: BookOpenText },
-  { href: "/teacher/assessments", label: "Batch Assessment", key: "assessments", icon: ClipboardCheck }
+  { href: "/teacher/group-classes", label: "Group Classes", key: "group-classes", icon: Users }
 ] as const;
 
-type TeacherTabKey = (typeof tabs)[number]["key"];
+type TeacherTabKey = (typeof tabs)[number]["key"] | "assessments";
 
 export function TeacherPortalTabs({ active }: { active: TeacherTabKey }) {
   return (

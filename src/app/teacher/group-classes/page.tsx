@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { CalendarDays, CheckCircle2, Clock3, LogOut, Users } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardCheck, Clock3, LogOut, Users } from "lucide-react";
 import { logoutTeacher, saveBatchClassAttendance } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
@@ -71,7 +71,12 @@ export default async function TeacherGroupClassesPage() {
             <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Group Classes</h1>
             <p className="mt-2 text-sm text-lead-gray">Mark the whole batch roster once. Results flow into monthly assessments.</p>
           </div>
-          <form action={logoutTeacher}><Button type="submit" variant="secondary"><LogOut className="h-4 w-4" /> Logout</Button></form>
+          <div className="flex flex-wrap gap-2">
+            <a href="/teacher/assessments" className="focus-ring inline-flex items-center gap-2 rounded-lg bg-lead-blue px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700">
+              <ClipboardCheck className="h-4 w-4" /> Batch Assessment
+            </a>
+            <form action={logoutTeacher}><Button type="submit" variant="secondary"><LogOut className="h-4 w-4" /> Logout</Button></form>
+          </div>
         </div>
         <TeacherPortalTabs active="group-classes" />
       </header>
