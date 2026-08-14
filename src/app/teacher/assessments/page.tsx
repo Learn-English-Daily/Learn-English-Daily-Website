@@ -241,9 +241,12 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || "" : value || "";
 }
 
-function numberParam(value: string | string[] | undefined, fallback: number) {
-  const parsed = Number(firstParam(value));
-  return Number.isFinite(parsed) ? parsed : fallback;
+function numberParam(value: string | string[] | undefined, fallback: number, min: number, max: number) {
+  const rawValue = firstParam(value).trim();
+  if (!rawValue) return fallback;
+
+  const parsed = Number(rawValue);
+  return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
 }
 
 function statusClassName(status: ComputedClassSessionStatus | AttendanceStatus) {
@@ -446,8 +449,8 @@ export default async function TeacherPortalPage({
 
   const currentPeriod = currentJakartaMonth();
   const hasOpenedPeriod = Boolean(firstParam(resolvedSearchParams?.assessmentMonth) && firstParam(resolvedSearchParams?.assessmentYear));
-  const requestedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, currentPeriod.month);
-  const requestedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, currentPeriod.year);
+  const requestedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, currentPeriod.month, 1, 12);
+  const requestedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, currentPeriod.year, 2020, 2100);
   const data = await getTeacherPortalData(teacher.id, requestedAssessmentMonth, requestedAssessmentYear);
   const selectedAssessmentMonth = requestedAssessmentMonth;
   const selectedAssessmentYear = requestedAssessmentYear;
