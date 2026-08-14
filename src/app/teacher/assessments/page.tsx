@@ -445,6 +445,7 @@ export default async function TeacherPortalPage({
   }
 
   const currentPeriod = currentJakartaMonth();
+  const hasOpenedPeriod = Boolean(firstParam(resolvedSearchParams?.assessmentMonth) && firstParam(resolvedSearchParams?.assessmentYear));
   const requestedAssessmentMonth = numberParam(resolvedSearchParams?.assessmentMonth, currentPeriod.month);
   const requestedAssessmentYear = numberParam(resolvedSearchParams?.assessmentYear, currentPeriod.year);
   const data = await getTeacherPortalData(teacher.id, requestedAssessmentMonth, requestedAssessmentYear);
@@ -463,7 +464,7 @@ export default async function TeacherPortalPage({
   );
   const selectedAssessmentMeetings = defaultMeetingsFromAssessment(selectedAssessment);
   const selectedAssessmentRatings = selectedAssessment?.ratings || defaultRatingsFromAssessment();
-  const isAssessmentReadyToEdit = Boolean(selectedBatch && selectedStudent);
+  const isAssessmentReadyToEdit = Boolean(selectedBatch && selectedStudent && hasOpenedPeriod);
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -499,8 +500,6 @@ export default async function TeacherPortalPage({
               batches={data.batches}
               selectedBatchId={selectedAssessmentBatchId}
               selectedStudentId={selectedAssessmentStudentId}
-              month={selectedAssessmentMonth}
-              year={selectedAssessmentYear}
             />
 
             <Card id="batch-assessment" className="scroll-mt-6 p-5">
@@ -511,6 +510,13 @@ export default async function TeacherPortalPage({
               <p className="mt-2 text-sm leading-6 text-lead-gray">
                 Monthly assessment for your assigned group students. The system calculates grades automatically.
               </p>
+
+              {selectedStudent && !hasOpenedPeriod ? (
+                <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="font-bold text-lead-navy">Choose the assessment period</p>
+                  <p className="mt-1 text-sm text-lead-gray">Current month and year are selected by default.</p>
+                </div>
+              ) : null}
 
               {selectedStudent ? (
                 <form action="/teacher/assessments#batch-assessment" className="mt-4 flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-end">
@@ -601,7 +607,7 @@ export default async function TeacherPortalPage({
                 </ActionFeedbackForm>
               ) : (
                 <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">
-                  Select a student from the left to open their assessment.
+                  {selectedStudent ? "Select the month and year, then press Open Period to begin the assessment." : "Select a student from the left to continue."}
                 </p>
               )}
             </Card>

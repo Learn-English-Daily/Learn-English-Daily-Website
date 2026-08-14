@@ -19,24 +19,18 @@ type BatchOption = {
 export function AssessmentStudentSelector({
   batches,
   selectedBatchId,
-  selectedStudentId,
-  month,
-  year
+  selectedStudentId
 }: {
   batches: BatchOption[];
   selectedBatchId: string;
   selectedStudentId: string;
-  month: number;
-  year: number;
 }) {
   const router = useRouter();
   const selectedBatch = batches.find((batch) => batch.id === selectedBatchId);
 
   function openBatch(batchId: string) {
     const query = new URLSearchParams({
-      assessmentBatchId: batchId,
-      assessmentMonth: String(month),
-      assessmentYear: String(year)
+      assessmentBatchId: batchId
     });
     router.push(`/teacher/assessments?${query.toString()}`);
   }
@@ -68,9 +62,7 @@ export function AssessmentStudentSelector({
             {selectedBatch.students.map((student) => {
               const query = new URLSearchParams({
                 assessmentBatchId: selectedBatch.id,
-                assessmentStudentId: student.studentId,
-                assessmentMonth: String(month),
-                assessmentYear: String(year)
+                assessmentStudentId: student.studentId
               });
               const selected = student.studentId === selectedStudentId;
 
