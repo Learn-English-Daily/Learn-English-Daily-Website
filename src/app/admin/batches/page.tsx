@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { WithId } from "mongodb";
-import { Archive, CalendarPlus, Pencil, Plus, UserPlus, type LucideIcon } from "lucide-react";
+import { Archive, Pencil, Plus, UserPlus, Users, type LucideIcon } from "lucide-react";
 import type React from "react";
 import { logoutAdmin } from "@/app/admin/actions";
 import {
@@ -10,9 +10,9 @@ import {
   cancelBatchClass,
   createBatch,
   removeStudentFromBatch,
-  scheduleBatchClasses,
   updateBatch
 } from "@/app/admin/batches/actions";
+import { BatchScheduleForm } from "@/app/admin/batches/batch-schedule-form";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -287,18 +287,7 @@ export default async function AdminBatchesPage() {
                   {batch.status === "active" ? (
                     <div className="grid gap-5 border-b border-slate-100 bg-blue-50/40 p-5 lg:grid-cols-[1fr_1.2fr]">
                       <div>
-                        <SectionTitle icon={CalendarPlus} title="Schedule Group Classes" description="Create one class or the complete 12-meeting timetable. Times are WIB." />
-                        <ActionFeedbackForm action={scheduleBatchClasses} successMessage="Group class schedule created." className="mt-4 grid gap-3 sm:grid-cols-2">
-                          <input type="hidden" name="batchId" value={batch.id} />
-                          <SelectField label="Schedule" name="scheduleMode" defaultValue="single" options={[{ label: "One class", value: "single" }, { label: "12-class series", value: "series" }]} required />
-                          <Field label="First Meeting" name="firstMeetingNumber" type="number" min={1} max={12} defaultValue={1} required />
-                          <Field label="First Date" name="firstDate" type="date" required />
-                          <Field label="From (WIB)" name="startTime" type="time" required />
-                          <Field label="To (WIB)" name="endTime" type="time" required />
-                          <Field label="Topic (optional)" name="topic" placeholder="Introductions and greetings" />
-                          <div className="flex items-end"><Button type="submit" className="w-full">Create Schedule</Button></div>
-                        </ActionFeedbackForm>
-                        <p className="mt-3 text-xs leading-5 text-lead-gray">The 12-class option follows the batch days: {batch.days}. The current student roster is saved with each class.</p>
+                        <BatchScheduleForm batchId={batch.id} batchName={batch.batchName} days={batch.days} />
                       </div>
                       <div>
                         <h3 className="font-heading text-lg font-extrabold text-lead-navy">Scheduled Classes</h3>
@@ -326,6 +315,9 @@ export default async function AdminBatchesPage() {
                     </div>
                   ) : null}
 
+                  <div className="border-b border-slate-100 bg-white p-5">
+                    <SectionTitle icon={Users} title={`Students in ${batch.batchName}`} description={`These ${batchStudents.length} students belong to this batch. They will appear together in the teacher's group attendance roster.`} />
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[560px] text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase tracking-[0.12em] text-lead-gray">
