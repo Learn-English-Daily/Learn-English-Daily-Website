@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
+import { getAuthenticatedAdmin } from "@/lib/admin-auth";
+import {
+  generateBatchMeetingDates,
+  getBatchClassSessionsCollectionName,
+  parseBatchWeekdays
+} from "@/lib/batch-class-sessions";
 import {
   getBatchesCollectionName,
   isAssessmentProgram
@@ -32,6 +38,9 @@ async function assertAdmin() {
   if (!isAuthenticated) {
     throw new Error("Unauthorized");
   }
+  const admin = await getAuthenticatedAdmin();
+  if (!admin) throw new Error("Unauthorized");
+  return admin;
 }
 
 async function resolveTeacher(teacherId: string) {
@@ -203,4 +212,83 @@ export async function removeStudentFromBatch(formData: FormData) {
 
   revalidatePath("/admin/batches");
   revalidatePath("/admin/students");
+}
+
+export async function scheduleBatchClasses(formData: FormData) {
+  const admin = await assertAdmin();
+  const batchId = clean(formData.get("batchId"));
+  const scheduleMode = clean(formData.get("scheduleMode"));
+  const firstMeetingNumber = numberInRange(formData.get("firstMeetingNumber"), 1, 12, 1);
+  const firstDate = clean(formData.get("firstDate"));
+  const startTime = clean(formData.get("startTime"));
+  const endTime = clean(formData.get("endTime"));
+  const topic = clean(formData.get("topic"));
+  const count = scheduleMode === "series" ? 12 : 1;
+
+  if (firstMeetingNumber + count - 1 > 12) {
+    throw new Error("A 12-class series must start at Meeting 1. Single classes can use Meeting 1 to 12.");
+  }
+
+  if (!ObjectId.isValid(batchId) || !/^\d{4}-\d{2}-\d{2}$/.test(firstDate) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime) || endTime <= startTime) {
+    throw new Error("Enter a valid date and WIB time range.");
+  }
+
+  const db = await getMongoDb();
+  const batch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), status: "active" });
+  if (!batch) throw new Error("Active batch not found.");
+
+  const weekdays = scheduleMode === "series" ? parseBatchWeekdays(String(batch.days || "")) : [new Date(`${firstDate}T00:00:00Z`).getUTCDay()];
+  const dates = generateBatchMeetingDates(firstDate, weekdays, count);
+  if (dates.length !== count) throw new Error("Could not generate meeting dates. Check the batch Days field.");
+
+  const meetingNumbers = Array.from({ length: count }, (_, index) => firstMeetingNumber + index);
+  const conflict = await db.collection(getBatchClassSessionsCollectionName()).findOne({
+    batchId,
+    meetingNumber: { $in: meetingNumbers },
+    status: { $ne: "Cancelled" }
+  });
+  if (conflict) throw new Error(`Meeting ${conflict.meetingNumber} is already scheduled for this batch.`);
+
+  const students = await db.collection(getStudentRegistrationCollectionName()).find({
+    ...getBasicGroupStudentFilter(),
+    activeBatchId: batchId
+  }).sort({ studentName: 1 }).toArray();
+  if (!students.length) throw new Error("Assign at least one student before scheduling classes.");
+
+  const now = new Date();
+  await db.collection(getBatchClassSessionsCollectionName()).insertMany(dates.map((sessionDate, index) => ({
+    batchId,
+    batchName: String(batch.batchName || "Batch"),
+    program: String(batch.program || ""),
+    meetingNumber: meetingNumbers[index],
+    sessionDate,
+    startTime,
+    endTime,
+    teacherId: String(batch.teacherId || ""),
+    teacherName: String(batch.teacherName || ""),
+    topic,
+    status: "Scheduled",
+    studentSnapshot: students.map((student) => ({ studentId: String(student.studentId || ""), studentName: String(student.studentName || "Student") })),
+    attendanceMarked: false,
+    createdBy: admin.name,
+    createdAt: now,
+    updatedAt: now
+  })));
+
+  revalidatePath("/admin/batches");
+  revalidatePath("/teacher/group-classes");
+}
+
+export async function cancelBatchClass(formData: FormData) {
+  await assertAdmin();
+  const sessionId = clean(formData.get("sessionId"));
+  if (!ObjectId.isValid(sessionId)) throw new Error("Invalid group class.");
+
+  const db = await getMongoDb();
+  await db.collection(getBatchClassSessionsCollectionName()).updateOne(
+    { _id: new ObjectId(sessionId), attendanceMarked: { $ne: true } },
+    { $set: { status: "Cancelled", updatedAt: new Date() } }
+  );
+  revalidatePath("/admin/batches");
+  revalidatePath("/teacher/group-classes");
 }

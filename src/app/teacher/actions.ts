@@ -19,6 +19,12 @@ import {
 } from "@/lib/billing-periods";
 import { getClassSessionsCollectionName, type ClassSessionDocument } from "@/lib/class-sessions";
 import {
+  getBatchClassSessionsCollectionName,
+  getJakartaPeriod,
+  type BatchAttendanceEntry,
+  type BatchClassSessionDocument
+} from "@/lib/batch-class-sessions";
+import {
   getGameSessionExpiry,
   getGameSessionsCollectionName,
   type GameSessionDocument
@@ -97,6 +103,15 @@ async function assertTeacher() {
     throw new Error("Unauthorized");
   }
   return teacher;
+}
+
+function getTodayJakarta() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
 }
 
 async function syncPaymentFromTeacherAttendance({
@@ -507,6 +522,84 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
   );
 
   revalidatePath("/teacher");
+  revalidatePath("/teacher/assessments");
+  revalidatePath("/admin/batches");
+  revalidatePath("/parent");
+}
+
+export async function saveBatchClassAttendance(formData: FormData) {
+  const teacher = await assertTeacher();
+  const sessionId = clean(formData.get("sessionId"));
+  if (!ObjectId.isValid(sessionId)) throw new Error("Invalid group class.");
+
+  const db = await getMongoDb();
+  const sessions = db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName());
+  const session = await sessions.findOne({
+    _id: new ObjectId(sessionId),
+    teacherId: teacher.id,
+    status: "Scheduled"
+  });
+
+  if (!session) throw new Error("Scheduled group class not found for this teacher.");
+  if (session.sessionDate > getTodayJakarta()) throw new Error("Attendance can only be marked on or after the class date.");
+
+  const attendance: BatchAttendanceEntry[] = session.studentSnapshot.map((student, index) => {
+    const status = clean(formData.get(`attendance_${index}`));
+    if (!isAssessmentAttendanceStatus(status)) throw new Error(`Select attendance for ${student.studentName}.`);
+    return {
+      ...student,
+      attendance: status,
+      participationStars: numberInRange(formData.get(`stars_${index}`), 0, 5, 0),
+      minutesLate: numberInRange(formData.get(`late_${index}`), 0, 240, 0)
+    };
+  });
+
+  const now = new Date();
+  await sessions.updateOne(
+    { _id: session._id, status: "Scheduled" },
+    { $set: { attendance, attendanceMarked: true, attendanceMarkedAt: now, attendanceMarkedBy: teacher.id, status: "Completed", updatedAt: now } }
+  );
+
+  const period = getJakartaPeriod(session.sessionDate);
+  if (period && session.meetingNumber >= 1 && session.meetingNumber <= 12) {
+    const assessments = db.collection(getMonthlyAssessmentsCollectionName());
+    for (const entry of attendance) {
+      const existing = await assessments.findOne({ studentId: entry.studentId, month: period.month, year: period.year });
+      const meetings: MeetingAssessmentInput[] = Array.from({ length: 12 }, (_, index) => {
+        const saved = Array.isArray(existing?.meetings) ? existing.meetings[index] as MeetingAssessmentInput | undefined : undefined;
+        return saved || { attendance: "Absent", participationStars: 0, minutesLate: 0 };
+      });
+      meetings[session.meetingNumber - 1] = {
+        attendance: entry.attendance,
+        participationStars: entry.participationStars,
+        minutesLate: entry.minutesLate
+      };
+
+      await assessments.updateOne(
+        { studentId: entry.studentId, month: period.month, year: period.year },
+        {
+          $set: {
+            studentId: entry.studentId,
+            studentName: entry.studentName,
+            batchId: session.batchId,
+            batchName: session.batchName,
+            program: session.program,
+            teacherId: teacher.id,
+            teacherName: teacher.name,
+            month: period.month,
+            year: period.year,
+            status: existing?.status === "finalized" ? "finalized" : "in-progress",
+            meetings,
+            updatedAt: now
+          },
+          $setOnInsert: { createdAt: now }
+        },
+        { upsert: true }
+      );
+    }
+  }
+
+  revalidatePath("/teacher/group-classes");
   revalidatePath("/teacher/assessments");
   revalidatePath("/admin/batches");
   revalidatePath("/parent");

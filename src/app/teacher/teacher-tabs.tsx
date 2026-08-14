@@ -1,7 +1,8 @@
-import { BookOpenText, CalendarCheck, ClipboardCheck } from "lucide-react";
+import { BookOpenText, CalendarCheck, ClipboardCheck, Users } from "lucide-react";
 
 const tabs = [
   { href: "/teacher", label: "Attendance", key: "attendance", icon: CalendarCheck },
+  { href: "/teacher/group-classes", label: "Group Classes", key: "group-classes", icon: Users },
   { href: "/teacher/journals", label: "Journal", key: "journal", icon: BookOpenText },
   { href: "/teacher/assessments", label: "Batch Assessment", key: "assessments", icon: ClipboardCheck }
 ] as const;
