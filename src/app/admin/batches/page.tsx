@@ -7,12 +7,10 @@ import { logoutAdmin } from "@/app/admin/actions";
 import {
   archiveBatch,
   assignStudentToBatch,
-  cancelBatchClass,
   createBatch,
   removeStudentFromBatch,
   updateBatch
 } from "@/app/admin/batches/actions";
-import { BatchScheduleForm } from "@/app/admin/batches/batch-schedule-form";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -24,7 +22,6 @@ import {
   getBatchesCollectionName
 } from "@/lib/assessments";
 import { getMongoDb } from "@/lib/mongodb";
-import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getAvailableTeachers, type TeacherOption } from "@/lib/teachers";
 
@@ -77,19 +74,6 @@ type Student = {
 
 type Teacher = TeacherOption;
 
-type BatchSession = {
-  id: string;
-  batchId: string;
-  meetingNumber: number;
-  sessionDate: string;
-  startTime: string;
-  endTime: string;
-  topic: string;
-  status: string;
-  studentCount: number;
-  attendanceMarked: boolean;
-};
-
 function formatDate(value: string) {
   if (!value) return "Not set";
   return new Intl.DateTimeFormat("en", {
@@ -107,11 +91,10 @@ function getBasicGroupStudentFilter() {
 async function getBatchPageData() {
   const db = await getMongoDb();
 
-  const [batchDocs, teacherDocs, studentDocs, sessionDocs] = await Promise.all([
+  const [batchDocs, teacherDocs, studentDocs] = await Promise.all([
     db.collection<BatchDocument>(getBatchesCollectionName()).find({}).sort({ status: 1, startDate: -1 }).limit(100).toArray() as Promise<WithId<BatchDocument>[]>,
     getAvailableTeachers(db),
-    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getBasicGroupStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>,
-    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({}).sort({ sessionDate: -1, meetingNumber: -1 }).limit(500).toArray()
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getBasicGroupStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>
   ]);
 
   return {
@@ -136,18 +119,6 @@ async function getBatchPageData() {
       classType: student.classType || "",
       classMode: student.classMode || "Online",
       activeBatchId: student.activeBatchId || ""
-    })),
-    sessions: sessionDocs.map((session): BatchSession => ({
-      id: session._id.toString(),
-      batchId: session.batchId,
-      meetingNumber: session.meetingNumber,
-      sessionDate: session.sessionDate,
-      startTime: session.startTime,
-      endTime: session.endTime,
-      topic: session.topic || "",
-      status: session.status,
-      studentCount: session.studentSnapshot?.length || 0,
-      attendanceMarked: Boolean(session.attendanceMarked)
     }))
   };
 }
@@ -183,7 +154,7 @@ export default async function AdminBatchesPage() {
   }
 
   const [batchPageData, admin] = await Promise.all([getBatchPageData(), getAuthenticatedAdmin()]);
-  const { batches, teachers, students, sessions } = batchPageData;
+  const { batches, teachers, students } = batchPageData;
   const activeBatches = batches.filter((batch) => batch.status === "active");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
 
@@ -240,7 +211,6 @@ export default async function AdminBatchesPage() {
         <div className="grid gap-5">
             {batches.map((batch) => {
               const batchStudents = students.filter((student) => student.activeBatchId === batch.id);
-              const batchSessions = sessions.filter((session) => session.batchId === batch.id);
 
               return (
                 <Card key={batch.id} className="overflow-hidden">
@@ -283,37 +253,6 @@ export default async function AdminBatchesPage() {
                       <Metric label="Students" value={`${batchStudents.length}/${batch.maximumStudents}`} />
                     </div>
                   </div>
-
-                  {batch.status === "active" ? (
-                    <div className="grid gap-5 border-b border-slate-100 bg-blue-50/40 p-5 lg:grid-cols-[1fr_1.2fr]">
-                      <div>
-                        <BatchScheduleForm batchId={batch.id} batchName={batch.batchName} days={batch.days} />
-                      </div>
-                      <div>
-                        <h3 className="font-heading text-lg font-extrabold text-lead-navy">Scheduled Classes</h3>
-                        <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
-                          {batchSessions.map((session) => (
-                            <div key={session.id} className="flex flex-col gap-2 rounded-xl border border-blue-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <p className="font-bold text-lead-navy">Meeting {session.meetingNumber} / {formatDate(session.sessionDate)}</p>
-                                <p className="text-xs text-lead-gray">{session.startTime} - {session.endTime} WIB / {session.studentCount} students{session.topic ? ` / ${session.topic}` : ""}</p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${session.status === "Completed" ? "bg-emerald-50 text-emerald-700" : session.status === "Cancelled" ? "bg-slate-100 text-slate-600" : "bg-blue-50 text-lead-blue"}`}>{session.status}</span>
-                                {!session.attendanceMarked && session.status !== "Cancelled" ? (
-                                  <ActionFeedbackForm action={cancelBatchClass} successMessage="Group class cancelled.">
-                                    <input type="hidden" name="sessionId" value={session.id} />
-                                    <button type="submit" className="text-xs font-bold text-rose-600">Cancel</button>
-                                  </ActionFeedbackForm>
-                                ) : null}
-                              </div>
-                            </div>
-                          ))}
-                          {!batchSessions.length ? <p className="rounded-xl bg-white p-4 text-sm text-lead-gray">No group classes scheduled yet.</p> : null}
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
 
                   <div className="border-b border-slate-100 bg-white p-5">
                     <SectionTitle icon={Users} title={`Students in ${batch.batchName}`} description={`These ${batchStudents.length} students belong to this batch. They will appear together in the teacher's group attendance roster.`} />

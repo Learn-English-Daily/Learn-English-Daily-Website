@@ -44,7 +44,7 @@ export function AdminPageHeader({
   logoutAction: () => void | Promise<void>;
 }) {
   const access = getAdminAccessForUsername(username || "");
-  const visibleNavItems = adminNavItems.filter((item) => access === "full" || ["students", "batches"].includes(item.key));
+  const visibleNavItems = adminNavItems.filter((item) => access === "full" || ["sessions", "students", "batches"].includes(item.key));
 
   return (
     <header className="border-b border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">

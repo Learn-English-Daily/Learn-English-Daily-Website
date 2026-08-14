@@ -1,10 +1,11 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { redirect } from "next/navigation";
-import { CalendarClock, Gamepad2, Pencil, Trash2 } from "lucide-react";
+import { CalendarClock, Gamepad2, Pencil, Trash2, UserRound, Users } from "lucide-react";
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
+import { cancelBatchClass } from "@/app/admin/batches/actions";
+import { BatchScheduleForm } from "@/app/admin/batches/batch-schedule-form";
 import {
   createClassSession,
   deleteClassSession,
@@ -30,6 +31,8 @@ import {
   type ComputedClassSessionStatus
 } from "@/lib/class-sessions";
 import { getStudentAttendanceCollectionName } from "@/lib/attendance";
+import { getBatchesCollectionName } from "@/lib/assessments";
+import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 import {
   getGameSessionUrl,
   getGameSessionsCollectionName,
@@ -104,11 +107,35 @@ type GameLink = {
   expiresAt: string;
 };
 
+type SchedulingBatch = {
+  id: string;
+  batchName: string;
+  program: string;
+  teacherName: string;
+  days: string;
+  time: string;
+};
+
+type GroupClassSession = {
+  id: string;
+  batchId: string;
+  batchName: string;
+  meetingNumber: number;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  topic: string;
+  teacherName: string;
+  studentCount: number;
+  status: string;
+  attendanceMarked: boolean;
+};
+
 async function getStudents(): Promise<Student[]> {
   const db = await getMongoDb();
   const docs = (await db
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
-    .find(getActiveStudentFilter())
+    .find({ $and: [getActiveStudentFilter(), { classType: { $ne: "Basic Group" } }] })
     .sort({ createdAt: -1 })
     .limit(200)
     .toArray()) as WithId<StudentDocument>[];
@@ -122,6 +149,39 @@ async function getStudents(): Promise<Student[]> {
     classType: doc.classType || "",
     classMode: doc.classMode || "Online"
   }));
+}
+
+async function getGroupSchedulingData() {
+  const db = await getMongoDb();
+  const [batchDocs, sessionDocs] = await Promise.all([
+    db.collection(getBatchesCollectionName()).find({ status: "active" }).sort({ batchName: 1 }).limit(100).toArray(),
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: { $ne: "Cancelled" } }).sort({ sessionDate: -1, meetingNumber: -1 }).limit(500).toArray()
+  ]);
+
+  return {
+    batches: batchDocs.map((batch): SchedulingBatch => ({
+      id: batch._id.toString(),
+      batchName: String(batch.batchName || "Untitled batch"),
+      program: String(batch.program || ""),
+      teacherName: String(batch.teacherName || "Not assigned"),
+      days: String(batch.days || ""),
+      time: String(batch.time || "")
+    })),
+    sessions: sessionDocs.map((session): GroupClassSession => ({
+      id: session._id.toString(),
+      batchId: session.batchId,
+      batchName: session.batchName,
+      meetingNumber: session.meetingNumber,
+      sessionDate: session.sessionDate,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      topic: session.topic || "",
+      teacherName: session.teacherName || "Not assigned",
+      studentCount: session.studentSnapshot?.length || 0,
+      status: session.status,
+      attendanceMarked: Boolean(session.attendanceMarked)
+    }))
+  };
 }
 
 async function getTeachers(): Promise<Teacher[]> {
@@ -281,7 +341,7 @@ function ClassGamePanel({ classSessionId, link }: { classSessionId: string; link
   );
 }
 
-export default async function AdminSessionsPage() {
+export default async function AdminSessionsPage({ searchParams }: { searchParams?: Promise<{ type?: string | string[]; batchId?: string | string[] }> }) {
   noStore();
   const cookieStore = await cookies();
   const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
@@ -315,9 +375,19 @@ export default async function AdminSessionsPage() {
     );
   }
 
-  if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
-
-  const [students, teachers, sessions, admin] = await Promise.all([getStudents(), getTeachers(), getSessions(), getAuthenticatedAdmin()]);
+  const resolvedSearchParams = await searchParams;
+  const requestedType = Array.isArray(resolvedSearchParams?.type) ? resolvedSearchParams?.type[0] : resolvedSearchParams?.type;
+  const requestedBatchId = Array.isArray(resolvedSearchParams?.batchId) ? resolvedSearchParams?.batchId[0] : resolvedSearchParams?.batchId;
+  const groupOnly = isGroupStudentAdminSession(session);
+  const schedulingType = groupOnly || requestedType === "group" ? "group" : "private";
+  const admin = await getAuthenticatedAdmin();
+  const [students, teachers, sessions] = schedulingType === "private"
+    ? await Promise.all([getStudents(), getTeachers(), getSessions()])
+    : [[], [], []] as [Student[], Teacher[], ClassSession[]];
+  const groupData = schedulingType === "group" ? await getGroupSchedulingData() : { batches: [], sessions: [] };
+  const selectedBatchId = groupData.batches.some((batch) => batch.id === requestedBatchId) ? requestedBatchId || "" : groupData.batches[0]?.id || "";
+  const selectedBatch = groupData.batches.find((batch) => batch.id === selectedBatchId);
+  const selectedBatchSessions = groupData.sessions.filter((groupSession) => groupSession.batchId === selectedBatchId);
   const needsAttendance = sessions.filter((session) => session.status === "Needs Attendance");
   const today = getIndonesiaDateInput();
   const todaysSessions = sessions.filter((session) => session.sessionDate === today);
@@ -333,7 +403,25 @@ export default async function AdminSessionsPage() {
         logoutAction={logoutAdmin}
       />
 
-      <section className="container-shell grid gap-6 py-8 2xl:grid-cols-[0.85fr_1.15fr]">
+      <section className="container-shell pt-8">
+        <Card className="p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {!groupOnly ? (
+              <a href="/admin/sessions?type=private" className={`focus-ring flex items-center gap-4 rounded-xl border p-4 transition ${schedulingType === "private" ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white hover:border-blue-300"}`}>
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-lead-blue shadow-sm"><UserRound className="h-5 w-5" /></div>
+                <div><p className="font-heading text-lg font-extrabold text-lead-navy">Private 1-to-1 Classes</p><p className="mt-1 text-sm text-lead-gray">Schedule one individual student at a time.</p></div>
+              </a>
+            ) : null}
+            <a href="/admin/sessions?type=group" className={`focus-ring flex items-center gap-4 rounded-xl border p-4 transition ${schedulingType === "group" ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white hover:border-blue-300"}`}>
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-lead-blue shadow-sm"><Users className="h-5 w-5" /></div>
+              <div><p className="font-heading text-lg font-extrabold text-lead-navy">Group Batch Classes</p><p className="mt-1 text-sm text-lead-gray">Schedule one batch roster for 1 or 12 meetings.</p></div>
+            </a>
+          </div>
+        </Card>
+      </section>
+
+      {schedulingType === "private" ? (
+      <section className="container-shell grid gap-6 py-6 2xl:grid-cols-[0.85fr_1.15fr]">
         <div className="grid gap-6 content-start">
           <Card className="p-5">
             <h2 className="font-heading text-xl font-bold text-lead-navy">Schedule class</h2>
@@ -514,6 +602,47 @@ export default async function AdminSessionsPage() {
           </div>
         </Card>
       </section>
+      ) : (
+        <section className="container-shell grid gap-6 py-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div className="grid gap-5">
+            <Card className="p-5">
+              <div className="flex items-center gap-3"><Users className="h-5 w-5 text-lead-blue" /><h2 className="font-heading text-xl font-extrabold text-lead-navy">Choose a Batch</h2></div>
+              <p className="mt-2 text-sm leading-6 text-lead-gray">Select the whole group first. Students and the assigned teacher come from Batch Management automatically.</p>
+              <form action="/admin/sessions" className="mt-4 grid gap-3">
+                <input type="hidden" name="type" value="group" />
+                <select name="batchId" defaultValue={selectedBatchId} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-lead-navy">
+                  {groupData.batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.batchName} - {batch.program}</option>)}
+                </select>
+                <Button type="submit" variant="secondary">Open Batch Schedule</Button>
+              </form>
+              {selectedBatch ? (
+                <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-lead-gray">
+                  <p><strong className="text-lead-navy">Teacher:</strong> {selectedBatch.teacherName}</p>
+                  <p><strong className="text-lead-navy">Class days:</strong> {selectedBatch.days}</p>
+                  <p><strong className="text-lead-navy">Regular time:</strong> {selectedBatch.time}</p>
+                </div>
+              ) : null}
+            </Card>
+            {selectedBatch ? <Card className="p-5"><BatchScheduleForm batchId={selectedBatch.id} batchName={selectedBatch.batchName} days={selectedBatch.days} /></Card> : null}
+            {!selectedBatch ? <Card className="p-6 text-sm text-lead-gray">Create an active batch and assign its students before scheduling group classes.</Card> : null}
+          </div>
+
+          <Card className="p-5">
+            <div className="flex items-start justify-between gap-3"><div><h2 className="font-heading text-xl font-extrabold text-lead-navy">{selectedBatch ? `${selectedBatch.batchName} Schedule` : "Group Schedule"}</h2><p className="mt-2 text-sm text-lead-gray">Only classes for the selected batch are shown here.</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-lead-blue">{selectedBatchSessions.length} classes</span></div>
+            <div className="mt-5 max-h-[760px] space-y-3 overflow-y-auto pr-1">
+              {selectedBatchSessions.map((groupSession) => (
+                <div key={groupSession.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div><p className="font-heading text-lg font-bold text-lead-navy">Meeting {groupSession.meetingNumber}</p><p className="mt-1 text-sm font-semibold text-lead-gray">{formatDate(groupSession.sessionDate)} / {groupSession.startTime} - {groupSession.endTime} WIB</p><p className="mt-1 text-sm text-lead-gray">{groupSession.teacherName} / {groupSession.studentCount} students{groupSession.topic ? ` / ${groupSession.topic}` : ""}</p></div>
+                    <div className="flex items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-bold ${groupSession.status === "Completed" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-lead-blue"}`}>{groupSession.status}</span>{!groupSession.attendanceMarked ? <ActionFeedbackForm action={cancelBatchClass} successMessage="Group class cancelled."><input type="hidden" name="sessionId" value={groupSession.id} /><button type="submit" className="text-xs font-bold text-rose-600">Cancel</button></ActionFeedbackForm> : null}</div>
+                  </div>
+                </div>
+              ))}
+              {!selectedBatchSessions.length ? <p className="rounded-xl bg-slate-50 p-5 text-sm text-lead-gray">No classes scheduled for this batch yet.</p> : null}
+            </div>
+          </Card>
+        </section>
+      )}
     </main>
   );
 }
