@@ -287,14 +287,17 @@ async function getDashboardData(period: Period) {
       }) === "Needs Attendance"
   );
 
-  const courseCounts = new Map<string, number>();
+  const courseCounts = new Map<string, { course: string; classType: string; count: number }>();
   for (const student of periodStudents) {
     const course = student.courseJoined || "Not assigned";
-    courseCounts.set(course, (courseCounts.get(course) || 0) + 1);
+    const classType = student.classType || "Class type not set";
+    const key = `${course}\u0000${classType}`;
+    const current = courseCounts.get(key);
+    courseCounts.set(key, { course, classType, count: (current?.count || 0) + 1 });
   }
-  const courses = [...courseCounts.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
+  const courses = [...courseCounts.values()]
+    .map(({ course, classType, count }) => ({ name: `${course} · ${classType}`, course, classType, count }))
+    .sort((a, b) => b.count - a.count || a.course.localeCompare(b.course) || a.classType.localeCompare(b.classType));
 
   const teacherCounts = new Map<string, number>();
   for (const record of periodAttendance) {
@@ -653,7 +656,8 @@ export default async function CeoDashboardPage({
 
         <section className="grid gap-6 xl:grid-cols-3">
           <Card className="p-5">
-            <div className="flex items-center gap-3"><GraduationCap className="h-5 w-5 text-lead-blue" /><h2 className="font-heading text-xl font-bold text-lead-navy">Students by course</h2></div>
+            <div className="flex items-center gap-3"><GraduationCap className="h-5 w-5 text-lead-blue" /><h2 className="font-heading text-xl font-bold text-lead-navy">Students by course &amp; class type</h2></div>
+            <p className="mt-1 text-sm text-lead-gray">Group, buddy, and premium students are counted separately.</p>
             <div className="mt-5 grid gap-4">
               {data.courses.map((course) => (
                 <div key={course.name}>
