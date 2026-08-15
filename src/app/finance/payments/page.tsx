@@ -37,6 +37,8 @@ type StudentDocument = {
   classType?: string;
   classMode?: string;
   englishLevel?: string;
+  studentStatus?: string;
+  createdAt?: Date;
 };
 
 type Student = {
@@ -49,6 +51,9 @@ type Student = {
   classType: string;
   classMode: string;
   englishLevel: string;
+  studentStatus: string;
+  unpaidCount: number;
+  totalUnpaid: number;
 };
 
 type PaymentDocument = {
@@ -139,6 +144,7 @@ type PendingReceiptStudent = {
 type FinancePaymentOverview = {
   summary: FinancePaymentSummary;
   pendingReceiptStudents: PendingReceiptStudent[];
+  unpaidByStudent: Record<string, { count: number; total: number }>;
 };
 
 function escapeRegex(value: string) {
@@ -211,7 +217,11 @@ function currentJakartaMonth() {
   };
 }
 
-async function getStudents(query = ""): Promise<Student[]> {
+function isActiveFinanceStudent(student: StudentDocument) {
+  return !student.studentStatus || student.studentStatus === "Active";
+}
+
+async function getStudents(query = "", unpaidByStudent: FinancePaymentOverview["unpaidByStudent"] = {}, showArchived = false): Promise<Student[]> {
   const db = await getMongoDb();
   const search = query.trim();
   const searchFilter: Filter<StudentDocument> = search
@@ -227,10 +237,12 @@ async function getStudents(query = ""): Promise<Student[]> {
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
     .find(filter)
     .sort({ createdAt: -1 })
-    .limit(search ? 20 : 8)
+    .limit(search ? 200 : 1000)
     .toArray()) as WithId<StudentDocument>[];
 
-  return docs.map((doc) => ({
+  return docs
+    .filter((doc) => showArchived || isActiveFinanceStudent(doc) || (unpaidByStudent[doc.studentId || ""]?.count || 0) > 0)
+    .map((doc) => ({
     id: doc._id.toString(),
     studentId: doc.studentId || "",
     studentName: doc.studentName || "Unknown",
@@ -239,11 +251,16 @@ async function getStudents(query = ""): Promise<Student[]> {
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
     classMode: doc.classMode || "",
-    englishLevel: doc.englishLevel || ""
-  }));
+    englishLevel: doc.englishLevel || "",
+    studentStatus: doc.studentStatus || "Active",
+    unpaidCount: unpaidByStudent[doc.studentId || ""]?.count || 0,
+    totalUnpaid: unpaidByStudent[doc.studentId || ""]?.total || 0
+  }))
+    .sort((left, right) => right.unpaidCount - left.unpaidCount || left.studentName.localeCompare(right.studentName))
+    .slice(0, search ? 20 : 8);
 }
 
-async function getSelectedStudent(studentId = "") {
+async function getSelectedStudent(studentId = "", unpaidByStudent: FinancePaymentOverview["unpaidByStudent"] = {}, showArchived = false) {
   if (!studentId) return null;
 
   const db = await getMongoDb();
@@ -251,6 +268,7 @@ async function getSelectedStudent(studentId = "") {
     $and: [{ studentId }, getCourseStudentFilter()]
   });
   if (!doc) return null;
+  if (!showArchived && !isActiveFinanceStudent(doc) && !(unpaidByStudent[doc.studentId || ""]?.count > 0)) return null;
 
   return {
     id: doc._id.toString(),
@@ -261,7 +279,10 @@ async function getSelectedStudent(studentId = "") {
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
     classMode: doc.classMode || "",
-    englishLevel: doc.englishLevel || ""
+    englishLevel: doc.englishLevel || "",
+    studentStatus: doc.studentStatus || "Active",
+    unpaidCount: unpaidByStudent[doc.studentId || ""]?.count || 0,
+    totalUnpaid: unpaidByStudent[doc.studentId || ""]?.total || 0
   };
 }
 
@@ -347,6 +368,15 @@ async function getFinancePaymentOverview(closedPeriodKeys = new Set<string>()): 
   });
   const paidPayments = activePayments.filter((payment) => payment.status === "Paid");
   const unpaidPayments = activePayments.filter((payment) => payment.status !== "Paid");
+  const unpaidByStudent = unpaidPayments.reduce((students, payment) => {
+    const studentId = payment.studentId || "";
+    if (!studentId) return students;
+    const current = students[studentId] || { count: 0, total: 0 };
+    current.count += 1;
+    current.total += getEffectivePaymentAmountDue(payment, studentsById.get(studentId));
+    students[studentId] = current;
+    return students;
+  }, {} as Record<string, { count: number; total: number }>);
 
   const pendingReceiptStudents = Array.from(
     paidPayments
@@ -383,7 +413,8 @@ async function getFinancePaymentOverview(closedPeriodKeys = new Set<string>()): 
       totalPaid: paidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0),
       totalUnpaid: unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0)
     },
-    pendingReceiptStudents
+    pendingReceiptStudents,
+    unpaidByStudent
   };
 }
 
@@ -433,10 +464,10 @@ export default async function FinancePaymentsPage({
   }
 
   const closedPeriodKeys = await getClosedBillingPeriodKeys(await getMongoDb());
-  const [students, selectedStudent, financeOverview] = await Promise.all([
-    getStudents(searchQuery),
-    getSelectedStudent(selectedStudentId),
-    getFinancePaymentOverview(closedPeriodKeys)
+  const financeOverview = await getFinancePaymentOverview(closedPeriodKeys);
+  const [students, selectedStudent] = await Promise.all([
+    getStudents(searchQuery, financeOverview.unpaidByStudent, showArchived),
+    getSelectedStudent(selectedStudentId, financeOverview.unpaidByStudent, showArchived)
   ]);
   const { summary: financeSummary, pendingReceiptStudents } = financeOverview;
   const isGroupStudent = selectedStudent?.classType === "Basic Group";
@@ -568,9 +599,15 @@ export default async function FinancePaymentsPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{student.studentId || "No ID"}</span>
                     <span className="font-heading font-bold text-lead-navy">{student.studentName}</span>
+                    {student.unpaidCount > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-extrabold text-rose-700">
+                        <AlertCircle className="h-3.5 w-3.5" /> Unpaid dues
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined} / {student.classType} / {student.classMode || "Mode not set"}</p>
                   <p className="mt-1 text-xs text-lead-gray">Parent: {student.parentName || "Not set"}</p>
+                  {student.unpaidCount > 0 ? <p className="mt-2 text-xs font-bold text-rose-700">{student.unpaidCount} unpaid payment{student.unpaidCount === 1 ? "" : "s"} / {formatRupiah(student.totalUnpaid)}</p> : null}
                 </a>
               ))}
               {!students.length ? <p className="rounded-lg bg-white p-4 text-sm text-lead-gray">No students found.</p> : null}
