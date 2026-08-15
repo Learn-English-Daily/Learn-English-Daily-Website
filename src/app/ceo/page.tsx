@@ -309,6 +309,17 @@ async function getDashboardData(period: Period) {
     .map(([name, meetings]) => ({ name, meetings }))
     .sort((a, b) => b.meetings - a.meetings);
 
+  const journalCounts = new Map<string, number>();
+  for (const record of periodAttendance) {
+    if (!record.notes?.trim()) continue;
+    for (const teacher of new Set(record.teacherNames || [])) {
+      journalCounts.set(teacher, (journalCounts.get(teacher) || 0) + 1);
+    }
+  }
+  const journalTeachers = [...journalCounts.entries()]
+    .map(([name, journals]) => ({ name, journals }))
+    .sort((a, b) => b.journals - a.journals || a.name.localeCompare(b.name));
+
   const studentMeetingCounts = new Map<
     string,
     {
@@ -345,21 +356,6 @@ async function getDashboardData(period: Period) {
   const studentMeetings = [...studentMeetingCounts.values()].sort(
     (left, right) => right.completed - left.completed || right.recorded - left.recorded || left.name.localeCompare(right.name)
   );
-
-  const studentAttendance = new Map<string, { name: string; attended: number; counted: number }>();
-  for (const record of periodAttendance) {
-    if (record.status === "Cancelled") continue;
-    const key = record.studentId || record.studentName || "Unknown";
-    const current = studentAttendance.get(key) || { name: record.studentName || key, attended: 0, counted: 0 };
-    current.counted += 1;
-    if (record.status === "Present" || record.status === "Late") current.attended += 1;
-    studentAttendance.set(key, current);
-  }
-  const lowAttendance = [...studentAttendance.values()]
-    .filter((student) => student.counted >= 3 && percentage(student.attended, student.counted) < 75)
-    .map((student) => ({ ...student, rate: percentage(student.attended, student.counted) }))
-    .sort((a, b) => a.rate - b.rate)
-    .slice(0, 8);
 
   const [currentYear, currentMonth] = jakartaDateKey(new Date()).split("-").map(Number);
   const trendMonths = Array.from({ length: 6 }, (_, index) => {
@@ -398,12 +394,12 @@ async function getDashboardData(period: Period) {
       pendingReceipts: pendingReceipts.length,
       pendingReviews: pendingReviews.length,
       missingClassDetails: missingClassDetails.length,
-      sessionsNeedingAttendance: sessionsNeedingAttendance.length,
-      lowAttendance
+      sessionsNeedingAttendance: sessionsNeedingAttendance.length
     },
     periodSessions: periodSessions.slice(0, 20),
     courses,
     teachers,
+    journalTeachers,
     studentMeetings,
     outstandingStudents,
     trendMonths,
@@ -679,11 +675,11 @@ export default async function CeoDashboardPage({
           </Card>
 
           <Card className="p-5">
-            <h2 className="font-heading text-xl font-bold text-lead-navy">Low attendance</h2>
-            <p className="mt-1 text-sm text-lead-gray">Students below 75% after at least 3 meetings.</p>
+            <h2 className="font-heading text-xl font-bold text-lead-navy">Journals by teacher</h2>
+            <p className="mt-1 text-sm text-lead-gray">Completed class journals in {data.range.label.toLowerCase()}.</p>
             <div className="mt-5 divide-y divide-slate-100">
-              {data.actions.lowAttendance.map((student) => <ListRow key={`${student.name}-${student.counted}`} label={student.name} value={`${student.rate}% (${student.attended}/${student.counted})`} danger />)}
-              {!data.actions.lowAttendance.length ? <Empty text="No students currently below the threshold." /> : null}
+              {data.journalTeachers.map((teacher) => <ListRow key={teacher.name} label={teacher.name} value={plural(teacher.journals, "journal")} />)}
+              {!data.journalTeachers.length ? <Empty text="No completed journals in this period." /> : null}
             </div>
           </Card>
         </section>
