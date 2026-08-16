@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { CalendarClock, Gamepad2, Pencil, Trash2, UserRound, Users } from "lucide-react";
+import { CalendarClock, Gamepad2, Pencil, Search, Trash2, UserRound, Users } from "lucide-react";
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -352,7 +352,7 @@ function ClassGamePanel({ classSessionId, link }: { classSessionId: string; link
   );
 }
 
-export default async function AdminSessionsPage({ searchParams }: { searchParams?: Promise<{ type?: string | string[]; batchId?: string | string[] }> }) {
+export default async function AdminSessionsPage({ searchParams }: { searchParams?: Promise<{ type?: string | string[]; batchId?: string | string[]; q?: string | string[] }> }) {
   noStore();
   const cookieStore = await cookies();
   const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "";
@@ -389,6 +389,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
   const resolvedSearchParams = await searchParams;
   const requestedType = Array.isArray(resolvedSearchParams?.type) ? resolvedSearchParams?.type[0] : resolvedSearchParams?.type;
   const requestedBatchId = Array.isArray(resolvedSearchParams?.batchId) ? resolvedSearchParams?.batchId[0] : resolvedSearchParams?.batchId;
+  const sessionSearch = (Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] : resolvedSearchParams?.q || "").trim();
   const groupOnly = isGroupStudentAdminSession(session);
   const schedulingType = groupOnly || requestedType === "group" ? "group" : "private";
   const admin = await getAuthenticatedAdmin();
@@ -402,6 +403,10 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
   const needsAttendance = sessions.filter((session) => session.status === "Needs Attendance");
   const today = getIndonesiaDateInput();
   const todaysSessions = sessions.filter((session) => session.sessionDate === today);
+  const normalizedSessionSearch = sessionSearch.toLocaleLowerCase();
+  const filteredSessions = normalizedSessionSearch
+    ? sessions.filter((classSession) => classSession.studentName.toLocaleLowerCase().includes(normalizedSessionSearch) || classSession.studentId.toLocaleLowerCase().includes(normalizedSessionSearch))
+    : sessions;
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -451,15 +456,30 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
         </div>
 
         <Card className="p-5">
-          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="font-heading text-xl font-bold text-lead-navy">Session queue</h2>
               <p className="mt-2 text-sm text-lead-gray">Latest scheduled classes first. Times are Indonesia WIB. Sessions disappear after attendance is marked.</p>
             </div>
+            <span className="w-fit shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-lead-blue">{filteredSessions.length} class{filteredSessions.length === 1 ? "" : "es"}</span>
           </div>
 
+          <form action="/admin/sessions" className="mt-5 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+            <input type="hidden" name="type" value="private" />
+            <label className="text-sm font-bold text-lead-navy" htmlFor="session-student-search">Find a student&apos;s scheduled classes</label>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lead-gray" />
+                <input id="session-student-search" name="q" defaultValue={sessionSearch} placeholder="Search student name or ID, e.g. STU002" className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-lead-navy" />
+              </div>
+              <Button type="submit"><Search className="h-4 w-4" /> Search</Button>
+              {sessionSearch ? <Button asChild type="button" variant="secondary"><a href="/admin/sessions?type=private">Clear</a></Button> : null}
+            </div>
+            {sessionSearch ? <p className="mt-2 text-xs font-semibold text-lead-gray">Showing scheduled classes matching “{sessionSearch}”.</p> : null}
+          </form>
+
           <div className="mt-5 grid gap-4">
-            {sessions.map((session) => {
+            {filteredSessions.map((session) => {
               return (
                 <div key={session.id} className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
@@ -522,7 +542,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                           </Button>
                         </ActionFeedbackForm>
                       </div>
-                    <details className="mt-4 rounded-lg border border-blue-200 bg-blue-50/60">
+                    <details open={Boolean(sessionSearch) && filteredSessions.length === 1} className="mt-4 rounded-lg border border-blue-200 bg-blue-50/60">
                       <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-bold text-lead-blue [&::-webkit-details-marker]:hidden">
                         <CalendarClock className="h-4 w-4" />
                         Reschedule class
@@ -569,9 +589,9 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
               </div>
             );
             })}
-            {!sessions.length ? (
+            {!filteredSessions.length ? (
               <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">
-                No class sessions yet. Schedule the next class to start tracking attendance reminders.
+                {sessionSearch ? `No scheduled classes found for “${sessionSearch}”. Try the student ID or clear the search.` : "No class sessions yet. Schedule the next class to start tracking attendance reminders."}
               </p>
             ) : null}
           </div>
