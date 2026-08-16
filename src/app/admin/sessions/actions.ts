@@ -1,6 +1,6 @@
 "use server";
 
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { ObjectId } from "mongodb";
 import type { Db } from "mongodb";
@@ -18,7 +18,8 @@ import {
   type GameType,
   type GameSessionDocument
 } from "@/lib/game-sessions";
-import { getMongoDb } from "@/lib/mongodb";
+import { getMongoClient, getMongoDb } from "@/lib/mongodb";
+import { getStudentNextMeetingNumbers } from "@/lib/meeting-sequence";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, isClassMode } from "@/lib/student-registration";
 import {
   resolveAvailableTeachers
@@ -26,11 +27,6 @@ import {
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function getPositiveInteger(value: FormDataEntryValue | null) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function addOneHour(time: string) {
@@ -65,12 +61,11 @@ export async function createClassSession(formData: FormData) {
   await assertAdmin();
 
   const studentId = clean(formData.get("studentId"));
-  const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
   const sessionDate = clean(formData.get("sessionDate"));
   const selectedClassMode = clean(formData.get("classMode"));
   const { startTime, endTime } = resolveSessionTimes(formData);
 
-  if (!studentId || !meetingNumber || !sessionDate || !startTime || !endTime) {
+  if (!studentId || !sessionDate || !startTime || !endTime) {
     throw new Error("Invalid class session");
   }
 
@@ -81,12 +76,18 @@ export async function createClassSession(formData: FormData) {
     courseJoined?: string;
     classType?: string;
     classMode?: string;
+    meetingSequenceNextNumber?: number;
+    meetingSequenceId?: string;
   }>(getStudentRegistrationCollectionName()).findOne({
     $and: [{ studentId }, getActiveStudentFilter()]
   });
 
   if (!student?.studentId || !student.studentName) {
     throw new Error("Active course student not found");
+  }
+
+  if (student.classType === "Basic Group") {
+    throw new Error("Group students must be scheduled from Group Batch Classes.");
   }
 
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
@@ -98,15 +99,25 @@ export async function createClassSession(formData: FormData) {
     throw new Error("This month is closed. Finalized class sessions cannot be changed.");
   }
 
-  await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
-    {
-      $or: [
-        { studentId, meetingNumber, billingMonth: period.billingMonth, billingYear: period.billingYear },
-        { studentId, meetingNumber, sessionDate }
-      ]
-    },
-    {
-      $set: {
+  const databaseSession = (await getMongoClient()).startSession();
+  try {
+    await databaseSession.withTransaction(async () => {
+      const studentCollection = db.collection<{
+        studentId?: string;
+        meetingSequenceNextNumber?: number;
+        meetingSequenceId?: string;
+      }>(getStudentRegistrationCollectionName());
+      const sequenceStudent = await studentCollection.findOne({ studentId }, { session: databaseSession });
+      if (!sequenceStudent) throw new Error("Student sequence record not found");
+      const configured = new Map<string, number>();
+      if (sequenceStudent.meetingSequenceNextNumber && sequenceStudent.meetingSequenceNextNumber > 0) {
+        configured.set(studentId, sequenceStudent.meetingSequenceNextNumber);
+      }
+      const nextNumbers = await getStudentNextMeetingNumbers(db, [studentId], configured, databaseSession);
+      const meetingNumber = nextNumbers.get(studentId) || 1;
+      const meetingSequenceId = sequenceStudent.meetingSequenceId || randomUUID();
+
+      await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).insertOne({
         studentId,
         studentName: student.studentName,
         courseJoined: student.courseJoined || "",
@@ -124,15 +135,21 @@ export async function createClassSession(formData: FormData) {
         endsAt: getSessionEndAt(sessionDate, endTime),
         teacherIds,
         teacherNames,
+        meetingSequenceId,
         status: "Scheduled",
+        createdAt: now,
         updatedAt: now
-      },
-      $setOnInsert: {
-        createdAt: now
-      }
-    },
-    { upsert: true }
-  );
+      }, { session: databaseSession });
+
+      await studentCollection.updateOne(
+        { _id: sequenceStudent._id },
+        { $set: { meetingSequenceId, meetingSequenceNextNumber: meetingNumber + 1, meetingSequenceUpdatedAt: now } },
+        { session: databaseSession }
+      );
+    });
+  } finally {
+    await databaseSession.endSession();
+  }
 
   revalidatePath("/admin");
   revalidatePath("/admin/sessions");
@@ -143,10 +160,9 @@ export async function updateClassSession(formData: FormData) {
   await assertAdmin();
 
   const id = clean(formData.get("id"));
-  const meetingNumber = getPositiveInteger(formData.get("meetingNumber"));
   const classMode = clean(formData.get("classMode"));
 
-  if (!ObjectId.isValid(id) || !meetingNumber || !isClassMode(classMode)) {
+  if (!ObjectId.isValid(id) || !isClassMode(classMode)) {
     throw new Error("Invalid class session update");
   }
 
@@ -165,23 +181,10 @@ export async function updateClassSession(formData: FormData) {
     throw new Error("This month is closed. Finalized class sessions cannot be changed.");
   }
 
-  const duplicateSession = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).findOne({
-    _id: { $ne: recordId },
-    studentId: existingSession.studentId,
-    meetingNumber,
-    billingMonth: period.billingMonth,
-    billingYear: period.billingYear
-  });
-
-  if (duplicateSession) {
-    throw new Error(`Meeting ${meetingNumber} is already scheduled for this student in this month.`);
-  }
-
   await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
     { _id: recordId },
     {
       $set: {
-        meetingNumber,
         classMode,
         teacherIds,
         teacherNames,
@@ -190,15 +193,36 @@ export async function updateClassSession(formData: FormData) {
     }
   );
 
-  await db.collection<GameSessionDocument>(getGameSessionsCollectionName()).updateMany(
-    { classSessionId: id },
-    { $set: { meetingNumber, updatedAt: new Date() } }
-  );
-
   revalidatePath("/admin");
   revalidatePath("/admin/sessions");
   revalidatePath("/teacher");
   revalidatePath("/ceo");
+}
+
+export async function resetStudentMeetingSequence(formData: FormData) {
+  await assertAdmin();
+  const studentId = clean(formData.get("studentId"));
+  if (!studentId) return { success: false, message: "Select a student first." };
+
+  const db = await getMongoDb();
+  const student = await db.collection<{ studentId?: string; classType?: string }>(getStudentRegistrationCollectionName()).findOne({
+    $and: [{ studentId }, getActiveStudentFilter()]
+  });
+  if (!student || student.classType === "Basic Group") return { success: false, message: "Active private student not found." };
+
+  const scheduledCount = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).countDocuments({ studentId });
+  if (scheduledCount) {
+    return { success: false, message: `Delete or complete the student's ${scheduledCount} scheduled class${scheduledCount === 1 ? "" : "es"} before resetting to Meeting 1.` };
+  }
+
+  const now = new Date();
+  await db.collection(getStudentRegistrationCollectionName()).updateOne(
+    { _id: student._id },
+    { $set: { meetingSequenceId: randomUUID(), meetingSequenceNextNumber: 1, meetingSequenceResetAt: now, meetingSequenceUpdatedAt: now } }
+  );
+
+  revalidatePath("/admin/sessions");
+  return { success: true };
 }
 
 export async function rescheduleClassSession(formData: FormData) {

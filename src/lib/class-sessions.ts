@@ -21,6 +21,7 @@ export type ClassSessionDocument = {
   endsAt?: string;
   teacherIds?: string[];
   teacherNames?: string[];
+  meetingSequenceId?: string;
   status?: ClassSessionStatus;
   attendanceId?: string;
   originalSessionDate?: string;

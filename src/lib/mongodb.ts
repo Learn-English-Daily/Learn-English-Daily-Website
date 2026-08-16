@@ -14,7 +14,7 @@ const globalForMongo = globalThis as typeof globalThis & {
 const cache = globalForMongo._leadMongo ?? {};
 globalForMongo._leadMongo = cache;
 
-export async function getMongoDb(): Promise<Db> {
+export async function getMongoClient(): Promise<MongoClient> {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
     throw new Error("Missing MONGODB_URI environment variable");
@@ -25,6 +25,10 @@ export async function getMongoDb(): Promise<Db> {
     cache.promise = cache.client.connect();
   }
 
-  const client = await cache.promise;
+  return cache.promise;
+}
+
+export async function getMongoDb(): Promise<Db> {
+  const client = await getMongoClient();
   return client.db(dbName);
 }

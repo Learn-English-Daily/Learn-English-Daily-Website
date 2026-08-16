@@ -7,7 +7,6 @@ import { logoutAdmin } from "@/app/admin/actions";
 import { cancelBatchClass } from "@/app/admin/batches/actions";
 import { BatchScheduleForm } from "@/app/admin/batches/batch-schedule-form";
 import {
-  createClassSession,
   deleteClassSession,
   generateGamesLink,
   rescheduleClassSession,
@@ -16,6 +15,7 @@ import {
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { GchatSessionMessage } from "@/app/admin/sessions/gchat-session-message";
 import { TemporaryMeetLink } from "@/app/admin/sessions/temporary-meet-link";
+import { PrivateSessionForm } from "@/app/admin/sessions/private-session-form";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -40,6 +40,7 @@ import {
   type GameSessionDocument
 } from "@/lib/game-sessions";
 import { getMongoDb } from "@/lib/mongodb";
+import { getStudentNextMeetingNumbers } from "@/lib/meeting-sequence";
 import { classModeOptions, getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import {
   getAvailableTeachers,
@@ -55,6 +56,7 @@ type StudentDocument = {
   courseJoined?: string;
   classType?: string;
   classMode?: string;
+  meetingSequenceNextNumber?: number;
 };
 
 type Student = {
@@ -65,6 +67,7 @@ type Student = {
   courseJoined: string;
   classType: string;
   classMode: string;
+  nextMeetingNumber: number;
 };
 
 type Teacher = TeacherOption;
@@ -140,6 +143,13 @@ async function getStudents(): Promise<Student[]> {
     .limit(200)
     .toArray()) as WithId<StudentDocument>[];
 
+  const configuredNextNumbers = new Map(
+    docs
+      .filter((doc) => doc.studentId && doc.meetingSequenceNextNumber && doc.meetingSequenceNextNumber > 0)
+      .map((doc) => [doc.studentId || "", doc.meetingSequenceNextNumber || 1])
+  );
+  const nextMeetingNumbers = await getStudentNextMeetingNumbers(db, docs.map((doc) => doc.studentId || ""), configuredNextNumbers);
+
   return docs.map((doc) => ({
     id: doc._id.toString(),
     studentId: doc.studentId || "",
@@ -147,7 +157,8 @@ async function getStudents(): Promise<Student[]> {
     parentName: doc.parentName || "",
     courseJoined: doc.courseJoined || "",
     classType: doc.classType || "",
-    classMode: doc.classMode || "Online"
+    classMode: doc.classMode || "Online",
+    nextMeetingNumber: nextMeetingNumbers.get(doc.studentId || "") || 1
   }));
 }
 
@@ -428,42 +439,9 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
             <p className="mt-2 text-sm leading-6 text-lead-gray">
               This creates a reminder record using Indonesia time (WIB / UTC+7). The Google Meet link is handled only on session cards, not saved in the database.
             </p>
-            <ActionFeedbackForm action={createClassSession} successMessage="Class session saved successfully." className="mt-5 grid gap-4">
-              <Field label="Student">
-                <select name="studentId" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy">
-                  <option value="">Select student</option>
-                  {students.map((student) => (
-                    <option key={student.id} value={student.studentId}>
-                      {student.studentName} ({student.studentId}) - {student.courseJoined}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Meeting Number">
-                  <input name="meetingNumber" type="number" min="1" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
-                </Field>
-                <Field label="Class Date (Indonesia)">
-                  <input name="sessionDate" type="date" required defaultValue={getIndonesiaDateInput(1)} className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
-                </Field>
-                <Field label="From Time (WIB)">
-                  <input name="startTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
-                </Field>
-                <Field label="To Time (WIB)">
-                  <input name="endTime" type="time" required className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
-                </Field>
-                <Field label="Class Mode">
-                  <select name="classMode" required defaultValue="Online" className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy">
-                    {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                </Field>
-              </div>
-              <TeacherSelector teachers={teachers} />
-              <Button type="submit" size="lg" className="w-full sm:w-fit">
-                <CalendarClock className="h-4 w-4" />
-                Save Class Session
-              </Button>
-            </ActionFeedbackForm>
+            <div className="mt-5">
+              <PrivateSessionForm students={students} teachers={teachers} defaultDate={getIndonesiaDateInput(1)} />
+            </div>
           </Card>
 
           <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
@@ -575,16 +553,13 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                       </summary>
                       <ActionFeedbackForm action={updateClassSession} successMessage="Class session updated successfully." className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2">
                         <input type="hidden" name="id" value={session.id} />
-                        <Field label="Meeting Number">
-                          <input name="meetingNumber" type="number" min="1" required defaultValue={session.meetingNumber} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
-                        </Field>
                         <Field label="Class Mode">
                           <select name="classMode" required defaultValue={session.classMode} className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy">
                             {classModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                           </select>
                         </Field>
                         <TeacherSelector teachers={teachers} selectedTeacherIds={session.teacherIds} compact />
-                        <p className="text-xs leading-5 text-lead-gray sm:col-span-2">To change the class date or time, use Reschedule class above so the change is tracked.</p>
+                        <p className="text-xs leading-5 text-lead-gray sm:col-span-2">Meeting numbers are sequence-controlled and cannot be edited. To change the date or time, use Reschedule class above.</p>
                         <Button type="submit" size="sm" className="sm:col-span-2 sm:w-fit">Update Class Details</Button>
                       </ActionFeedbackForm>
                     </details>
