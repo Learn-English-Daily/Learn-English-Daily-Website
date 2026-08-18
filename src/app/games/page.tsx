@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, KeyRound, Lock, Mic, Puzzle, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Bus, KeyRound, Lock, Mic, Puzzle, Sparkles, Trophy } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  {
+    title: "Transportation Adventure",
+    description: "Travel with Wisey through five playful stages while learning land, air, and water transportation English.",
+    status: "Available",
+    icon: Bus,
+    accent: "border-cyan-100 bg-cyan-50 text-cyan-700",
+    available: true,
+    href: "/games/transportation-adventure"
+  },
   {
     title: "Speech Competition Game",
     description: "Practice memorization, pronunciation, and confident delivery with live microphone feedback.",

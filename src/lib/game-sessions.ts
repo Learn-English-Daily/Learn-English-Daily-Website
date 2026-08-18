@@ -5,7 +5,8 @@ export type GameType =
   | "pronunciation-challenge"
   | "vocabulary-match"
   | "sentence-builder"
-  | "tongue-twister-battle";
+  | "tongue-twister-battle"
+  | "transportation-adventure";
 
 export type GameSessionDocument = {
   token?: string;

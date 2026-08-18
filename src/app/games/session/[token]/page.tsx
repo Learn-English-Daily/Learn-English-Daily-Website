@@ -1,13 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowRight, Clock, Gamepad2, KeyRound, LockKeyhole, Mic, Puzzle, Sparkles } from "lucide-react";
+import { ArrowRight, Bus, Clock, Gamepad2, KeyRound, LockKeyhole, Mic, Puzzle, Sparkles } from "lucide-react";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
 import { SentenceBuilderGame } from "@/app/games/sentence-builder/sentence-builder-game";
 import { SpeechCompetitionGame } from "@/app/games/speech-competition/speech-competition-game";
 import { TongueTwisterBattleGame } from "@/app/games/tongue-twister-battle/tongue-twister-battle-game";
 import { VocabularyMatchGame } from "@/app/games/vocabulary-match/vocabulary-match-game";
+import { TransportationAdventureGame } from "@/app/games/transportation-adventure/transportation-adventure-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -80,6 +81,7 @@ export default async function GameSessionPage({
   const isVocabularyMatch = activeGame === "vocabulary-match";
   const isSentenceBuilder = activeGame === "sentence-builder";
   const isTongueTwisterBattle = activeGame === "tongue-twister-battle";
+  const isTransportationAdventure = activeGame === "transportation-adventure";
   const shouldShowHub =
     gameSession?.gameType === "games-hub" &&
     !isEscapeRoom &&
@@ -87,7 +89,8 @@ export default async function GameSessionPage({
     !isPronunciationChallenge &&
     !isVocabularyMatch &&
     !isSentenceBuilder &&
-    !isTongueTwisterBattle;
+    !isTongueTwisterBattle &&
+    !isTransportationAdventure;
   const gameTitle = shouldShowHub
     ? "LEAD Class Games"
     : isEscapeRoom
@@ -100,6 +103,8 @@ export default async function GameSessionPage({
             ? "Sentence Builder"
             : isTongueTwisterBattle
               ? "Tongue Twister Battle"
+              : isTransportationAdventure
+                ? "Transportation Adventure"
               : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
@@ -113,8 +118,10 @@ export default async function GameSessionPage({
     ? "Build clear English sentences from shuffled word cards before the class game window ends."
     : isTongueTwisterBattle
     ? "Race through tongue twisters and improve speaking control before the class game window ends."
+    : isTransportationAdventure
+    ? "Travel through five English stages with Wisey before the class game window ends."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -179,6 +186,8 @@ export default async function GameSessionPage({
           <SentenceBuilderGame />
         ) : isTongueTwisterBattle ? (
           <TongueTwisterBattleGame />
+        ) : isTransportationAdventure ? (
+          <TransportationAdventureGame />
         ) : (
           <SpeechCompetitionGame />
         )}
@@ -189,6 +198,13 @@ export default async function GameSessionPage({
 
 function GameHub({ token }: { token: string }) {
   const games = [
+    {
+      title: "Transportation Adventure",
+      description: "Explore land, air, and water transportation with Wisey.",
+      href: `/games/session/${encodeURIComponent(token)}?game=transportation-adventure`,
+      icon: Bus,
+      accent: "border-cyan-100 bg-cyan-50 text-cyan-700"
+    },
     {
       title: "Speech Competition Game",
       description: "Practice memorization, pronunciation, and confident delivery.",
