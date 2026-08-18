@@ -33,7 +33,10 @@ const dropOffTalk: Dialogue[] = [
   { passenger: "Where should you drop me off?", choices: ["🏫 School", "✈️ Airport", "🏥 Hospital"], answer: "✈️ Airport", reply: "Yes, this is the airport!" },
   { passenger: "Thank you for the ride!", choices: ["You're welcome. Have a good flight!", "Ride the thank you.", "How airport are you?"], answer: "You're welcome. Have a good flight!", reply: "What a friendly driver!" }
 ];
-const stageNames = ["Meet the Vehicles", "Where Does It Go?", "Choose Your Vehicle", "Pick Up a Passenger", "Drive and Drop Off"];
+const schoolTalk: Dialogue = { passenger: "We are at school!", choices: ["Have a great day at school!", "School drives today.", "You are a bus stop."], answer: "Have a great day at school!", reply: "Thank you, driver!" };
+const schoolBus = { name: "School Bus", emoji: "🚌", color: "bg-yellow-50 border-yellow-300" };
+const waitingPeople = [{ id: "student-1", emoji: "👧", label: "Student", student: true }, { id: "adult-1", emoji: "👨", label: "Office worker", student: false }, { id: "student-2", emoji: "👦", label: "Student", student: true }, { id: "adult-2", emoji: "👩", label: "Shopkeeper", student: false }, { id: "student-3", emoji: "🧒", label: "Student", student: true }];
+const stageNames = ["Meet the Vehicles", "Where Does It Go?", "Choose Your Vehicle", "Level 1: Passenger Trip", "Level 2: School Bus Run"];
 
 function speak(text: string) {
   if (!("speechSynthesis" in window)) return;
@@ -55,12 +58,14 @@ export function TransportationAdventureGame() {
   const [ride, setRide] = useState(rideChoices[0]);
   const [driveDistance, setDriveDistance] = useState(0);
   const [lane, setLane] = useState(1);
+  const [boarded, setBoarded] = useState<string[]>([]);
   const finished = stage === 5;
-  const stageLengths = [identify.length, sortVehicles.length, 1, passengerTalk.length + 1, dropOffTalk.length + 1];
-  const stageStarts = [0, 3, 7, 8, 12];
-  const totalChallenges = 16;
+  const stageLengths = [identify.length, sortVehicles.length, 1, 8, 4];
+  const stageStarts = [0, 3, 7, 8, 16];
+  const totalChallenges = 20;
   const progress = Math.round((((stageStarts[stage] ?? totalChallenges) + round) / totalChallenges) * 100);
-  const stars = Math.max(1, Math.min(5, Math.ceil((score / 170) * 5)));
+  const stars = Math.max(1, Math.min(5, Math.ceil((score / 220) * 5)));
+  const isDrivingRound = (stage === 3 && (round === 0 || round === 4)) || (stage === 4 && (round === 0 || round === 2));
 
   function reward(message: string, points = 10) { setAnswered(true); setScore((value) => value + points); setCorrect((value) => value + 1); setAttempts((value) => value + 1); setFeedback(message); }
   function tryAnswer(value: string, answer: string, reply: string, points = 10) {
@@ -76,20 +81,29 @@ export function TransportationAdventureGame() {
     if (direction === "left") { setDriveDistance((value) => Math.max(0, value - 10)); return; }
     const nextDistance = Math.min(100, driveDistance + 25);
     setDriveDistance(nextDistance);
-    if (nextDistance === 100) reward(stage === 3 ? "Passenger found! Stop and say hello." : "Airport reached! Time to finish the trip.");
+    if (nextDistance === 100) reward(stage === 3 && round === 0 ? "Passenger found! Stop and say hello." : stage === 3 ? "Airport reached! Complete the drop-off." : round === 0 ? "Bus stop reached! Find the school students." : "School reached safely!");
     else setFeedback("Keep driving! Follow the road and watch the traffic lights.");
   }
   function next() {
     if (round + 1 < stageLengths[stage]) setRound((value) => value + 1);
     else { setStage((value) => value + 1); setRound(0); }
     setAnswered(false);
-    if (stage === 3 && round === stageLengths[3] - 1) { setDriveDistance(0); setLane(1); }
+    if ((stage === 3 && (round === 3 || round === 7)) || (stage === 4 && round === 1)) { setDriveDistance(0); setLane(1); }
+    if (stage === 3 && round === 7) setBoarded([]);
     setFeedback("A new part of the adventure is ready!");
   }
-  function reset() { setStarted(false); setStage(0); setRound(0); setScore(0); setCorrect(0); setAttempts(0); setAnswered(false); setRide(rideChoices[0]); setDriveDistance(0); setLane(1); setFeedback("Choose an answer to continue your journey."); }
+  function pickPerson(person: typeof waitingPeople[number]) {
+    if (answered || boarded.includes(person.id)) return;
+    if (!person.student) { setAttempts((value) => value + 1); setFeedback("That person is going to work. Find a student going to school."); return; }
+    const nextBoarded = [...boarded, person.id];
+    setBoarded(nextBoarded);
+    setFeedback(`${person.label} boarded! ${3 - nextBoarded.length} student${3 - nextBoarded.length === 1 ? "" : "s"} left.`);
+    if (nextBoarded.length === 3) reward("All students are on the bus. Next stop: school!", 20);
+  }
+  function reset() { setStarted(false); setStage(0); setRound(0); setScore(0); setCorrect(0); setAttempts(0); setAnswered(false); setRide(rideChoices[0]); setDriveDistance(0); setLane(1); setBoarded([]); setFeedback("Choose an answer to continue your journey."); }
 
   useEffect(() => {
-    if (!started || (stage !== 3 && stage !== 4) || round !== 0 || answered) return;
+    if (!started || !isDrivingRound || answered) return;
     function handleKeyDown(event: KeyboardEvent) {
       const directions: Record<string, "left" | "right" | "up" | "down"> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
       const direction = directions[event.key];
@@ -101,6 +115,12 @@ export function TransportationAdventureGame() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
+  useEffect(() => {
+    if (!answered) return;
+    const timer = window.setTimeout(next, 1100);
+    return () => window.clearTimeout(timer);
+  }, [answered]);
+
   if (!started) return <Card className="relative overflow-hidden border-0 bg-[linear-gradient(145deg,#0f172a,#1d4ed8)] p-6 text-white shadow-soft sm:p-10"><motion.div animate={reduceMotion ? {} : { x: [0, 28, 0] }} transition={{ duration: 4, repeat: Infinity }} className="text-7xl">🚌</motion.div><div className="mt-6 max-w-2xl"><p className="font-bold uppercase tracking-[0.18em] text-yellow-300">LEAD · Speak English with Confidence</p><h2 className="mt-3 font-heading text-4xl font-extrabold sm:text-5xl">Ready for a Transportation Adventure?</h2><p className="mt-4 text-lg leading-8 text-blue-100">Hi! I&apos;m Wisey 🦉. Learn the vehicles, choose your ride, pick up a passenger, and drive them safely to the airport.</p><Button onClick={() => setStarted(true)} className="mt-7 bg-yellow-400 text-slate-950 hover:bg-yellow-300">Start Adventure <ArrowRight className="h-4 w-4" /></Button></div></Card>;
 
   if (finished) return <Card className="overflow-hidden border-yellow-200 bg-[linear-gradient(145deg,#fff7d6,#ffffff,#dbeafe)] p-6 text-center shadow-soft sm:p-10"><motion.div initial={{ scale: 0 }} animate={{ scale: 1, rotate: reduceMotion ? 0 : [0, -8, 8, 0] }} className="text-8xl">🏆</motion.div><p className="mt-5 font-bold uppercase tracking-[0.18em] text-lead-blue">Passenger delivered safely</p><h2 className="mt-2 font-heading text-4xl font-extrabold text-lead-navy">You completed the Transportation Adventure!</h2><p className="mt-3 text-lg text-lead-gray">Wisey says: You are a Transportation Explorer and a friendly English-speaking driver!</p><div className="mx-auto mt-7 grid max-w-4xl gap-3 sm:grid-cols-2 lg:grid-cols-4"><Result label="Vehicle" value={`${ride.emoji} ${ride.name}`} /><Result label="Total score" value={`${score} points`} /><Result label="Accuracy" value={`${attempts ? Math.round((correct / attempts) * 100) : 100}%`} /><Result label="English mission" value={correct >= 13 ? "Excellent" : "Completed"} /></div><div className="mt-6 flex justify-center gap-1">{[1,2,3,4,5].map((number) => <Star key={number} className={`h-9 w-9 ${number <= stars ? "fill-yellow-400 text-yellow-500" : "text-slate-300"}`} />)}</div><Button onClick={reset} className="mt-7"><RotateCcw className="h-4 w-4" />Play Again</Button></Card>;
@@ -110,8 +130,10 @@ export function TransportationAdventureGame() {
       {stage === 0 && <IdentifyRound item={identify[round]} answered={answered} onChoose={(value) => tryAnswer(value, identify[round].vehicle.name, `It's a ${identify[round].vehicle.name.toLowerCase()}!`)} />}
       {stage === 1 && <SortRound vehicle={sortVehicles[round]} answered={answered} onChoose={(zone) => tryAnswer(zone, sortVehicles[round].zone, `A ${sortVehicles[round].name.toLowerCase()} travels on ${sortVehicles[round].zone.toLowerCase()}.`)} />}
       {stage === 2 && <RideGarage selected={answered ? ride.name : ""} onChoose={chooseRide} />}
-      {(stage === 3 || stage === 4) && <MissionScene ride={ride} distance={driveDistance} lane={lane} destination={stage === 3 ? "Passenger" : "Airport"} dialogue={round === 0 ? null : stage === 3 ? passengerTalk[round - 1] : dropOffTalk[round - 1]} answered={answered} onMove={moveVehicle} onChoose={(value) => { const dialogue = stage === 3 ? passengerTalk[round - 1] : dropOffTalk[round - 1]; tryAnswer(value, dialogue.answer, dialogue.reply, stage === 4 && round === 3 ? 20 : 15); }} />}
-      {answered && <div className="mt-6 flex justify-end"><Button onClick={next}>{stage === 4 && round === 3 ? "Finish Mission" : "Continue Adventure"}<ArrowRight className="h-4 w-4" /></Button></div>}
+      {stage === 3 && <MissionScene ride={ride} distance={driveDistance} lane={lane} destination={round < 4 ? "Passenger" : "Airport"} dialogue={round === 0 || round === 4 ? null : round < 4 ? passengerTalk[round - 1] : dropOffTalk[round - 5]} answered={answered} onMove={moveVehicle} onChoose={(value) => { const dialogue = round < 4 ? passengerTalk[round - 1] : dropOffTalk[round - 5]; tryAnswer(value, dialogue.answer, dialogue.reply, round === 7 ? 20 : 15); }} />}
+      {stage === 4 && round === 1 && <StudentPickup boarded={boarded} answered={answered} onPick={pickPerson} />}
+      {stage === 4 && round !== 1 && <MissionScene ride={schoolBus} distance={driveDistance} lane={lane} destination={round < 2 ? "Bus Stop" : "School"} dialogue={round === 3 ? schoolTalk : null} answered={answered} onMove={moveVehicle} onChoose={(value) => tryAnswer(value, schoolTalk.answer, schoolTalk.reply, 20)} />}
+      {answered && <p className="mt-5 text-center text-sm font-bold text-emerald-700">✓ Checkpoint cleared · moving to the next point...</p>}
     </Card></motion.div></AnimatePresence></div>;
 }
 
@@ -127,6 +149,11 @@ function MissionScene({ ride, distance, lane, destination, dialogue, answered, o
       {dialogue && <div className="absolute inset-x-3 top-16 z-20 mx-auto max-w-3xl rounded-3xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur sm:inset-x-8 sm:p-6"><div className="flex items-start gap-3"><span className="text-4xl">🧍</span><div className="flex-1"><div className="flex items-start gap-2"><p className="flex-1 rounded-2xl rounded-tl-sm bg-slate-100 p-3 font-semibold text-lead-navy">{dialogue.passenger}</p><button onClick={() => speak(dialogue.passenger)} aria-label="Hear passenger" className="rounded-full bg-blue-50 p-3 text-lead-blue"><Volume2 className="h-5 w-5" /></button></div><p className="mt-3 text-xs font-bold uppercase tracking-wider text-lead-blue">Choose your driver reply</p></div></div><ChoiceButtons choices={dialogue.choices} disabled={answered} onChoose={onChoose} compact /></div>}
     </div>
     {!dialogue && <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><button onClick={() => onMove("left")} disabled={answered} className="grid h-14 place-items-center rounded-2xl bg-slate-100 text-lead-navy hover:bg-slate-200" aria-label="Drive left"><ArrowLeft /></button><div className="grid grid-cols-2 gap-2"><button onClick={() => onMove("up")} disabled={answered} className="grid h-12 w-14 place-items-center rounded-xl bg-blue-100 text-lead-blue" aria-label="Move up"><ArrowUp /></button><button onClick={() => onMove("down")} disabled={answered} className="grid h-12 w-14 place-items-center rounded-xl bg-blue-100 text-lead-blue" aria-label="Move down"><ArrowDown /></button></div><button onClick={() => onMove("right")} disabled={answered} className="grid h-14 place-items-center rounded-2xl bg-lead-blue text-white hover:bg-blue-700" aria-label="Drive right"><ArrowRight /></button></div>}
+  </div>;
+}
+function StudentPickup({ boarded, answered, onPick }: { boarded: string[]; answered: boolean; onPick: (person: typeof waitingPeople[number]) => void }) {
+  return <div><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold uppercase tracking-wider text-lead-blue">School bus checkpoint</p><h3 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">Tap the three students to let them board</h3></div><span className="rounded-full bg-yellow-50 px-4 py-2 font-bold text-yellow-800">{boarded.length} / 3 aboard</span></div>
+    <div className="relative mt-6 min-h-[430px] overflow-hidden rounded-3xl bg-[linear-gradient(#bae6fd_0_48%,#86efac_48%_70%,#64748b_70%_100%)] p-5 shadow-inner"><span className="absolute left-5 top-5 text-5xl">🏘️</span><span className="absolute right-5 top-5 text-6xl">🚌</span><div className="absolute inset-x-4 bottom-16 flex flex-wrap items-end justify-center gap-3 sm:gap-6">{waitingPeople.map((person) => { const isBoarded = boarded.includes(person.id); return <motion.button key={person.id} whileHover={{ y: -6 }} onClick={() => onPick(person)} disabled={answered || isBoarded} className={`rounded-2xl border-2 bg-white/95 p-3 text-center shadow-lg transition ${isBoarded ? "border-emerald-400 opacity-50" : "border-white hover:border-yellow-400"}`}><span className="block text-5xl">{isBoarded ? "✅" : person.emoji}</span><span className="mt-2 block text-xs font-bold text-lead-navy">{isBoarded ? "On the bus" : person.label}</span></motion.button>; })}</div><div className="absolute bottom-0 left-0 right-0 h-12 bg-slate-600"><div className="mt-5 border-t-4 border-dashed border-yellow-300" /></div></div>
   </div>;
 }
 function ChoiceButtons({ choices, disabled, onChoose, compact = false }: { choices: string[]; disabled: boolean; onChoose: (value: string) => void; compact?: boolean }) { return <div className={`mx-auto grid max-w-3xl gap-2 ${compact ? "mt-3" : "mt-6"}`}>{choices.map((choice) => <button key={choice} disabled={disabled} onClick={() => onChoose(choice)} className={`${compact ? "min-h-10 px-4 py-2 text-sm" : "min-h-14 px-5 py-3"} rounded-2xl border-2 border-blue-100 bg-blue-50 text-left font-bold text-lead-navy transition hover:translate-x-1 hover:border-lead-blue hover:bg-blue-100 disabled:opacity-60`}>💬 {choice}</button>)}</div>; }
