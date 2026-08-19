@@ -3,7 +3,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { ObjectId } from "mongodb";
-import type { Db } from "mongodb";
+import type { ClientSession, Db } from "mongodb";
 import { assertFullAdminAccess } from "@/lib/admin-permissions";
 import { getBillingPeriodFromDate, isBillingPeriodClosed } from "@/lib/billing-periods";
 import {
@@ -43,6 +43,40 @@ function resolveSessionTimes(formData: FormData) {
   return { startTime, endTime };
 }
 
+async function findStudentTimeConflict({
+  db,
+  studentId,
+  sessionDate,
+  startTime,
+  endTime,
+  excludeId,
+  session
+}: {
+  db: Db;
+  studentId: string;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  excludeId?: ObjectId;
+  session?: ClientSession;
+}) {
+  const records = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName())
+    .find({
+      studentId,
+      sessionDate,
+      status: { $ne: "Completed" },
+      ...(excludeId ? { _id: { $ne: excludeId } } : {})
+    }, { session })
+    .project({ meetingNumber: 1, startTime: 1, endTime: 1, sessionTime: 1 })
+    .toArray();
+
+  return records.find((record) => {
+    const existingStart = record.startTime || record.sessionTime || "";
+    const existingEnd = record.endTime || addOneHour(existingStart);
+    return existingStart < endTime && existingEnd > startTime;
+  });
+}
+
 async function assertAdmin() {
   await assertFullAdminAccess();
 }
@@ -67,6 +101,10 @@ export async function createClassSession(formData: FormData) {
 
   if (!studentId || !sessionDate || !startTime || !endTime) {
     throw new Error("Invalid class session");
+  }
+
+  if (endTime <= startTime) {
+    throw new Error("The class end time must be later than the start time.");
   }
 
   const db = await getMongoDb();
@@ -109,6 +147,12 @@ export async function createClassSession(formData: FormData) {
       }>(getStudentRegistrationCollectionName());
       const sequenceStudent = await studentCollection.findOne({ studentId }, { session: databaseSession });
       if (!sequenceStudent) throw new Error("Student sequence record not found");
+      const timeConflict = await findStudentTimeConflict({ db, studentId, sessionDate, startTime, endTime, session: databaseSession });
+      if (timeConflict) {
+        const conflictStart = timeConflict.startTime || timeConflict.sessionTime || "";
+        const conflictEnd = timeConflict.endTime || addOneHour(conflictStart);
+        throw new Error(`This student already has Meeting ${timeConflict.meetingNumber || "?"} scheduled from ${conflictStart} to ${conflictEnd} WIB on this date.`);
+      }
       const configured = new Map<string, number>();
       if (sequenceStudent.meetingSequenceNextNumber && sequenceStudent.meetingSequenceNextNumber > 0) {
         configured.set(studentId, sequenceStudent.meetingSequenceNextNumber);
@@ -284,6 +328,21 @@ export async function rescheduleClassSession(formData: FormData) {
 
   if (duplicateSession) {
     return { success: false, message: `Meeting ${existingSession.meetingNumber} is already scheduled for this student in the selected month.` };
+  }
+
+  const timeConflict = await findStudentTimeConflict({
+    db,
+    studentId: existingSession.studentId,
+    sessionDate,
+    startTime,
+    endTime,
+    excludeId: recordId
+  });
+
+  if (timeConflict) {
+    const conflictStart = timeConflict.startTime || timeConflict.sessionTime || "";
+    const conflictEnd = timeConflict.endTime || addOneHour(conflictStart);
+    return { success: false, message: `This student already has Meeting ${timeConflict.meetingNumber || "?"} scheduled from ${conflictStart} to ${conflictEnd} WIB on this date.` };
   }
 
   await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
