@@ -83,7 +83,8 @@ export const sharedContent = {
       experience: "6 years",
       specialization: "Studying is ordinary but making it fun is extra-ordinary.",
       initials: "EY",
-      accent: "blue"
+      accent: "blue",
+      photo: "/images/teachers/ms-eva-yulia.webp"
     },
     {
       name: "Ms. Nila Niswah",
@@ -91,7 +92,8 @@ export const sharedContent = {
       experience: "10 years",
       specialization: "The world becomes a classroom when we never stop being curious",
       initials: "NN",
-      accent: "yellow"
+      accent: "yellow",
+      photo: null
     },
     {
       name: "Mr. Adam",
@@ -99,7 +101,8 @@ export const sharedContent = {
       experience: "LEAD Teacher",
       specialization: "Consistency turns small daily efforts into real progress.",
       initials: "AD",
-      accent: "green"
+      accent: "green",
+      photo: null
     }
   ]
 } as const;

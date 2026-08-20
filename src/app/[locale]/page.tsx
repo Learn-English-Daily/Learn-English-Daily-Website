@@ -299,7 +299,22 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               const accent = teacherAccentStyles[teacher.accent as keyof typeof teacherAccentStyles] ?? teacherAccentStyles.blue;
               return (
               <Card key={teacher.name} className="overflow-hidden">
-                <div className={`grid h-72 place-items-center bg-gradient-to-br ${accent.card}`}>
+                <div className={`relative grid h-72 place-items-center overflow-hidden bg-gradient-to-br ${accent.card}`}>
+                  {teacher.photo ? (
+                    <>
+                      <Image
+                        src={teacher.photo}
+                        alt={`${teacher.name}, LEAD English teacher`}
+                        fill
+                        sizes="(min-width: 768px) 33vw, 100vw"
+                        className="object-cover object-[center_28%]"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-lead-navy/25 via-transparent to-transparent" aria-hidden="true" />
+                      <span className={`absolute right-4 top-4 grid h-12 w-12 place-items-center rounded-lg shadow-soft ${accent.icon}`}>
+                        <Icon name="GraduationCap" className="h-6 w-6" />
+                      </span>
+                    </>
+                  ) : (
                   <div className="relative grid h-32 w-32 place-items-center rounded-full bg-white shadow-soft">
                     <span className={`absolute -right-2 -top-2 grid h-12 w-12 place-items-center rounded-lg ${accent.icon}`}>
                       <Icon name="GraduationCap" className="h-6 w-6" />
@@ -309,6 +324,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                       LEAD
                     </span>
                   </div>
+                  )}
                 </div>
                 <div className="p-6">
                   <h3 className="font-heading text-xl font-bold text-lead-navy">{teacher.name}</h3>
