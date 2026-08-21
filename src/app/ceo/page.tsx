@@ -252,9 +252,8 @@ async function getDashboardData(period: Period) {
     ? approvedReviews.reduce((sum, review) => sum + (review.rating || 0), 0) / approvedReviews.length
     : 0;
   const pendingReviews = periodReviews.filter((review) => review.status === "pending");
-  const missingClassDetails = periodAttendance.filter(
-    (record) => !record.teacherNames?.length || !record.notes?.trim()
-  );
+  const missingJournals = periodAttendance.filter((record) => !record.notes?.trim());
+  const missingTeacherAssignments = periodAttendance.filter((record) => !record.teacherNames?.length);
   const scheduledInPeriod = classSessions.filter((session) => matchesRange(session.sessionDate || ""));
   const periodSessions = scheduledInPeriod
     .map((session) => {
@@ -393,7 +392,8 @@ async function getDashboardData(period: Period) {
       unpaidCount: unpaidPayments.length,
       pendingReceipts: pendingReceipts.length,
       pendingReviews: pendingReviews.length,
-      missingClassDetails: missingClassDetails.length,
+      missingJournals: missingJournals.length,
+      missingTeacherAssignments: missingTeacherAssignments.length,
       sessionsNeedingAttendance: sessionsNeedingAttendance.length
     },
     periodSessions: periodSessions.slice(0, 20),
@@ -615,7 +615,8 @@ export default async function CeoDashboardPage({
             <ActionCard label="Unpaid payments" value={data.actions.unpaidCount} detail={formatRupiah(data.kpis.outstandingAmount)} href="/finance/payments" />
             <ActionCard label="Drive receipts pending" value={data.actions.pendingReceipts} detail="Paid receipts not marked uploaded" href="/finance/payments" />
             <ActionCard label="Reviews pending" value={data.actions.pendingReviews} detail="Waiting for approval" href="/admin/reviews" />
-            <ActionCard label="Class details missing" value={data.actions.missingClassDetails} detail="Missing journal or teacher in period" href="/admin/attendance" />
+            <ActionCard label="Missing journals" value={data.actions.missingJournals} detail="Attendance records without journal notes" href="/admin/attendance" />
+            <ActionCard label="Teacher assignment missing" value={data.actions.missingTeacherAssignments} detail="Attendance records without an assigned teacher" href="/admin/attendance" />
             <ActionCard label="Sessions need attendance" value={data.actions.sessionsNeedingAttendance} detail="Scheduled classes past their time" href="/admin/sessions" />
           </div>
         </section>
