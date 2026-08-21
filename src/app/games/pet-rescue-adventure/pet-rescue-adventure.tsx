@@ -50,9 +50,20 @@ function speak(text: string) {
 }
 
 function findDropTarget(point: DropPoint) {
+  const clientPoints = [
+    point,
+    { x: point.x - window.scrollX, y: point.y - window.scrollY }
+  ];
+
   return [...document.querySelectorAll<HTMLElement>("[data-pet-drop]")].find((element) => {
     const box = element.getBoundingClientRect();
-    return point.x >= box.left && point.x <= box.right && point.y >= box.top && point.y <= box.bottom;
+    const margin = 18;
+    return clientPoints.some((clientPoint) =>
+      clientPoint.x >= box.left - margin &&
+      clientPoint.x <= box.right + margin &&
+      clientPoint.y >= box.top - margin &&
+      clientPoint.y <= box.bottom + margin
+    );
   })?.dataset.petDrop || "";
 }
 
@@ -88,9 +99,9 @@ export function PetRescueAdventure() {
 function Progress({ level, score, completed }: { level: number; score: number; completed: number[] }) { return <Card className="p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Level {Math.min(level + 1, 6)} of 6</p><h2 className="font-heading text-xl font-extrabold text-lead-navy">{levelNames[level]}</h2></div><span className="rounded-full bg-yellow-50 px-4 py-2 font-bold text-yellow-800">⭐ {score}</span></div><div className="mt-4 flex items-center justify-between gap-1">{["🐶","🐱","🐰","🐢","🐠","🏆"].map((icon, index) => <div key={icon} className="flex flex-1 items-center"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-xl ${completed.includes(index) ? "bg-emerald-500 text-white" : index === level ? "bg-yellow-300 ring-4 ring-yellow-100" : "bg-slate-100 grayscale"}`}>{completed.includes(index) ? "✓" : icon}</span>{index < 5 && <span className={`h-2 flex-1 ${completed.includes(index) ? "bg-emerald-400" : "bg-slate-100"}`} />}</div>)}</div></Card>; }
 
 function MatchLevel({ award, complete }: GameProps) {
-  const matchPets = pets.slice(0, 5); const [matched, setMatched] = useState<string[]>([]); const [selected, setSelected] = useState(""); const [message, setMessage] = useState("Drag each pet to its English name. On touch screens, tap the pet and then its name.");
+  const matchPets = pets.slice(0, 5); const namePets = useMemo(() => shuffle(pets.slice(0, 5)), []); const [matched, setMatched] = useState<string[]>([]); const [selected, setSelected] = useState(""); const [message, setMessage] = useState("Drag each pet to its English name. On touch screens, tap the pet and then its name.");
   function drop(petId: string, target: string) { if (!target) return; if (petId !== target) { setMessage("Almost! Try another name."); return; } const next = [...matched, petId]; setMatched(next); setSelected(""); award(10); speak(matchPets.find((pet) => pet.id === petId)?.name || ""); setMessage("Awesome! That pet found its name."); if (next.length === matchPets.length) complete(); }
-  return <GameShell guide="Match the pets" message={message}><div className="grid gap-7 lg:grid-cols-2"><div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-3">{matchPets.map((pet) => <DragToken key={pet.id} {...pet} label="Drag me" selected={selected === pet.id} disabled={matched.includes(pet.id)} onSelect={() => setSelected(pet.id)} onDrop={(target) => drop(pet.id, target)} />)}</div><div className="grid gap-3">{matchPets.map((pet) => <button key={pet.id} data-pet-drop={pet.id} onClick={() => selected && drop(selected, pet.id)} className={`min-h-14 rounded-2xl border-2 border-dashed px-5 text-left font-heading text-lg font-extrabold ${matched.includes(pet.id) ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-blue-200 bg-blue-50 text-lead-navy"}`}>{matched.includes(pet.id) ? `${pet.emoji} ${pet.name} ✓` : pet.name}</button>)}</div></div></GameShell>;
+  return <GameShell guide="Match the pets" message={message}><div className="grid gap-7 lg:grid-cols-2"><div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-3">{matchPets.map((pet) => <DragToken key={pet.id} {...pet} label="Drag me" selected={selected === pet.id} disabled={matched.includes(pet.id)} onSelect={() => setSelected(pet.id)} onDrop={(target) => drop(pet.id, target)} />)}</div><div className="grid gap-3">{namePets.map((pet) => <button key={pet.id} data-pet-drop={pet.id} onClick={() => selected && drop(selected, pet.id)} className={`min-h-16 rounded-2xl border-2 border-dashed px-5 text-left font-heading text-lg font-extrabold ${matched.includes(pet.id) ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-blue-200 bg-blue-50 text-lead-navy"}`}>{matched.includes(pet.id) ? `${pet.emoji} ${pet.name} ✓` : pet.name}</button>)}</div></div></GameShell>;
 }
 
 type GameProps = { award: (points: number) => void; complete: () => void };
@@ -103,9 +114,10 @@ function MemoryLevel({ award, complete }: GameProps) {
 }
 
 function ShopLevel({ award, complete }: GameProps) {
-  const [task, setTask] = useState(0); const [selected, setSelected] = useState(""); const current = shopTasks[task];
-  function deliver(itemId: string, target: string) { if (target !== "basket") return; if (itemId !== current.item) return; award(10); const next = task + 1; if (next === shopTasks.length) complete(); else setTask(next); setSelected(""); }
-  return <GameShell guide="Pet Care Shop" message={`Help! The ${current.pet.name.toLowerCase()} ${current.need}. Drag the useful item into the basket.`}><div className="text-center"><motion.div key={current.pet.id + task} animate={{ scale: [1, 1.08, 1] }} className="text-8xl">{current.pet.emoji}</motion.div><div data-pet-drop="basket" onClick={() => selected && deliver(selected, "basket")} className="mx-auto mt-4 grid min-h-24 max-w-sm place-items-center rounded-3xl border-4 border-dashed border-yellow-300 bg-yellow-50 text-4xl">🧺 <span className="text-sm font-bold text-yellow-800">Pet basket</span></div><div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-6">{items.map((item) => <DragToken key={item.id} {...item} label={item.name} selected={selected === item.id} onSelect={() => setSelected(item.id)} onDrop={(target) => deliver(item.id, target)} />)}</div></div></GameShell>;
+  const [task, setTask] = useState(0); const [selected, setSelected] = useState(""); const [feedback, setFeedback] = useState(""); const [locked, setLocked] = useState(false); const current = shopTasks[task];
+  const instruction = feedback || `Help! The ${current.pet.name.toLowerCase()} ${current.need}. Drag the useful item into the basket.`;
+  function deliver(itemId: string, target: string) { if (locked) return; if (target !== "basket") { setFeedback("Move the item farther into the basket and release it."); return; } if (itemId !== current.item) { setFeedback("That item does not solve this pet's need. Try another object!"); return; } setLocked(true); award(10); setFeedback("Awesome! The pet got exactly what it needed."); const next = task + 1; if (next === shopTasks.length) complete(); else window.setTimeout(() => { setTask(next); setFeedback(""); setLocked(false); }, 450); setSelected(""); }
+  return <GameShell guide="Pet Care Shop" message={instruction}><div className="text-center"><motion.div key={current.pet.id + task} animate={{ scale: [1, 1.08, 1] }} className="text-8xl">{current.pet.emoji}</motion.div><div data-pet-drop="basket" onClick={() => selected && deliver(selected, "basket")} className="mx-auto mt-4 grid min-h-32 max-w-md place-items-center rounded-3xl border-4 border-dashed border-yellow-300 bg-yellow-50 text-5xl shadow-inner">🧺 <span className="text-sm font-bold text-yellow-800">Drop the item in this basket</span></div><div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-6">{items.map((item) => <DragToken key={item.id} {...item} label={item.name} selected={selected === item.id} disabled={locked} onSelect={() => setSelected(item.id)} onDrop={(target) => deliver(item.id, target)} />)}</div></div></GameShell>;
 }
 
 function CareLevel({ award, complete }: GameProps) {
