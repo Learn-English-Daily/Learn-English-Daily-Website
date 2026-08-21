@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, type PanInfo, useReducedMotion } from "framer-motion";
-import { ArrowRight, Check, RotateCcw, Star, Volume2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, RotateCcw, Star, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -34,13 +34,13 @@ const careSteps = [
 const sentences = [
   ["I", "feed", "my", "dog."], ["I", "play", "with", "my", "cat."], ["I", "give", "my", "rabbit", "water."]
 ];
-const finalStations = [
-  { name: "Food Area", icon: "🍖", pet: pets[0], item: items[0] },
-  { name: "Water Area", icon: "💧", pet: pets[2], item: items[1] },
-  { name: "Grooming", icon: "🧼", pet: pets[1], item: items[4] },
-  { name: "Play Area", icon: "🎾", pet: pets[0], item: items[2] }
+const rescueObjectives = [
+  { pet: pets[0], item: items[0], petPosition: "5,0", itemPosition: "1,1" },
+  { pet: pets[1], item: items[4], petPosition: "5,3", itemPosition: "2,4" },
+  { pet: pets[2], item: items[1], petPosition: "0,0", itemPosition: "3,2" }
 ];
-const levelNames = ["Pet Matching", "Pet Memory", "Pet Care Shop", "Grooming Challenge", "Build a Sentence", "Final Rescue Center"];
+const rescueObstacles = new Set(["1,3", "2,3", "3,3", "4,1", "4,2"]);
+const levelNames = ["Pet Matching", "Pet Memory", "Pet Care Shop", "Grooming Challenge", "Build a Sentence", "Final Rescue Maze"];
 
 function speak(text: string) {
   if (!("speechSynthesis" in window)) return;
@@ -79,7 +79,7 @@ export function PetRescueAdventure() {
   const [completed, setCompleted] = useState<number[]>([]);
   const [celebrating, setCelebrating] = useState(false);
   const results = level === 6;
-  const stars = Math.max(1, Math.min(5, Math.ceil((score / 295) * 5)));
+  const stars = Math.max(1, Math.min(5, Math.ceil((score / 305) * 5)));
 
   function award(points: number) { setScore((value) => value + points); }
   function finishLevel() {
@@ -135,9 +135,54 @@ function SentenceLevel({ award, complete }: GameProps) {
 }
 
 function FinalRescue({ award, complete }: GameProps) {
-  const [station, setStation] = useState(0); const [selected, setSelected] = useState(""); const current = finalStations[station];
-  function rescue(itemId: string, target: string) { if (target !== "rescue-pet" || itemId !== current.item.id) return; award(20); const next = station + 1; if (next === finalStations.length) complete(); else setStation(next); setSelected(""); }
-  return <GameShell guide="Final Rescue Center" message={`Station ${station + 1}: ${current.name}. Give the ${current.item.name.toLowerCase()} to the ${current.pet.name.toLowerCase()}.`}><div className="grid gap-5 lg:grid-cols-[220px_1fr]"><div className="grid gap-2">{finalStations.map((place, index) => <div key={place.name} className={`rounded-2xl border-2 p-3 font-bold ${index < station ? "border-emerald-400 bg-emerald-50 text-emerald-700" : index === station ? "border-yellow-400 bg-yellow-50 text-lead-navy" : "border-slate-100 text-slate-400"}`}>{index < station ? "✓" : place.icon} {place.name}</div>)}</div><div className="rounded-3xl bg-[linear-gradient(135deg,#dcfce7,#dbeafe)] p-5"><div data-pet-drop="rescue-pet" onClick={() => selected && rescue(selected, "rescue-pet")} className="grid min-h-52 place-items-center rounded-3xl border-4 border-dashed border-white bg-white/50"><motion.span animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 1.8 }} className="text-9xl">{current.pet.emoji}</motion.span></div><div className="mt-5 flex justify-center"><DragToken {...current.item} label={`Give ${current.item.name}`} selected={Boolean(selected)} onSelect={() => setSelected(current.item.id)} onDrop={(target) => rescue(current.item.id, target)} /></div></div></div></GameShell>;
+  const width = 6; const height = 5;
+  const [position, setPosition] = useState({ x: 0, y: 4 });
+  const [inventory, setInventory] = useState<string[]>([]);
+  const [collected, setCollected] = useState<string[]>([]);
+  const [rescued, setRescued] = useState<string[]>([]);
+  const [message, setMessage] = useState("Explore the maze. Collect the correct care items, then reach each pet.");
+  const [locked, setLocked] = useState(false);
+
+  function move(dx: number, dy: number) {
+    if (locked) return;
+    const next = { x: position.x + dx, y: position.y + dy };
+    const key = `${next.x},${next.y}`;
+    if (next.x < 0 || next.x >= width || next.y < 0 || next.y >= height) { setMessage("The rescue center ends there. Try another direction!"); return; }
+    if (rescueObstacles.has(key)) { setMessage("That path is blocked. Find another way around!"); return; }
+    setPosition(next);
+
+    const foundItem = rescueObjectives.find((objective) => objective.itemPosition === key && !collected.includes(objective.item.id));
+    if (foundItem) {
+      setInventory((current) => [...current, foundItem.item.id]); setCollected((current) => [...current, foundItem.item.id]); award(10);
+      setMessage(`${foundItem.item.emoji} ${foundItem.item.name} added to your rescue bag!`);
+      return;
+    }
+
+    const foundPet = rescueObjectives.find((objective) => objective.petPosition === key && !rescued.includes(objective.pet.id));
+    if (!foundPet) return;
+    if (!inventory.includes(foundPet.item.id)) { setMessage(`${foundPet.pet.emoji} The ${foundPet.pet.name.toLowerCase()} needs ${foundPet.item.name.toLowerCase()}. Find it first!`); return; }
+
+    const nextRescued = [...rescued, foundPet.pet.id];
+    setRescued(nextRescued); setInventory((current) => current.filter((item) => item !== foundPet.item.id)); award(20);
+    setMessage(`${foundPet.pet.emoji} ${foundPet.pet.name} rescued with ${foundPet.item.name.toLowerCase()}!`);
+    if (nextRescued.length === rescueObjectives.length) { setLocked(true); window.setTimeout(complete, 700); }
+  }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const moves: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      const direction = moves[event.key];
+      if (!direction) return;
+      event.preventDefault(); move(...direction);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
+  return <GameShell guide="Final Rescue Maze" message={message}><div className="grid gap-5 lg:grid-cols-[230px_1fr]"><div><p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Rescue missions</p><div className="mt-3 grid gap-2">{rescueObjectives.map((objective) => <div key={objective.pet.id} className={`rounded-2xl border-2 p-3 text-sm font-bold ${rescued.includes(objective.pet.id) ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-lead-navy"}`}>{rescued.includes(objective.pet.id) ? "✓ Rescued" : `${objective.item.emoji} → ${objective.pet.emoji}`}<span className="mt-1 block text-xs font-medium">Give {objective.item.name.toLowerCase()} to the {objective.pet.name.toLowerCase()}</span></div>)}</div><div className="mt-4 rounded-2xl bg-blue-50 p-3"><p className="text-xs font-bold uppercase text-blue-700">Rescue bag</p><p className="mt-2 min-h-8 text-2xl">{inventory.length ? inventory.map((id) => items.find((item) => item.id === id)?.emoji).join(" ") : "Empty"}</p></div></div>
+      <div><div className="grid grid-cols-6 gap-1 rounded-3xl border-4 border-emerald-100 bg-emerald-50 p-2 shadow-inner sm:gap-2 sm:p-3">{Array.from({ length: width * height }, (_, index) => { const x = index % width; const y = Math.floor(index / width); const key = `${x},${y}`; const objectivePet = rescueObjectives.find((objective) => objective.petPosition === key); const objectiveItem = rescueObjectives.find((objective) => objective.itemPosition === key); const isPlayer = position.x === x && position.y === y; const isObstacle = rescueObstacles.has(key); const petRescued = objectivePet && rescued.includes(objectivePet.pet.id); const itemCollected = objectiveItem && collected.includes(objectiveItem.item.id); return <div key={key} className={`relative grid aspect-square place-items-center rounded-xl text-2xl sm:text-4xl ${isObstacle ? "bg-slate-400" : "bg-white shadow-sm"}`}>{isObstacle ? "🌳" : isPlayer ? <motion.span layoutId="rescue-helper" className="z-10">🦉</motion.span> : objectivePet && !petRescued ? objectivePet.pet.emoji : objectiveItem && !itemCollected ? objectiveItem.item.emoji : petRescued ? "✨" : ""}</div>; })}</div>
+      <div className="mx-auto mt-4 grid w-fit grid-cols-3 gap-2"><span /><button onClick={() => move(0, -1)} className="grid h-12 w-14 place-items-center rounded-xl bg-blue-100 text-lead-blue" aria-label="Move up"><ArrowUp /></button><span /><button onClick={() => move(-1, 0)} className="grid h-12 w-14 place-items-center rounded-xl bg-blue-100 text-lead-blue" aria-label="Move left"><ArrowLeft /></button><button onClick={() => move(0, 1)} className="grid h-12 w-14 place-items-center rounded-xl bg-blue-100 text-lead-blue" aria-label="Move down"><ArrowDown /></button><button onClick={() => move(1, 0)} className="grid h-12 w-14 place-items-center rounded-xl bg-lead-blue text-white" aria-label="Move right"><ArrowRight /></button></div><p className="mt-3 text-center text-xs font-semibold text-lead-gray">Use keyboard arrow keys or the touch controls.</p>
+    </div></div></GameShell>;
 }
 
 function GameShell({ guide, message, children }: { guide: string; message: string; children: React.ReactNode }) { return <div><div className="mb-7 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4"><span className="text-3xl">🦉</span><div><p className="font-heading text-lg font-extrabold text-lead-navy">{guide}</p><p className="mt-1 text-sm leading-6 text-lead-gray">{message}</p></div></div>{children}</div>; }
