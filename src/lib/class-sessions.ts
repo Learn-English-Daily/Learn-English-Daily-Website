@@ -51,6 +51,13 @@ export function getSessionEndAt(sessionDate: string, endTime: string) {
   return `${sessionDate}T${endTime}:00+07:00`;
 }
 
+export function hasClassSessionEnded(session: Pick<ClassSessionDocument, "sessionDate" | "endTime" | "endsAt">, now = new Date()) {
+  const endValue = session.endsAt || getSessionEndAt(session.sessionDate || "", session.endTime || "");
+  if (!endValue) return false;
+  const endTime = new Date(endValue).getTime();
+  return Number.isFinite(endTime) && endTime <= now.getTime();
+}
+
 export function getComputedClassSessionStatus({
   status,
   scheduledAt,

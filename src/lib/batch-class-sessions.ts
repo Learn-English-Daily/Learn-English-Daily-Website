@@ -44,6 +44,18 @@ export function getJakartaPeriod(date: string) {
   return { year: Number(match[1]), month: Number(match[2]) };
 }
 
+export function getBatchClassEndAt(sessionDate: string, endTime: string) {
+  if (!sessionDate || !endTime) return "";
+  return `${sessionDate}T${endTime}:00+07:00`;
+}
+
+export function hasBatchClassEnded(session: Pick<BatchClassSessionDocument, "sessionDate" | "endTime">, now = new Date()) {
+  const endValue = getBatchClassEndAt(session.sessionDate, session.endTime);
+  if (!endValue) return false;
+  const endTime = new Date(endValue).getTime();
+  return Number.isFinite(endTime) && endTime <= now.getTime();
+}
+
 const weekdayAliases: Record<string, number> = {
   sun: 0,
   sunday: 0,

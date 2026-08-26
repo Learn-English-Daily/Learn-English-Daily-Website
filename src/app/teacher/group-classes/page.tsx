@@ -9,17 +9,13 @@ import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { assessmentAttendanceStatuses } from "@/lib/assessments";
-import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
+import { getBatchClassSessionsCollectionName, hasBatchClassEnded, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { isValidTeacherSession, TEACHER_ID_COOKIE, TEACHER_SESSION_COOKIE } from "@/lib/teacher-auth";
 import { getEmployeeTeacherById } from "@/lib/teachers";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Group Classes | LEAD Teacher", robots: { index: false, follow: false } };
-
-function todayWib() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-}
 
 function displayDate(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "full", timeZone: "Asia/Jakarta" }).format(new Date(`${value}T00:00:00+07:00`));
@@ -57,9 +53,9 @@ export default async function TeacherGroupClassesPage() {
     .sort({ sessionDate: -1, meetingNumber: -1 })
     .limit(100)
     .toArray();
-  const today = todayWib();
-  const open = sessions.filter((session) => session.status === "Scheduled" && session.sessionDate <= today).reverse();
-  const future = sessions.filter((session) => session.status === "Scheduled" && session.sessionDate > today).reverse();
+  const now = new Date();
+  const open = sessions.filter((session) => session.status === "Scheduled" && hasBatchClassEnded(session, now)).reverse();
+  const future = sessions.filter((session) => session.status === "Scheduled" && !hasBatchClassEnded(session, now)).reverse();
   const completed = sessions.filter((session) => session.status === "Completed").slice(0, 12);
 
   return (
@@ -113,7 +109,7 @@ export default async function TeacherGroupClassesPage() {
               </ActionFeedbackForm>
             </Card>
           ))}
-          {!open.length ? <Card className="p-8 text-center"><CheckCircle2 className="mx-auto h-9 w-9 text-emerald-600" /><h2 className="mt-3 font-heading text-xl font-bold text-lead-navy">No group attendance pending</h2><p className="mt-2 text-sm text-lead-gray">Today and overdue group classes will appear here.</p></Card> : null}
+          {!open.length ? <Card className="p-8 text-center"><CheckCircle2 className="mx-auto h-9 w-9 text-emerald-600" /><h2 className="mt-3 font-heading text-xl font-bold text-lead-navy">No group attendance pending</h2><p className="mt-2 text-sm text-lead-gray">Classes appear here only after their end time.</p></Card> : null}
         </div>
 
         <div className="grid gap-5 lg:grid-cols-2">

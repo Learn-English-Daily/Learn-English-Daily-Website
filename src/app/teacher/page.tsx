@@ -885,6 +885,8 @@ function TeacherSessionList({
 }
 
 function TeacherSessionCard({ session }: { session: TeacherSession }) {
+  const canMarkAttendance = session.status === "Needs Attendance";
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -899,7 +901,7 @@ function TeacherSessionCard({ session }: { session: TeacherSession }) {
       <p className="mt-1 text-sm text-lead-gray">{session.courseJoined} / {session.classType || "Class type not set"}</p>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <ActionFeedbackForm action={saveTeacherAttendance} successMessage="Attendance saved. This class will leave your queue." className="grid gap-3 rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+        {canMarkAttendance ? <ActionFeedbackForm action={saveTeacherAttendance} successMessage="Attendance saved. This class will leave your queue." className="grid gap-3 rounded-lg border border-blue-100 bg-blue-50/50 p-4">
           <input type="hidden" name="classSessionId" value={session.id} />
           <label className="grid gap-2 text-sm font-bold text-lead-navy">
             Attendance
@@ -917,7 +919,10 @@ function TeacherSessionCard({ session }: { session: TeacherSession }) {
             <CalendarCheck className="h-4 w-4" />
             Save Attendance
           </Button>
-        </ActionFeedbackForm>
+        </ActionFeedbackForm> : <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-bold text-amber-900">Attendance opens after class</p>
+          <p className="mt-2 text-sm leading-6 text-amber-800">You can view this meeting now. Attendance will become available after {formatTime(session.endsAt || session.scheduledAt)} WIB.</p>
+        </div>}
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

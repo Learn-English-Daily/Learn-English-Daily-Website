@@ -17,10 +17,11 @@ import {
   getBillingPeriodFromDate,
   isBillingPeriodClosed
 } from "@/lib/billing-periods";
-import { getClassSessionsCollectionName, type ClassSessionDocument } from "@/lib/class-sessions";
+import { getClassSessionsCollectionName, hasClassSessionEnded, type ClassSessionDocument } from "@/lib/class-sessions";
 import {
   getBatchClassSessionsCollectionName,
   getJakartaPeriod,
+  hasBatchClassEnded,
   type BatchAttendanceEntry,
   type BatchClassSessionDocument
 } from "@/lib/batch-class-sessions";
@@ -103,15 +104,6 @@ async function assertTeacher() {
     throw new Error("Unauthorized");
   }
   return teacher;
-}
-
-function getTodayJakarta() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jakarta",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
 }
 
 async function syncPaymentFromTeacherAttendance({
@@ -256,6 +248,10 @@ export async function saveTeacherAttendance(formData: FormData) {
 
   if (!session?.studentId || !session.meetingNumber || !session.sessionDate || !session.teacherIds?.includes(teacher.id)) {
     throw new Error("Class session not found for this teacher");
+  }
+
+  if (!hasClassSessionEnded(session)) {
+    throw new Error("Attendance can only be marked after the class end time (WIB).");
   }
 
   const student = await db.collection<{
@@ -541,7 +537,7 @@ export async function saveBatchClassAttendance(formData: FormData) {
   });
 
   if (!session) throw new Error("Scheduled group class not found for this teacher.");
-  if (session.sessionDate > getTodayJakarta()) throw new Error("Attendance can only be marked on or after the class date.");
+  if (!hasBatchClassEnded(session)) throw new Error("Attendance can only be marked after the class end time (WIB).");
 
   const attendance: BatchAttendanceEntry[] = session.studentSnapshot.map((student, index) => {
     const status = clean(formData.get(`attendance_${index}`));
