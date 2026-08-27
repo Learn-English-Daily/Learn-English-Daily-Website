@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, Bus, KeyRound, Lock, Mic, PawPrint, Puzzle, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Bus, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Trophy } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  {
+    title: "My City Adventure",
+    description: "Explore a lively town, visit public places, shop, deliver packages, and speak useful real-life English.",
+    status: "Available",
+    icon: MapPinned,
+    accent: "border-sky-100 bg-sky-50 text-sky-700",
+    available: true,
+    href: "/games/my-city-adventure"
+  },
   {
     title: "Pet Rescue Adventure",
     description: "Match, remember, feed, groom, and rescue cute pets through hands-on English activities.",
