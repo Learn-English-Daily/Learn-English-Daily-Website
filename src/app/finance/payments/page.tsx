@@ -548,6 +548,7 @@ export default async function FinancePaymentsPage({
                 <li>Every paid receipt is marked uploaded to Google Drive.</li>
                 <li>Every meeting payment is marked Paid.</li>
                 <li>Every scheduled class has an attendance record.</li>
+                <li>Every Present or Late attendance record has a completed journal.</li>
               </ol>
             </div>
             <ActionFeedbackForm action={closeMonthlyBalance} successMessage="Month closed successfully." className="mt-4 grid gap-3">

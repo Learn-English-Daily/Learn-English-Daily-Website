@@ -282,8 +282,11 @@ export async function closeMonthlyBalance(formData: FormData) {
     }).limit(50000).toArray(),
     db.collection<{
       studentId?: string;
+      studentName?: string;
       meetingNumber?: number;
       meetingDate?: string;
+      status?: string;
+      notes?: string;
     }>(getStudentAttendanceCollectionName()).find({
       $or: [
         { billingMonth: period.billingMonth, billingYear: period.billingYear },
@@ -296,6 +299,9 @@ export async function closeMonthlyBalance(formData: FormData) {
   );
   const sessionsMissingAttendance = monthSessions.filter(
     (session) => !attendanceKeys.has(`${session.studentId || ""}:${session.meetingNumber || 0}:${session.sessionDate || ""}`)
+  );
+  const missingJournals = monthAttendance.filter(
+    (record) => (record.status === "Present" || record.status === "Late") && !record.notes?.trim()
   );
   const reasons: string[] = [];
 
@@ -313,6 +319,13 @@ export async function closeMonthlyBalance(formData: FormData) {
     const studentSummary = affectedStudents.slice(0, 4).join(", ");
     reasons.push(
       `${sessionsMissingAttendance.length} scheduled class${sessionsMissingAttendance.length === 1 ? " is" : "es are"} missing attendance${studentSummary ? ` (${studentSummary}${affectedStudents.length > 4 ? ", and others" : ""})` : ""}.`
+    );
+  }
+  if (missingJournals.length) {
+    const affectedStudents = [...new Set(missingJournals.map((record) => record.studentName || record.studentId || "Unknown student"))];
+    const studentSummary = affectedStudents.slice(0, 4).join(", ");
+    reasons.push(
+      `${missingJournals.length} attended class journal${missingJournals.length === 1 ? " is" : "s are"} still missing${studentSummary ? ` (${studentSummary}${affectedStudents.length > 4 ? ", and others" : ""})` : ""}.`
     );
   }
 
@@ -334,6 +347,7 @@ export async function closeMonthlyBalance(formData: FormData) {
         paymentCount: monthPayments.length,
         paidCount: paidPayments.length,
         unpaidCount: unpaidPayments.length,
+        journalCount: monthAttendance.filter((record) => (record.status === "Present" || record.status === "Late") && Boolean(record.notes?.trim())).length,
         totalPaid: paidPayments.reduce((sum, payment) => sum + (payment.amountDue || 0), 0),
         totalUnpaid: unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0),
         updatedAt: now
