@@ -356,7 +356,7 @@ async function getAuthenticatedTeacher() {
 
 async function getTeacherPortalData(teacherId: string, month: number, year: number) {
   const db = await getMongoDb();
-  const [sessionDocs, attendanceDocs, gameSessionDocs, batchDocs, studentDocs, assessmentDocs, journalMissingCount] = await Promise.all([
+  const [sessionDocs, attendanceDocs, activeStudentDocs, gameSessionDocs, batchDocs, studentDocs, assessmentDocs, journalMissingCount] = await Promise.all([
     db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
       .find({ teacherIds: teacherId })
@@ -369,6 +369,12 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
       .sort({ meetingDate: -1, updatedAt: -1 })
       .limit(300)
       .toArray() as Promise<WithId<AttendanceDocument>[]>,
+    db
+      .collection<StudentDocument>(getStudentRegistrationCollectionName())
+      .find(getActiveStudentFilter())
+      .project({ studentId: 1 })
+      .limit(5000)
+      .toArray() as Promise<WithId<StudentDocument>[]>,
     db
       .collection<GameSessionDocument>(getGameSessionsCollectionName())
       .find({ gameType: "games-hub" })
@@ -410,6 +416,7 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
         ]
       } as Filter<AttendanceDocument>)
   ]);
+  const activeStudentIds = new Set(activeStudentDocs.map((student) => student.studentId || "").filter(Boolean));
   const attendanceKeys = new Set(
     attendanceDocs.map((doc) => {
       const period = getRecordBillingPeriod(doc);
@@ -434,7 +441,7 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
     const period = getRecordBillingPeriod(doc);
     const attendanceKey = `${studentId}:${meetingNumber}:${period.billingPeriod}`;
 
-    if (doc.status === "Completed" || attendanceKeys.has(attendanceKey)) {
+    if (!activeStudentIds.has(studentId) || doc.status === "Completed" || attendanceKeys.has(attendanceKey)) {
       return [];
     }
 
@@ -478,7 +485,7 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
   const studentsById = new Map<string, TeacherStudentSummary>();
 
   for (const record of recentAttendance) {
-    if (!record.studentId) continue;
+    if (!record.studentId || !activeStudentIds.has(record.studentId)) continue;
     const existing = studentsById.get(record.studentId);
     studentsById.set(record.studentId, {
       studentId: record.studentId,
