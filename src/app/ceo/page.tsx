@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import {
   AlertTriangle,
   CalendarCheck,
+  CheckCircle2,
   CircleDollarSign,
   Clock,
   GraduationCap,
@@ -251,6 +252,7 @@ async function getDashboardData(period: Period) {
   const averageRating = approvedReviews.length
     ? approvedReviews.reduce((sum, review) => sum + (review.rating || 0), 0) / approvedReviews.length
     : 0;
+  const presentClasses = periodAttendance.filter((record) => record.status === "Present").length;
   const pendingReviews = periodReviews.filter((review) => review.status === "pending");
   const missingJournals = periodAttendance.filter((record) => !record.notes?.trim());
   const missingTeacherAssignments = periodAttendance.filter((record) => !record.teacherNames?.length);
@@ -386,7 +388,8 @@ async function getDashboardData(period: Period) {
       attendanceRate,
       revenue,
       outstandingAmount,
-      averageRating
+      averageRating,
+      presentClasses
     },
     actions: {
       unpaidCount: unpaidPayments.length,
@@ -501,6 +504,7 @@ export default async function CeoDashboardPage({
           <Kpi icon={WalletCards} label="Revenue collected" value={formatRupiah(data.kpis.revenue)} detail={data.range.label} color="text-emerald-600" />
           <Kpi icon={CircleDollarSign} label="Outstanding" value={formatRupiah(data.kpis.outstandingAmount)} detail="Current unpaid balance" color="text-yellow-700" />
           <Kpi icon={Star} label="Average rating" value={data.kpis.averageRating ? data.kpis.averageRating.toFixed(1) : "N/A"} detail="Approved reviews" color="text-yellow-600" />
+          <Kpi icon={CheckCircle2} label="Present classes" value={String(data.kpis.presentClasses)} detail={data.range.label} color="text-emerald-600" />
         </section>
 
         <Card className="p-5">
