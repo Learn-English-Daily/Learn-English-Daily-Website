@@ -275,6 +275,15 @@ function countStatus(attendance: TeacherAttendance[], status: AttendanceStatus) 
   return attendance.filter((record) => record.status === status).length;
 }
 
+function getCurrentCourseAttendance(attendance: TeacherAttendance[]) {
+  const latestMeetingOne = attendance
+    .filter((record) => record.meetingNumber === 1 && record.meetingDate)
+    .sort((left, right) => right.meetingDate.localeCompare(left.meetingDate))[0];
+
+  if (!latestMeetingOne?.meetingDate) return attendance;
+  return attendance.filter((record) => record.meetingDate >= latestMeetingOne.meetingDate);
+}
+
 function gradeClassName(grade: AssessmentGrade | "") {
   if (grade === "A") return "bg-emerald-50 text-emerald-700";
   if (grade === "B") return "bg-yellow-50 text-yellow-800";
@@ -615,6 +624,7 @@ export default async function TeacherPortalPage({
   const selectedStudentAttendance = selectedAttendanceStudent
     ? data.recentAttendance.filter((record) => record.studentId === selectedAttendanceStudent.studentId)
     : [];
+  const currentCourseAttendance = getCurrentCourseAttendance(selectedStudentAttendance);
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -738,9 +748,10 @@ export default async function TeacherPortalPage({
                       <div className="grid grid-cols-2 gap-2 text-sm font-bold md:text-right">
                         {attendanceStatuses.map((status) => (
                           <p key={status} className={summaryTextClassName(status)}>
-                            {status}: {countStatus(selectedStudentAttendance, status)}
+                            {status}: {countStatus(currentCourseAttendance, status)}
                           </p>
                         ))}
+                        <p className="col-span-2 mt-1 text-xs font-semibold text-lead-gray">Current course phase · resets from the latest Meeting 1</p>
                       </div>
                     </div>
                   </Card>
