@@ -69,7 +69,7 @@ async function getCumulativePaymentRequest(studentId: string): Promise<Cumulativ
     db
       .collection<PaymentDocument>(getStudentPaymentsCollectionName())
       .find({ studentId, status: "Unpaid" })
-      .sort({ meetingNumber: 1, meetingDate: 1 })
+      .sort({ meetingDate: 1, meetingNumber: 1 })
       .limit(200)
       .toArray() as Promise<WithId<PaymentDocument>[]>
   ]);
@@ -126,9 +126,9 @@ export default async function CumulativePaymentRequestPage({
   }
 
   const receiptNumber = `LEAD-CUM-${request.studentId}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
-  const meetingRange = request.payments.length
-    ? `Meeting ${request.payments[0].meetingNumber} to Meeting ${request.payments[request.payments.length - 1].meetingNumber}`
-    : "No unpaid meetings";
+  const paymentDateRange = request.payments.length
+    ? `${formatDate(request.payments[0].meetingDate)} to ${formatDate(request.payments[request.payments.length - 1].meetingDate)}`
+    : "No outstanding payments";
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 print:bg-white print:p-0">
@@ -177,8 +177,8 @@ export default async function CumulativePaymentRequestPage({
 
           <div className="grid gap-4 border-b border-slate-200 py-6 sm:grid-cols-3">
             <Detail label="Student ID" value={request.studentId} />
-            <Detail label="Meetings included" value={`${request.payments.length} unpaid meetings`} />
-            <Detail label="Meeting range" value={meetingRange} />
+            <Detail label="Payment items" value={`${request.payments.length} outstanding items`} />
+            <Detail label="Class date range" value={paymentDateRange} />
           </div>
 
           <div className="my-6 rounded-lg bg-blue-50 p-5">
@@ -197,16 +197,16 @@ export default async function CumulativePaymentRequestPage({
                 <table className="w-full min-w-[680px] border-collapse text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-[0.08em] text-lead-gray">
                     <tr>
-                      <th className="px-4 py-3">Meeting</th>
+                      <th className="px-4 py-3">No.</th>
                       <th className="px-4 py-3">Class date</th>
                       <th className="px-4 py-3">Attendance</th>
                       <th className="px-4 py-3 text-right">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {request.payments.map((payment) => (
+                    {request.payments.map((payment, index) => (
                       <tr key={payment.id}>
-                        <td className="px-4 py-4 font-semibold text-lead-navy">Meeting {payment.meetingNumber}</td>
+                        <td className="px-4 py-4 font-semibold text-lead-navy">{index + 1}</td>
                         <td className="px-4 py-4 text-lead-gray">{formatDate(payment.meetingDate)}</td>
                         <td className="px-4 py-4 text-lead-gray">{payment.attendanceStatus || "Recorded"}</td>
                         <td className="px-4 py-4 text-right font-bold text-lead-navy">{formatRupiah(payment.amountDue)}</td>
@@ -229,7 +229,7 @@ export default async function CumulativePaymentRequestPage({
           <div className="mt-6 rounded-lg border border-slate-200 p-5">
             <h2 className="font-heading text-lg font-bold text-lead-navy">Payment note</h2>
             <p className="mt-2 text-sm leading-6 text-lead-gray">
-              Please complete the total payment for the meetings listed above and send payment confirmation to LEAD via WhatsApp. The admin will update each payment record after confirmation.
+              Please complete the total payment for the classes listed above and send payment confirmation to LEAD via WhatsApp. The finance team will update each payment record after confirmation.
             </p>
           </div>
 
@@ -249,9 +249,9 @@ export default async function CumulativePaymentRequestPage({
             courseJoined: request.courseJoined,
             classType: request.classType,
             totalAmountDue: formatRupiah(request.totalAmountDue),
-            meetingCount: request.payments.length,
-            meetings: request.payments.map((payment) => ({
-              meetingNumber: payment.meetingNumber,
+            paymentCount: request.payments.length,
+            payments: request.payments.map((payment, index) => ({
+              serialNumber: index + 1,
               meetingDate: formatDate(payment.meetingDate),
               attendanceStatus: payment.attendanceStatus,
               amountDue: formatRupiah(payment.amountDue)

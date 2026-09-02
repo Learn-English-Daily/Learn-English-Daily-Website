@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Download, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type CumulativePaymentMeeting = {
-  meetingNumber: number;
+type CumulativePaymentItem = {
+  serialNumber: number;
   meetingDate: string;
   attendanceStatus: string;
   amountDue: string;
@@ -17,8 +17,8 @@ type CumulativePaymentRequestData = {
   courseJoined: string;
   classType: string;
   totalAmountDue: string;
-  meetingCount: number;
-  meetings: CumulativePaymentMeeting[];
+  paymentCount: number;
+  payments: CumulativePaymentItem[];
 };
 
 function safeFilePart(value: string) {
@@ -83,11 +83,11 @@ export function CumulativePaymentRequestActions({ receipt }: { receipt: Cumulati
       pdf.setTextColor(gray);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(8);
-      pdf.text("MEETINGS", 18, 104);
+      pdf.text("PAYMENT ITEMS", 18, 104);
       pdf.text("TOTAL AMOUNT", pageWidth - 18, 104, { align: "right" });
       pdf.setTextColor(navy);
       pdf.setFontSize(13);
-      pdf.text(`${receipt.meetingCount} unpaid meetings`, 18, 113);
+      pdf.text(`${receipt.paymentCount} outstanding items`, 18, 113);
       pdf.text(receipt.totalAmountDue, pageWidth - 18, 113, { align: "right" });
 
       pdf.setFillColor("#EFF6FF");
@@ -104,18 +104,18 @@ export function CumulativePaymentRequestActions({ receipt }: { receipt: Cumulati
       pdf.setTextColor(navy);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(11);
-      pdf.text("Included meetings", 18, y);
+      pdf.text("Included payment items", 18, y);
       y += 9;
 
       pdf.setFontSize(8);
       pdf.setTextColor(gray);
-      pdf.text("MEETING", 18, y);
+      pdf.text("NO.", 18, y);
       pdf.text("DATE", 45, y);
       pdf.text("ATTENDANCE", 110, y);
       pdf.text("AMOUNT", pageWidth - 18, y, { align: "right" });
       y += 6;
 
-      for (const meeting of receipt.meetings) {
+      for (const payment of receipt.payments) {
         if (y > 255) {
           pdf.addPage();
           y = 24;
@@ -124,10 +124,10 @@ export function CumulativePaymentRequestActions({ receipt }: { receipt: Cumulati
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(9);
         pdf.setTextColor(navy);
-        pdf.text(`Meeting ${meeting.meetingNumber}`, 18, y);
-        pdf.text(meeting.meetingDate, 45, y);
-        pdf.text(meeting.attendanceStatus || "Recorded", 110, y);
-        pdf.text(meeting.amountDue, pageWidth - 18, y, { align: "right" });
+        pdf.text(String(payment.serialNumber), 18, y);
+        pdf.text(payment.meetingDate, 45, y);
+        pdf.text(payment.attendanceStatus || "Recorded", 110, y);
+        pdf.text(payment.amountDue, pageWidth - 18, y, { align: "right" });
         y += 7;
       }
 
