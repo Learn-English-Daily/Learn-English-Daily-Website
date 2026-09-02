@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 export type AdminAccessLevel = "full" | "group-students";
 
 function getGroupAdminUsernames() {
-  const configured = process.env.GROUP_STUDENT_ADMIN_USERNAMES || "novi";
+  const configured = process.env.GROUP_STUDENT_ADMIN_USERNAMES || "kar";
   return new Set(configured.split(",").map(normalizeEmployeeUsername).filter(Boolean));
 }
 
