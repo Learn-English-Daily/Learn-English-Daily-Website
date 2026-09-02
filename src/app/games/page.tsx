@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, Bus, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Bus, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Trophy } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  {
+    title: "Action Hero",
+    description: "Control Bill in a real 2D world and learn action verbs by running, jumping, reading, swimming, dancing, and climbing.",
+    status: "Available",
+    icon: Footprints,
+    accent: "border-blue-100 bg-blue-50 text-lead-blue",
+    available: true,
+    href: "/games/action-hero"
+  },
   {
     title: "My City Adventure",
     description: "Explore a lively town, visit public places, shop, deliver packages, and speak useful real-life English.",

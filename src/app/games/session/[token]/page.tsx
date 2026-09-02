@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowRight, Bus, Clock, Gamepad2, KeyRound, LockKeyhole, Mic, PawPrint, Puzzle, Sparkles } from "lucide-react";
+import { ArrowRight, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, PawPrint, Puzzle, Sparkles } from "lucide-react";
+import { ActionHeroGame } from "@/app/games/action-hero/action-hero-game";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
 import { SentenceBuilderGame } from "@/app/games/sentence-builder/sentence-builder-game";
@@ -84,6 +85,7 @@ export default async function GameSessionPage({
   const isTongueTwisterBattle = activeGame === "tongue-twister-battle";
   const isTransportationAdventure = activeGame === "transportation-adventure";
   const isPetRescueAdventure = activeGame === "pet-rescue-adventure";
+  const isActionHero = activeGame === "action-hero";
   const shouldShowHub =
     gameSession?.gameType === "games-hub" &&
     !isEscapeRoom &&
@@ -93,7 +95,8 @@ export default async function GameSessionPage({
     !isSentenceBuilder &&
     !isTongueTwisterBattle &&
     !isTransportationAdventure &&
-    !isPetRescueAdventure;
+    !isPetRescueAdventure &&
+    !isActionHero;
   const gameTitle = shouldShowHub
     ? "LEAD Class Games"
     : isEscapeRoom
@@ -110,6 +113,8 @@ export default async function GameSessionPage({
                 ? "Transportation Adventure"
                 : isPetRescueAdventure
                   ? "Pet Rescue Adventure"
+                  : isActionHero
+                    ? "Action Hero"
               : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
@@ -127,8 +132,10 @@ export default async function GameSessionPage({
     ? "Travel through five English stages with Wisey before the class game window ends."
     : isPetRescueAdventure
     ? "Match, feed, groom, and rescue pets through hands-on English activities."
+    : isActionHero
+    ? "Control Bill and perform action verbs in a real interactive LEAD world."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -197,6 +204,8 @@ export default async function GameSessionPage({
           <TransportationAdventureGame />
         ) : isPetRescueAdventure ? (
           <PetRescueAdventure />
+        ) : isActionHero ? (
+          <ActionHeroGame />
         ) : (
           <SpeechCompetitionGame />
         )}
@@ -207,6 +216,13 @@ export default async function GameSessionPage({
 
 function GameHub({ token }: { token: string }) {
   const games = [
+    {
+      title: "Action Hero",
+      description: "Control Bill and learn action verbs through movement and real interactions.",
+      href: `/games/session/${encodeURIComponent(token)}?game=action-hero`,
+      icon: Footprints,
+      accent: "border-blue-100 bg-blue-50 text-lead-blue"
+    },
     {
       title: "Pet Rescue Adventure",
       description: "Match, care for, and rescue pets through interactive English play.",

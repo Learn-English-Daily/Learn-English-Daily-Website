@@ -7,7 +7,8 @@ export type GameType =
   | "sentence-builder"
   | "tongue-twister-battle"
   | "transportation-adventure"
-  | "pet-rescue-adventure";
+  | "pet-rescue-adventure"
+  | "action-hero";
 
 export type GameSessionDocument = {
   token?: string;
