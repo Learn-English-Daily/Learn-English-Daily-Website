@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { logoutFinance } from "@/app/finance/actions";
 import { FinanceLoginForm } from "@/app/finance/login-form";
-import { closeMonthlyBalance, saveGroupStudentPayment, updateStudentPaymentStatus } from "@/app/finance/payments/actions";
+import { saveGroupStudentPayment, updateStudentPaymentStatus } from "@/app/finance/payments/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { FinancePageHeader } from "@/components/finance/finance-page-header";
 import { getMonthlyAssessmentsCollectionName } from "@/lib/assessments";
@@ -538,26 +538,6 @@ export default async function FinancePaymentsPage({
 
         <div className="grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="grid gap-6 xl:sticky xl:top-6 xl:self-start">
-          <Card className="p-5">
-            <h2 className="font-heading text-xl font-bold text-lead-navy">Monthly close</h2>
-            <p className="mt-2 text-sm leading-6 text-lead-gray">Close a finished month after every operational and payment record is complete.</p>
-            <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-lead-gray">
-              <p className="font-bold text-lead-navy">Before closing, the system checks:</p>
-              <ol className="mt-2 list-decimal space-y-1 pl-5">
-                <li>It is the last day of the month or later.</li>
-                <li>Every paid receipt is marked uploaded to Google Drive.</li>
-                <li>Every meeting payment is marked Paid.</li>
-                <li>Every scheduled class has an attendance record.</li>
-                <li>Every Present or Late attendance record has a completed journal.</li>
-              </ol>
-            </div>
-            <ActionFeedbackForm action={closeMonthlyBalance} successMessage="Month closed successfully." className="mt-4 grid gap-3">
-              <input name="billingMonth" type="month" required className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
-              <input name="notes" placeholder="Optional closing note" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
-              <Button type="submit">Close Month</Button>
-            </ActionFeedbackForm>
-          </Card>
-
           <Card className="p-4">
             <form action="/finance/payments" className="flex flex-col gap-3 md:flex-row">
               <input type="hidden" name="view" value={showArchived ? "history" : "active"} />

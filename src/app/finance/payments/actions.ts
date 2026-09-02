@@ -24,6 +24,7 @@ import {
   type PaymentStatus
 } from "@/lib/payments";
 import { getActiveStudentFilter, getCourseStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { assertFullAdminAccess } from "@/lib/admin-permissions";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -216,7 +217,7 @@ export async function saveGroupStudentPayment(formData: FormData) {
 }
 
 export async function closeMonthlyBalance(formData: FormData) {
-  await assertFinance();
+  await assertFullAdminAccess();
 
   const billingMonthValue = clean(formData.get("billingMonth"));
   const notes = clean(formData.get("notes"));
@@ -354,7 +355,7 @@ export async function closeMonthlyBalance(formData: FormData) {
       },
       $setOnInsert: {
         closedAt: now,
-        closedBy: "finance",
+        closedBy: "admin",
         createdAt: now
       }
     },
@@ -362,6 +363,7 @@ export async function closeMonthlyBalance(formData: FormData) {
   );
 
   revalidatePath("/finance/payments");
+  revalidatePath("/admin");
   revalidatePath("/admin/attendance");
   revalidatePath("/ceo/finance");
   revalidatePath("/ceo");
