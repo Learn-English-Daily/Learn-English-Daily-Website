@@ -1,11 +1,13 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
-import { BookOpenCheck, CalendarCheck, CalendarClock, Search, UserRoundCheck } from "lucide-react";
+import { BookOpenCheck, CalendarCheck, CalendarClock, CalendarRange, ChevronDown, Search, UserRoundCheck } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
+import { closeMonthlyBalance } from "@/app/finance/payments/actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
@@ -428,6 +430,49 @@ export default async function AdminAttendancePage({
             ))}
           </OperationsList>
         </div>
+
+        <details className="group overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+          <summary className="focus-ring flex cursor-pointer list-none items-center gap-4 p-5 marker:content-none">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-lead-blue">
+              <CalendarRange className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-heading text-lg font-extrabold text-lead-navy">Month-End Closing</span>
+              <span className="mt-1 block text-sm text-lead-gray">Use after attendance, journals, payments, and receipts are complete.</span>
+            </span>
+            <span className="hidden rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase text-lead-blue sm:block">Admin only</span>
+            <ChevronDown className="h-5 w-5 shrink-0 text-lead-gray transition group-open:rotate-180" />
+          </summary>
+
+          <div className="grid border-t border-blue-100 bg-slate-50/70 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="p-5 sm:p-6">
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-lead-blue">System prerequisites</p>
+              <div className="mt-4 grid gap-2 text-sm text-lead-gray sm:grid-cols-2">
+                <p className="rounded-lg bg-white p-3"><strong className="text-lead-navy">1.</strong> Last day of the month reached in WIB</p>
+                <p className="rounded-lg bg-white p-3"><strong className="text-lead-navy">2.</strong> All paid receipts uploaded to Drive</p>
+                <p className="rounded-lg bg-white p-3"><strong className="text-lead-navy">3.</strong> All meeting payments marked Paid</p>
+                <p className="rounded-lg bg-white p-3"><strong className="text-lead-navy">4.</strong> All scheduled classes have attendance</p>
+                <p className="rounded-lg bg-white p-3 sm:col-span-2"><strong className="text-lead-navy">5.</strong> All Present or Late classes have journals</p>
+              </div>
+              <p className="mt-3 text-xs font-semibold leading-5 text-lead-gray">Nothing closes unless every check passes. Any missing items will be listed after submission.</p>
+            </div>
+
+            <div className="border-t border-blue-100 bg-white p-5 sm:p-6 lg:border-l lg:border-t-0">
+              <h3 className="font-heading text-lg font-extrabold text-lead-navy">Close a completed month</h3>
+              <ActionFeedbackForm action={closeMonthlyBalance} successMessage="Month closed successfully." className="mt-4 grid gap-3">
+                <label className="grid gap-2 text-sm font-bold text-lead-navy">
+                  Month
+                  <input name="billingMonth" type="month" required className="focus-ring h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
+                </label>
+                <label className="grid gap-2 text-sm font-bold text-lead-navy">
+                  Internal note <span className="font-normal text-lead-gray">(optional)</span>
+                  <input name="notes" placeholder="Closing note" className="focus-ring h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm text-lead-navy" />
+                </label>
+                <Button type="submit">Check and Close Month</Button>
+              </ActionFeedbackForm>
+            </div>
+          </div>
+        </details>
 
         <Card className="p-5">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">

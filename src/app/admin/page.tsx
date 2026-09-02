@@ -6,7 +6,6 @@ import {
   ArrowRight,
   CalendarCheck,
   CalendarClock,
-  CalendarRange,
   Inbox,
   Star,
   Users
@@ -17,8 +16,6 @@ import { Card } from "@/components/ui/card";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
-import { closeMonthlyBalance } from "@/app/finance/payments/actions";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import {
@@ -208,44 +205,6 @@ export default async function AdminDashboardPage() {
           <DashboardKpi icon={Star} label="Pending reviews" value={data.pendingReviews} detail="Waiting approval" href="/admin/reviews" tone="blue" />
           <DashboardKpi icon={Users} label="Current students" value={data.currentStudents} detail="Active registrations" href="/admin/students" tone="blue" />
         </div>
-
-        <Card className="overflow-hidden border-blue-100">
-          <div className="grid lg:grid-cols-[0.8fr_1.2fr]">
-            <div className="bg-[linear-gradient(145deg,#0f172a_0%,#1e3a8a_100%)] p-6 text-white">
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-lead-yellow">
-                <CalendarRange className="h-6 w-6" />
-              </span>
-              <h2 className="mt-5 font-heading text-2xl font-extrabold">Close a completed month</h2>
-              <p className="mt-2 text-sm leading-6 text-blue-100">
-                This administrative action locks completed payment and attendance records into history.
-              </p>
-              <ActionFeedbackForm action={closeMonthlyBalance} successMessage="Month closed successfully." className="mt-5 grid gap-3">
-                <label className="grid gap-2 text-sm font-bold">
-                  Month to close
-                  <input name="billingMonth" type="month" required className="focus-ring rounded-lg border border-white/20 bg-white px-4 py-3 text-sm text-lead-navy" />
-                </label>
-                <label className="grid gap-2 text-sm font-bold">
-                  Closing note (optional)
-                  <input name="notes" placeholder="Add an internal note" className="focus-ring rounded-lg border border-white/20 bg-white px-4 py-3 text-sm text-lead-navy" />
-                </label>
-                <Button type="submit" className="bg-lead-yellow text-lead-navy hover:bg-yellow-300">Check and Close Month</Button>
-              </ActionFeedbackForm>
-            </div>
-            <div className="p-6">
-              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-lead-blue">Required before closing</p>
-              <ol className="mt-4 grid gap-3 text-sm leading-6 text-lead-gray sm:grid-cols-2">
-                <li className="rounded-xl bg-slate-50 p-4"><strong className="block text-lead-navy">1. Closing date reached</strong>It is the last day of the selected month or later in WIB.</li>
-                <li className="rounded-xl bg-slate-50 p-4"><strong className="block text-lead-navy">2. Receipts uploaded</strong>Every paid receipt is marked uploaded to Google Drive.</li>
-                <li className="rounded-xl bg-slate-50 p-4"><strong className="block text-lead-navy">3. Payments completed</strong>Every meeting payment for the month is marked Paid.</li>
-                <li className="rounded-xl bg-slate-50 p-4"><strong className="block text-lead-navy">4. Attendance completed</strong>Every scheduled class has an attendance record.</li>
-                <li className="rounded-xl bg-slate-50 p-4 sm:col-span-2"><strong className="block text-lead-navy">5. Journals completed</strong>Every Present or Late attendance record has a completed journal.</li>
-              </ol>
-              <p className="mt-4 rounded-xl bg-blue-50 p-4 text-sm font-semibold leading-6 text-lead-blue">
-                If a requirement is incomplete, the system will keep the month open and show the exact reasons here.
-              </p>
-            </div>
-          </div>
-        </Card>
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <Card className="p-5">
