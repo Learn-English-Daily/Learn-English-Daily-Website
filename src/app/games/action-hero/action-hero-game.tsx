@@ -107,7 +107,8 @@ const collisions: Rect[] = [
   { x: 1410, y: 506, width: 140, height: 24 },
   { x: 1195, y: 150, width: 48, height: 250 },
   { x: 1320, y: 150, width: 48, height: 250 },
-  { x: 900, y: 875, width: 70, height: 300 },
+  { x: 900, y: 875, width: 70, height: 92 },
+  { x: 900, y: 1067, width: 70, height: 108 },
   { x: 1370, y: 875, width: 70, height: 300 },
   { x: 900, y: 875, width: 540, height: 28 },
   { x: 900, y: 1147, width: 190, height: 28 },
@@ -548,6 +549,8 @@ function drawWorld(ctx: CanvasRenderingContext2D, state: GameState) {
 function drawPlayground(ctx: CanvasRenderingContext2D) {
   areaLabel(ctx, 105, 145, "PLAYGROUND", "#2563eb");
   ctx.strokeStyle = "#f8fafc"; ctx.lineWidth = 8; ctx.strokeRect(80, 90, 490, 420);
+  ctx.fillStyle = "#d6d3d1"; ctx.fillRect(410, 481, 90, 38);
+  drawGate(ctx, 410, 485, 90, "EXIT TO TOWN", "down");
   drawTree(ctx, 150, 185); drawTree(ctx, 510, 155); drawTree(ctx, 130, 445);
   drawBench(ctx, 380, 200); drawSlide(ctx, 450, 360); drawBall(ctx, 250, 310);
   drawNpc(ctx, 315, 420, "#16a34a", "Friend");
@@ -590,8 +593,30 @@ function drawPool(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#38bdf8"; ctx.fillRect(970, 915, 400, 215);
   ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 3; for (let y = 950; y < 1120; y += 45) { ctx.beginPath(); ctx.moveTo(980, y); ctx.bezierCurveTo(1080, y - 14, 1180, y + 14, 1360, y); ctx.stroke(); }
   areaLabel(ctx, 930, 850, "SWIMMING POOL", "#0369a1");
+  ctx.fillStyle = "#d6d3d1"; ctx.fillRect(885, 967, 90, 100);
+  drawGate(ctx, 900, 967, 70, "POOL GATE", "left");
+  drawGate(ctx, 1090, 1147, 170, "POOL EXIT", "down");
   drawNpc(ctx, 940, 1220, "#0284c7", "Coach");
   drawFinishFlag(ctx, 1480, 1190);
+}
+
+function drawGate(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, label: string, direction: "left" | "down") {
+  ctx.save();
+  ctx.fillStyle = "#facc15";
+  if (direction === "down") {
+    ctx.fillRect(x - 6, y - 16, 12, 36);
+    ctx.fillRect(x + width - 6, y - 16, 12, 36);
+    ctx.fillStyle = "#0f172a"; rounded(ctx, x - 18, y - 43, width + 36, 28, 8); ctx.fill();
+    ctx.fillStyle = "#facc15"; ctx.beginPath(); ctx.moveTo(x + width / 2 - 9, y + 24); ctx.lineTo(x + width / 2 + 9, y + 24); ctx.lineTo(x + width / 2, y + 36); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "white"; ctx.font = "900 11px sans-serif"; ctx.textAlign = "center"; ctx.fillText(label, x + width / 2, y - 24);
+  } else {
+    ctx.fillRect(x - 10, y - 5, 28, 10);
+    ctx.fillRect(x - 10, y + width - 5, 28, 10);
+    ctx.fillStyle = "#0f172a"; rounded(ctx, x - 4, y + width / 2 - 42, 86, 28, 8); ctx.fill();
+    ctx.fillStyle = "#facc15"; ctx.beginPath(); ctx.moveTo(x - 18, y + width / 2 - 3); ctx.lineTo(x - 6, y + width / 2 - 12); ctx.lineTo(x - 6, y + width / 2 + 6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "white"; ctx.font = "900 10px sans-serif"; ctx.textAlign = "center"; ctx.fillText(label, x + 39, y + width / 2 - 24);
+  }
+  ctx.restore();
 }
 
 function drawFinalCourse(ctx: CanvasRenderingContext2D, unlocked: boolean) {
