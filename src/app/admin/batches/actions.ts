@@ -292,3 +292,27 @@ export async function cancelBatchClass(formData: FormData) {
   revalidatePath("/admin/batches");
   revalidatePath("/teacher/group-classes");
 }
+
+export async function deleteBatchClass(formData: FormData) {
+  await assertAdmin();
+  const sessionId = clean(formData.get("sessionId"));
+  if (!ObjectId.isValid(sessionId)) {
+    return { success: false, message: "Invalid group class." };
+  }
+
+  const db = await getMongoDb();
+  const result = await db.collection(getBatchClassSessionsCollectionName()).deleteOne({
+    _id: new ObjectId(sessionId),
+    status: "Scheduled",
+    attendanceMarked: { $ne: true }
+  });
+
+  if (!result.deletedCount) {
+    return { success: false, message: "Only scheduled group classes without attendance can be deleted." };
+  }
+
+  revalidatePath("/admin/sessions");
+  revalidatePath("/admin/batches");
+  revalidatePath("/teacher/group-classes");
+  return { success: true };
+}
