@@ -4,8 +4,8 @@ import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/
 
 export const groupMonthlyPrices: Record<string, number> = {
   "Foundation English": 200000,
-  "Confident English": 250000,
-  "Fluent English": 300000
+  "Confident English": 230000,
+  "Fluent English": 260000
 };
 
 let groupInvoiceIndexPromise: Promise<string> | null = null;
