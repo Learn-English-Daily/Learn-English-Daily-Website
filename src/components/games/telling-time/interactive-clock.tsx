@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, type PointerEvent } from "react";
-import { Minus, Plus } from "lucide-react";
 
 type Hand = "hour" | "minute";
 
@@ -11,12 +10,11 @@ type Props = ClockTime & {
   onChange?: (time: ClockTime) => void;
   interactive?: boolean;
   compact?: boolean;
-  showControls?: boolean;
 };
 
 const normalizeHour = (hour: number) => ((hour - 1 + 12) % 12) + 1;
 
-export function InteractiveClock({ hour, minute, onChange, interactive = true, compact = false, showControls = true }: Props) {
+export function InteractiveClock({ hour, minute, onChange, interactive = true, compact = false }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragging, setDragging] = useState<Hand | null>(null);
   const minuteAngle = minute * 6;
@@ -45,18 +43,6 @@ export function InteractiveClock({ hour, minute, onChange, interactive = true, c
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragging(hand);
     updateFromPointer(event, hand);
-  }
-
-  function adjustHour(delta: number) {
-    onChange?.({ hour: normalizeHour(hour + delta), minute });
-  }
-
-  function adjustMinute(delta: number) {
-    let next = minute + delta;
-    let nextHour = hour;
-    if (next >= 60) { next -= 60; nextHour = normalizeHour(hour + 1); }
-    if (next < 0) { next += 60; nextHour = normalizeHour(hour - 1); }
-    onChange?.({ hour: nextHour, minute: next });
   }
 
   return (
@@ -88,12 +74,6 @@ export function InteractiveClock({ hour, minute, onChange, interactive = true, c
         </g>
         <circle cx="180" cy="180" r="13" fill="#facc15" stroke="#0f172a" strokeWidth="5" />
       </svg>
-      {interactive && showControls && (
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-slate-100 p-2 text-center"><p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Short hand · hour</p><div className="flex items-center justify-center gap-2"><button type="button" onClick={() => adjustHour(-1)} className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm" aria-label="Previous hour"><Minus className="h-4 w-4" /></button><strong className="w-8 text-xl">{hour}</strong><button type="button" onClick={() => adjustHour(1)} className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm" aria-label="Next hour"><Plus className="h-4 w-4" /></button></div></div>
-          <div className="rounded-2xl bg-blue-50 p-2 text-center"><p className="mb-1 text-xs font-bold uppercase tracking-wide text-blue-600">Long hand · minute</p><div className="flex items-center justify-center gap-2"><button type="button" onClick={() => adjustMinute(-5)} className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm" aria-label="Move back five minutes"><Minus className="h-4 w-4" /></button><strong className="w-8 text-xl">{String(minute).padStart(2, "0")}</strong><button type="button" onClick={() => adjustMinute(5)} className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm" aria-label="Move forward five minutes"><Plus className="h-4 w-4" /></button></div></div>
-        </div>
-      )}
     </div>
   );
 }
