@@ -8,6 +8,7 @@ import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isValidAdminSession } from
 import { getAdminAccessForUsername } from "@/lib/admin-permissions";
 import { getClassSessionsCollectionName } from "@/lib/class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
+import { ensureGroupMonthlyInvoice } from "@/lib/group-monthly-invoices";
 import { refreshUnpaidStudentPaymentPricing } from "@/lib/payment-pricing";
 import { generateParentAccessToken } from "@/lib/parent-access";
 import { isValidDateOfBirth } from "@/lib/student-age";
@@ -189,6 +190,16 @@ export async function updateStudentRegistration(formData: FormData) {
     courseJoined: registration.courseJoined,
     classType: registration.classType,
     classMode: registration.classMode
+  });
+  await ensureGroupMonthlyInvoice(db, {
+    studentId: currentStudentId,
+    studentName: registration.studentName,
+    courseJoined: registration.courseJoined,
+    classType: registration.classType,
+    classMode: registration.classMode,
+    activeBatchId: typeof existingRegistration?.activeBatchId === "string" ? existingRegistration.activeBatchId : "",
+    activeBatchName: typeof existingRegistration?.activeBatchName === "string" ? existingRegistration.activeBatchName : "",
+    batchProgram: typeof existingRegistration?.batchProgram === "string" ? existingRegistration.batchProgram : ""
   });
 
   if (currentStudentId) {

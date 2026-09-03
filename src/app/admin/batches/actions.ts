@@ -15,6 +15,7 @@ import {
   isAssessmentProgram
 } from "@/lib/assessments";
 import { getMongoDb } from "@/lib/mongodb";
+import { ensureGroupMonthlyInvoice } from "@/lib/group-monthly-invoices";
 import {
   getActiveStudentFilter,
   getStudentRegistrationCollectionName
@@ -179,7 +180,24 @@ export async function assignStudentToBatch(formData: FormData) {
     throw new Error("Student not found");
   }
 
+  const assignedStudent = await db.collection<{
+    studentId?: string;
+    studentName?: string;
+    courseJoined?: string;
+    classType?: string;
+    classMode?: string;
+  }>(getStudentRegistrationCollectionName()).findOne({ studentId });
+  if (assignedStudent) {
+    await ensureGroupMonthlyInvoice(db, {
+      ...assignedStudent,
+      activeBatchId: batch._id.toString(),
+      activeBatchName: String(batch.batchName || ""),
+      batchProgram: String(batch.program || "")
+    });
+  }
+
   revalidatePath("/admin/batches");
+  revalidatePath("/finance/payments");
   revalidatePath("/admin/students");
 }
 

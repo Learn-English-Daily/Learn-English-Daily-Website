@@ -57,6 +57,7 @@ import {
   profitDistributionStatuses
 } from "@/lib/finance";
 import { getMongoDb } from "@/lib/mongodb";
+import { ensureCurrentGroupMonthlyInvoices } from "@/lib/group-monthly-invoices";
 import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
@@ -372,6 +373,7 @@ function groupSum<T>(items: T[], keyFn: (item: T) => string, valueFn: (item: T) 
 
 async function getFinanceData(searchParams: SearchParams) {
   const db = await getMongoDb();
+  await ensureCurrentGroupMonthlyInvoices(db);
   const requestedPeriod = firstParam(searchParams.period);
   const period: ReportPeriod = periodOptions.some((option) => option.value === requestedPeriod) ? (requestedPeriod as ReportPeriod) : "month";
   const hasAppliedFilters = Boolean(

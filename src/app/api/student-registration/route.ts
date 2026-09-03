@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { ObjectId } from "mongodb";
 import { notifyNewStudentRegistration } from "@/lib/admin-notifications";
 import { getMongoDb } from "@/lib/mongodb";
+import { ensureGroupMonthlyInvoice } from "@/lib/group-monthly-invoices";
 import { generateParentAccessToken } from "@/lib/parent-access";
 import { isValidDateOfBirth } from "@/lib/student-age";
 import {
@@ -188,6 +189,9 @@ export async function POST(request: Request) {
           }
         ]
       );
+      await ensureGroupMonthlyInvoice(db, savedRegistration).catch((invoiceError) => {
+        console.error("Group monthly invoice creation failed", invoiceError);
+      });
       await notifyNewStudentRegistration(savedRegistration).catch((notificationError) => {
         console.error("Student registration admin notification failed", notificationError);
       });
@@ -198,6 +202,9 @@ export async function POST(request: Request) {
     const result = await collection.insertOne({
       ...savedRegistration,
       createdAt: now
+    });
+    await ensureGroupMonthlyInvoice(db, savedRegistration).catch((invoiceError) => {
+      console.error("Group monthly invoice creation failed", invoiceError);
     });
     await notifyNewStudentRegistration(savedRegistration).catch((notificationError) => {
       console.error("Student registration admin notification failed", notificationError);

@@ -31,6 +31,9 @@ type PaymentDocument = {
   paidDate?: string;
   paymentMethod?: string;
   attendanceStatus?: string;
+  billingMonth?: number;
+  billingYear?: number;
+  batchName?: string;
 };
 
 type StudentDocument = {
@@ -54,6 +57,10 @@ type PaymentRequest = {
   paidDate: string;
   paymentMethod: string;
   attendanceStatus: string;
+  source: string;
+  billingMonth: number;
+  billingYear: number;
+  batchName: string;
 };
 
 function formatDate(value: string) {
@@ -90,7 +97,11 @@ async function getPaymentRequest(id: string): Promise<PaymentRequest | null> {
     status: payment.status || "Unpaid",
     paidDate: payment.paidDate || "",
     paymentMethod: payment.paymentMethod || "",
-    attendanceStatus: payment.attendanceStatus || ""
+    attendanceStatus: payment.attendanceStatus || "",
+    source: payment.source || "",
+    billingMonth: payment.billingMonth || 0,
+    billingYear: payment.billingYear || 0,
+    batchName: payment.batchName || ""
   };
 }
 
@@ -125,7 +136,11 @@ export default async function PaymentRequestPage({
     notFound();
   }
 
-  const receiptNumber = `LEAD-M${String(payment.meetingNumber).padStart(2, "0")}-${payment.id.slice(-6).toUpperCase()}`;
+  const isGroupInvoice = ["batch-monthly", "batch-assessment"].includes(payment.source);
+  const billingLabel = payment.billingMonth && payment.billingYear ? new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(Date.UTC(payment.billingYear, payment.billingMonth - 1, 1))) : "Monthly group fee";
+  const receiptNumber = isGroupInvoice
+    ? `LEAD-GROUP-${payment.billingYear}${String(payment.billingMonth).padStart(2, "0")}-${payment.id.slice(-6).toUpperCase()}`
+    : `LEAD-M${String(payment.meetingNumber).padStart(2, "0")}-${payment.id.slice(-6).toUpperCase()}`;
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 print:bg-white print:p-0">
       <div className="mx-auto mb-5 flex w-full max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
@@ -172,16 +187,26 @@ export default async function PaymentRequestPage({
           </div>
 
           <div className="grid gap-4 border-b border-slate-200 py-6 sm:grid-cols-3">
-            <Detail label="Meeting" value={`Meeting ${payment.meetingNumber}`} />
-            <Detail label="Class Date" value={formatDate(payment.meetingDate)} />
-            <Detail label="Attendance" value={payment.attendanceStatus || "Recorded"} />
+            {isGroupInvoice ? (
+              <>
+                <Detail label="Billing period" value={billingLabel} />
+                <Detail label="Batch" value={payment.batchName || "Group class"} />
+                <Detail label="Package" value="12 meetings" />
+              </>
+            ) : (
+              <>
+                <Detail label="Meeting" value={`Meeting ${payment.meetingNumber}`} />
+                <Detail label="Class Date" value={formatDate(payment.meetingDate)} />
+                <Detail label="Attendance" value={payment.attendanceStatus || "Recorded"} />
+              </>
+            )}
           </div>
 
           <div className="my-6 rounded-lg bg-blue-50 p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-lead-blue">Amount to be paid</p>
-                <p className="mt-2 text-sm text-lead-gray">Payment for this completed class meeting.</p>
+                <p className="mt-2 text-sm text-lead-gray">{isGroupInvoice ? "Full monthly group fee covering 12 meetings." : "Payment for this completed class meeting."}</p>
               </div>
               <p className="font-heading text-4xl font-extrabold text-lead-navy">{formatRupiah(payment.amountDue)}</p>
             </div>
@@ -190,7 +215,7 @@ export default async function PaymentRequestPage({
           <div className="rounded-lg border border-slate-200 p-5">
             <h2 className="font-heading text-lg font-bold text-lead-navy">Payment note</h2>
             <p className="mt-2 text-sm leading-6 text-lead-gray">
-              Please complete the payment for this meeting and send payment confirmation to LEAD via WhatsApp. The admin will update the record after confirmation.
+              Please complete this {isGroupInvoice ? "monthly group fee" : "meeting payment"} and send payment confirmation to LEAD via WhatsApp. The finance team will update the record after confirmation.
             </p>
           </div>
 
@@ -220,7 +245,10 @@ export default async function PaymentRequestPage({
             meetingDate: formatDate(payment.meetingDate),
             attendanceStatus: payment.attendanceStatus,
             amountDue: formatRupiah(payment.amountDue),
-            status: payment.status
+            status: payment.status,
+            isGroupInvoice,
+            billingLabel,
+            batchName: payment.batchName
           }}
         />
       </div>

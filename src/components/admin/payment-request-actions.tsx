@@ -14,6 +14,9 @@ type PaymentRequestData = {
   attendanceStatus: string;
   amountDue: string;
   status: string;
+  isGroupInvoice?: boolean;
+  billingLabel?: string;
+  batchName?: string;
 };
 
 function safeFilePart(value: string) {
@@ -75,11 +78,9 @@ export function PaymentRequestActions({ receipt }: { receipt: PaymentRequestData
       pdf.setDrawColor("#E2E8F0");
       pdf.line(18, 91, pageWidth - 18, 91);
 
-      const details = [
-        ["MEETING", `Meeting ${receipt.meetingNumber}`],
-        ["CLASS DATE", receipt.meetingDate],
-        ["ATTENDANCE", receipt.attendanceStatus || "Recorded"]
-      ];
+      const details = receipt.isGroupInvoice
+        ? [["BILLING PERIOD", receipt.billingLabel || "Monthly fee"], ["BATCH", receipt.batchName || "Group class"], ["PACKAGE", "12 meetings"]]
+        : [["MEETING", `Meeting ${receipt.meetingNumber}`], ["CLASS DATE", receipt.meetingDate], ["ATTENDANCE", receipt.attendanceStatus || "Recorded"]];
       const columnWidth = (pageWidth - 36) / 3;
       details.forEach(([label, value], index) => {
         const x = 18 + columnWidth * index;
@@ -111,7 +112,9 @@ export function PaymentRequestActions({ receipt }: { receipt: PaymentRequestData
       pdf.setTextColor(gray);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9.5);
-      const note = "Please complete the payment for this meeting and send payment confirmation to LEAD. The admin will update the payment record after confirmation.";
+      const note = receipt.isGroupInvoice
+        ? "Please complete this monthly group fee and send payment confirmation to LEAD. The finance team will update the payment record after confirmation."
+        : "Please complete the payment for this meeting and send payment confirmation to LEAD. The finance team will update the payment record after confirmation.";
       pdf.text(pdf.splitTextToSize(note, pageWidth - 50), 25, 192);
 
       pdf.setDrawColor("#E2E8F0");
@@ -128,7 +131,9 @@ export function PaymentRequestActions({ receipt }: { receipt: PaymentRequestData
       pdf.text("Lead@learn-english-daily.com / +62 815-7816-1241", 18, 268);
 
       const studentFileName = safeFilePart(receipt.studentName) || "Student";
-      pdf.save(`LEAD-Payment-Request-${studentFileName}-Meeting-${receipt.meetingNumber}.pdf`);
+      pdf.save(receipt.isGroupInvoice
+        ? `LEAD-Group-Monthly-Invoice-${studentFileName}.pdf`
+        : `LEAD-Payment-Request-${studentFileName}-Meeting-${receipt.meetingNumber}.pdf`);
     } finally {
       setDownloading(false);
     }

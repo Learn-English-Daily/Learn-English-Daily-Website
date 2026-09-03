@@ -17,7 +17,7 @@ type PaymentPricingRecord = {
 };
 
 export function shouldUseCurrentStudentPrice(payment: PaymentPricingRecord) {
-  return payment.status !== "Paid" && payment.source !== "batch-assessment" && Boolean(payment.meetingNumber);
+  return payment.status !== "Paid" && !["batch-assessment", "batch-monthly"].includes(payment.source || "") && Boolean(payment.meetingNumber);
 }
 
 export function getEffectivePaymentAmountDue(payment: PaymentPricingRecord, student?: StudentPricingProfile | null) {
@@ -37,7 +37,7 @@ export async function refreshUnpaidStudentPaymentPricing(db: Db, student: Studen
     {
       studentId: student.studentId,
       status: { $ne: "Paid" },
-      source: { $ne: "batch-assessment" }
+      source: { $nin: ["batch-assessment", "batch-monthly"] }
     },
     {
       $set: {
