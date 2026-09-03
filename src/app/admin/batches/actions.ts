@@ -32,6 +32,45 @@ function numberInRange(value: FormDataEntryValue | null, min: number, max: numbe
   return Math.max(min, Math.min(max, Math.round(parsed)));
 }
 
+function parseBatchTimeRange(value: string) {
+  const match = value.replace(/[–—]/g, "-").match(/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*-\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s+wib)?\s*$/i);
+  if (!match) return null;
+
+  function toTime(hourValue: string, minuteValue: string | undefined, meridiem: string | undefined) {
+    let hour = Number(hourValue);
+    const minute = Number(minuteValue || "0");
+    if (minute < 0 || minute > 59) return null;
+    if (meridiem) {
+      if (hour < 1 || hour > 12) return null;
+      hour = hour % 12 + (meridiem.toLowerCase() === "pm" ? 12 : 0);
+    } else if (hour < 0 || hour > 23) {
+      return null;
+    }
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  const startTime = toTime(match[1], match[2], match[3]);
+  const endTime = toTime(match[4], match[5], match[6]);
+  return startTime && endTime && endTime > startTime ? { startTime, endTime } : null;
+}
+
+function getJakartaDateInput() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function nextDateInput(value: string) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
 async function assertAdmin() {
   const cookieStore = await cookies();
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
@@ -237,14 +276,12 @@ export async function scheduleBatchClasses(formData: FormData) {
   const batchId = clean(formData.get("batchId"));
   const scheduleMode = clean(formData.get("scheduleMode"));
   const firstMeetingNumber = numberInRange(formData.get("firstMeetingNumber"), 1, 12, 1);
-  const firstDate = clean(formData.get("firstDate"));
-  const startTime = clean(formData.get("startTime"));
-  const endTime = clean(formData.get("endTime"));
+  const requestedFirstDate = clean(formData.get("firstDate"));
+  const requestedStartTime = clean(formData.get("startTime"));
+  const requestedEndTime = clean(formData.get("endTime"));
   const topic = clean(formData.get("topic"));
 
-  if (!ObjectId.isValid(batchId) || !/^\d{4}-\d{2}-\d{2}$/.test(firstDate) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime) || endTime <= startTime) {
-    throw new Error("Enter a valid date and WIB time range.");
-  }
+  if (!ObjectId.isValid(batchId)) throw new Error("Select a valid batch.");
 
   const db = await getMongoDb();
   const batch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), status: "active" });
@@ -255,7 +292,7 @@ export async function scheduleBatchClasses(formData: FormData) {
         batchId,
         meetingNumber: { $gte: 1, $lte: 12 },
         status: { $ne: "Cancelled" }
-      }).project({ meetingNumber: 1 }).toArray()
+      }).project({ meetingNumber: 1, sessionDate: 1 }).toArray()
     : [];
   const existingMeetingNumbers = new Set(existingMeetings.map((meeting) => Number(meeting.meetingNumber)));
   const meetingNumbers = scheduleMode === "series"
@@ -264,6 +301,24 @@ export async function scheduleBatchClasses(formData: FormData) {
   const count = meetingNumbers.length;
 
   if (!count) throw new Error("All 12 meetings are already scheduled for this batch.");
+
+  const savedTime = scheduleMode === "series" ? parseBatchTimeRange(String(batch.time || "")) : null;
+  if (scheduleMode === "series" && !savedTime) {
+    throw new Error("The batch time is invalid. Edit the batch and use a range such as 7:00 PM - 8:00 PM.");
+  }
+  const latestExistingDate = existingMeetings.map((meeting) => String(meeting.sessionDate || "")).filter(Boolean).sort().at(-1);
+  const automaticFirstDate = [
+    String(batch.startDate || ""),
+    getJakartaDateInput(),
+    latestExistingDate ? nextDateInput(latestExistingDate) : ""
+  ].filter(Boolean).sort().at(-1) || getJakartaDateInput();
+  const firstDate = scheduleMode === "series" ? automaticFirstDate : requestedFirstDate;
+  const startTime = scheduleMode === "series" ? savedTime!.startTime : requestedStartTime;
+  const endTime = scheduleMode === "series" ? savedTime!.endTime : requestedEndTime;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(firstDate) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime) || endTime <= startTime) {
+    throw new Error("Enter a valid date and WIB time range.");
+  }
 
   const weekdays = scheduleMode === "series" ? parseBatchWeekdays(String(batch.days || "")) : [new Date(`${firstDate}T00:00:00Z`).getUTCDay()];
   const dates = generateBatchMeetingDates(firstDate, weekdays, count);
