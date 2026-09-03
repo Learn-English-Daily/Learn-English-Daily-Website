@@ -11,6 +11,7 @@ import { TongueTwisterBattleGame } from "@/app/games/tongue-twister-battle/tongu
 import { VocabularyMatchGame } from "@/app/games/vocabulary-match/vocabulary-match-game";
 import { TransportationAdventureGame } from "@/app/games/transportation-adventure/transportation-adventure-game";
 import { PetRescueAdventure } from "@/app/games/pet-rescue-adventure/pet-rescue-adventure";
+import { TellingTimeGame } from "@/components/games/telling-time/telling-time-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -86,6 +87,7 @@ export default async function GameSessionPage({
   const isTransportationAdventure = activeGame === "transportation-adventure";
   const isPetRescueAdventure = activeGame === "pet-rescue-adventure";
   const isActionHero = activeGame === "action-hero";
+  const isTellingTime = activeGame === "telling-time";
   const shouldShowHub =
     gameSession?.gameType === "games-hub" &&
     !isEscapeRoom &&
@@ -96,7 +98,8 @@ export default async function GameSessionPage({
     !isTongueTwisterBattle &&
     !isTransportationAdventure &&
     !isPetRescueAdventure &&
-    !isActionHero;
+    !isActionHero &&
+    !isTellingTime;
   const gameTitle = shouldShowHub
     ? "LEAD Class Games"
     : isEscapeRoom
@@ -115,6 +118,8 @@ export default async function GameSessionPage({
                   ? "Pet Rescue Adventure"
                   : isActionHero
                     ? "Action Hero"
+                    : isTellingTime
+                      ? "Telling Time"
               : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
@@ -134,8 +139,10 @@ export default async function GameSessionPage({
     ? "Match, feed, groom, and rescue pets through hands-on English activities."
     : isActionHero
     ? "Control Bill and perform action verbs in a real interactive LEAD world."
+    : isTellingTime
+    ? "Move a real analog clock and help Bill complete his whole day."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -206,6 +213,8 @@ export default async function GameSessionPage({
           <PetRescueAdventure />
         ) : isActionHero ? (
           <ActionHeroGame />
+        ) : isTellingTime ? (
+          <TellingTimeGame />
         ) : (
           <SpeechCompetitionGame />
         )}
@@ -216,6 +225,13 @@ export default async function GameSessionPage({
 
 function GameHub({ token }: { token: string }) {
   const games = [
+    {
+      title: "Telling Time",
+      description: "Move an analog clock and help Bill complete his daily schedule.",
+      href: `/games/session/${encodeURIComponent(token)}?game=telling-time`,
+      icon: Clock,
+      accent: "border-amber-100 bg-amber-50 text-amber-700"
+    },
     {
       title: "Action Hero",
       description: "Control Bill and learn action verbs through movement and real interactions.",

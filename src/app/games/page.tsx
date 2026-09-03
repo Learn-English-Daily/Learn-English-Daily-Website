@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, Bus, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Trophy } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  {
+    title: "Telling Time",
+    description: "Move a real analog clock and help Bill complete his schedule from morning to bedtime.",
+    status: "Available",
+    icon: Clock3,
+    accent: "border-amber-100 bg-amber-50 text-amber-700",
+    available: true,
+    href: "/games/telling-time"
+  },
   {
     title: "Action Hero",
     description: "Control Bill in a real 2D world and learn action verbs by running, jumping, reading, swimming, dancing, and climbing.",
