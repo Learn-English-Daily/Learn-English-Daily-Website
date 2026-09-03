@@ -241,11 +241,6 @@ export async function scheduleBatchClasses(formData: FormData) {
   const startTime = clean(formData.get("startTime"));
   const endTime = clean(formData.get("endTime"));
   const topic = clean(formData.get("topic"));
-  const count = scheduleMode === "series" ? 12 : 1;
-
-  if (firstMeetingNumber + count - 1 > 12) {
-    throw new Error("A 12-class series must start at Meeting 1. Single classes can use Meeting 1 to 12.");
-  }
 
   if (!ObjectId.isValid(batchId) || !/^\d{4}-\d{2}-\d{2}$/.test(firstDate) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime) || endTime <= startTime) {
     throw new Error("Enter a valid date and WIB time range.");
@@ -255,11 +250,25 @@ export async function scheduleBatchClasses(formData: FormData) {
   const batch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), status: "active" });
   if (!batch) throw new Error("Active batch not found.");
 
+  const existingMeetings = scheduleMode === "series"
+    ? await db.collection(getBatchClassSessionsCollectionName()).find({
+        batchId,
+        meetingNumber: { $gte: 1, $lte: 12 },
+        status: { $ne: "Cancelled" }
+      }).project({ meetingNumber: 1 }).toArray()
+    : [];
+  const existingMeetingNumbers = new Set(existingMeetings.map((meeting) => Number(meeting.meetingNumber)));
+  const meetingNumbers = scheduleMode === "series"
+    ? Array.from({ length: 12 }, (_, index) => index + 1).filter((meetingNumber) => !existingMeetingNumbers.has(meetingNumber))
+    : [firstMeetingNumber];
+  const count = meetingNumbers.length;
+
+  if (!count) throw new Error("All 12 meetings are already scheduled for this batch.");
+
   const weekdays = scheduleMode === "series" ? parseBatchWeekdays(String(batch.days || "")) : [new Date(`${firstDate}T00:00:00Z`).getUTCDay()];
   const dates = generateBatchMeetingDates(firstDate, weekdays, count);
   if (dates.length !== count) throw new Error("Could not generate meeting dates. Check the batch Days field.");
 
-  const meetingNumbers = Array.from({ length: count }, (_, index) => firstMeetingNumber + index);
   const conflict = await db.collection(getBatchClassSessionsCollectionName()).findOne({
     batchId,
     meetingNumber: { $in: meetingNumbers },

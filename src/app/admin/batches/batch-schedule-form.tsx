@@ -6,9 +6,11 @@ import { scheduleBatchClasses } from "@/app/admin/batches/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 
-export function BatchScheduleForm({ batchId, batchName, days }: { batchId: string; batchName: string; days: string }) {
+export function BatchScheduleForm({ batchId, batchName, days, scheduledMeetingNumbers = [] }: { batchId: string; batchName: string; days: string; scheduledMeetingNumbers?: number[] }) {
   const [mode, setMode] = useState<"single" | "series">("single");
   const isSeries = mode === "series";
+  const scheduledCount = new Set(scheduledMeetingNumbers.filter((meeting) => meeting >= 1 && meeting <= 12)).size;
+  const remainingCount = 12 - scheduledCount;
 
   return (
     <div>
@@ -31,14 +33,14 @@ export function BatchScheduleForm({ batchId, batchName, days }: { batchId: strin
         <div className="flex gap-3">
           <CalendarDays className={`mt-0.5 h-5 w-5 shrink-0 ${isSeries ? "text-lead-blue" : "text-slate-500"}`} />
           {isSeries ? (
-            <div><p className="font-bold text-lead-navy">Creates Meetings 1 through 12 automatically</p><p className="mt-1 text-sm leading-6 text-lead-gray">Choose the starting date once. The system schedules all 12 meetings on this batch&apos;s class days: <strong>{days}</strong>.</p></div>
+            <div><p className="font-bold text-lead-navy">Schedules the {remainingCount} remaining {remainingCount === 1 ? "class" : "classes"}</p><p className="mt-1 text-sm leading-6 text-lead-gray">{scheduledCount ? `${scheduledCount} of 12 meetings already exist. ` : ""}Choose the next starting date once. Missing meetings are created in sequence on this batch&apos;s class days: <strong>{days}</strong>.</p></div>
           ) : (
             <div><p className="font-bold text-lead-navy">Creates one selected meeting</p><p className="mt-1 text-sm leading-6 text-lead-gray">Use this for a single class, replacement class, or a meeting you want to schedule separately.</p></div>
           )}
         </div>
       </div>
 
-      <ActionFeedbackForm action={scheduleBatchClasses} successMessage={isSeries ? "All 12 group classes scheduled." : "Group class scheduled."} className="mt-4 grid gap-4 sm:grid-cols-2">
+      <ActionFeedbackForm action={scheduleBatchClasses} successMessage={isSeries ? "Remaining group classes scheduled." : "Group class scheduled."} className="mt-4 grid gap-4 sm:grid-cols-2">
         <input type="hidden" name="batchId" value={batchId} />
         <input type="hidden" name="scheduleMode" value={mode} />
         {isSeries ? <input type="hidden" name="firstMeetingNumber" value="1" /> : (
@@ -48,7 +50,7 @@ export function BatchScheduleForm({ batchId, batchName, days }: { batchId: strin
         <label className="grid gap-2 text-sm font-bold text-lead-navy">Start Time (WIB)<input name="startTime" type="time" required className="rounded-lg border border-slate-200 px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100" /></label>
         <label className="grid gap-2 text-sm font-bold text-lead-navy">End Time (WIB)<input name="endTime" type="time" required className="rounded-lg border border-slate-200 px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100" /></label>
         <label className="grid gap-2 text-sm font-bold text-lead-navy sm:col-span-2">{isSeries ? "Series Topic or Note (optional)" : "Class Topic (optional)"}<input name="topic" placeholder={isSeries ? "Applied to all 12 meetings" : "Introductions and greetings"} className="rounded-lg border border-slate-200 px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100" /></label>
-        <Button type="submit" className="sm:col-span-2">{isSeries ? "Schedule All 12 Classes" : "Schedule This Class"}</Button>
+        <Button type="submit" disabled={isSeries && remainingCount === 0} className="sm:col-span-2">{isSeries ? remainingCount ? `Schedule ${remainingCount} Remaining ${remainingCount === 1 ? "Class" : "Classes"}` : "All 12 Classes Scheduled" : "Schedule This Class"}</Button>
       </ActionFeedbackForm>
     </div>
   );
