@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { MessageCircle, Pencil, QrCode, Search } from "lucide-react";
+import { ChevronDown, MessageCircle, Pencil, QrCode, Search, Users } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -74,12 +74,13 @@ type StudentRegistration = {
 };
 
 type RegistrationViewMode = "active" | "trial" | "archived";
+type StudentListScope = "all" | "private" | "group";
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function getStudentRegistrations(query = "", mode: RegistrationViewMode, groupOnly = false): Promise<StudentRegistration[]> {
+async function getStudentRegistrations(query = "", mode: RegistrationViewMode, scope: StudentListScope = "all"): Promise<StudentRegistration[]> {
   const db = await getMongoDb();
   const search = query.trim();
   const modeFilter = mode === "trial" ? getTrialStudentFilter() : mode === "archived" ? getInactiveStudentFilter() : getActiveStudentFilter();
@@ -110,7 +111,7 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode, g
         }))
       }
     : {};
-  const accessFilter = groupOnly ? { classType: "Basic Group" } : {};
+  const accessFilter = scope === "group" ? { classType: "Basic Group" } : scope === "private" ? { classType: { $ne: "Basic Group" } } : {};
   const filter = search ? { $and: [modeFilter, accessFilter, searchFilter] } : { $and: [modeFilter, accessFilter] };
 
   const docs = (await db
@@ -199,7 +200,12 @@ export default async function AdminStudentsPage({
     );
   }
 
-  const [registrations, admin] = await Promise.all([getStudentRegistrations(searchQuery, mode, groupOnly), getAuthenticatedAdmin()]);
+  const splitActiveStudents = mode === "active" && !groupOnly;
+  const [registrations, groupRegistrations, admin] = await Promise.all([
+    getStudentRegistrations(searchQuery, mode, groupOnly ? "group" : splitActiveStudents ? "private" : "all"),
+    splitActiveStudents ? getStudentRegistrations(searchQuery, mode, "group") : Promise.resolve([]),
+    getAuthenticatedAdmin()
+  ]);
   const isTrialView = mode === "trial";
   const isArchivedView = mode === "archived";
   const pagePath = isTrialView ? "/admin/students?view=trial" : isArchivedView ? "/admin/students?view=archived" : "/admin/students";
@@ -213,8 +219,8 @@ export default async function AdminStudentsPage({
         title={pageTitle}
         description={
           searchQuery
-            ? `Showing ${registrations.length} result${registrations.length === 1 ? "" : "s"} for "${searchQuery}".`
-            : `Showing latest ${registrations.length} ${isTrialView ? "trial" : isArchivedView ? "archived" : "current"} registrations.`
+            ? `Showing ${registrations.length + groupRegistrations.length} result${registrations.length + groupRegistrations.length === 1 ? "" : "s"} for "${searchQuery}".`
+            : splitActiveStudents ? `${registrations.length} private students and ${groupRegistrations.length} group students.` : `Showing latest ${registrations.length} ${isTrialView ? "trial" : isArchivedView ? "archived" : "current"} registrations.`
         }
         userName={admin?.name}
         username={admin?.username}
@@ -263,10 +269,43 @@ export default async function AdminStudentsPage({
           </form>
         </Card>
 
+        {splitActiveStudents ? (
+          <details open={Boolean(searchQuery)} className="group mb-6 overflow-hidden rounded-xl border border-blue-200 bg-white shadow-soft">
+            <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 bg-blue-50 px-5 py-4 [&::-webkit-details-marker]:hidden">
+              <span className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-lead-blue text-white"><Users className="h-5 w-5" /></span>
+                <span><strong className="block font-heading text-lg text-lead-navy">Group Students</strong><span className="text-sm text-lead-gray">{groupRegistrations.length} active Basic Group student{groupRegistrations.length === 1 ? "" : "s"}</span></span>
+              </span>
+              <ChevronDown className="h-5 w-5 text-lead-blue transition group-open:rotate-180" />
+            </summary>
+            <div className="grid gap-4 border-t border-blue-100 p-4 sm:p-5">
+              {groupRegistrations.length ? groupRegistrations.map((registration) => <RegistrationCard key={registration.id} registration={registration} isTrialView={false} groupOnly={groupOnly} />) : <p className="rounded-lg bg-slate-50 p-5 text-sm text-lead-gray">{searchQuery ? "No group students match this search." : "No active group students."}</p>}
+            </div>
+          </details>
+        ) : null}
+
+        {splitActiveStudents ? <div className="mb-4"><h2 className="font-heading text-2xl font-extrabold text-lead-navy">Private Students</h2><p className="mt-1 text-sm text-lead-gray">Active one-to-one course students.</p></div> : null}
+
         {registrations.length ? (
           <div className="grid gap-4">
-            {registrations.map((registration) => (
-              <Card key={registration.id} className="p-5">
+            {registrations.map((registration) => <RegistrationCard key={registration.id} registration={registration} isTrialView={isTrialView} groupOnly={groupOnly} />)}
+          </div>
+        ) : (
+          <Card className="p-8 text-center">
+            <h2 className="font-heading text-2xl font-bold text-lead-navy">{splitActiveStudents && !searchQuery ? "No active private students" : emptyTitle}</h2>
+            <p className="mt-3 text-lead-gray">
+              {searchQuery ? "Try a different student name, parent name, email, WhatsApp, course, or schedule." : isTrialView ? "Trial class registrations will appear here." : splitActiveStudents ? "Private students will appear here after registration." : "Students appear here after they join a course and receive an STU ID."}
+            </p>
+          </Card>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function RegistrationCard({ registration, isTrialView, groupOnly }: { registration: StudentRegistration; isTrialView: boolean; groupOnly: boolean }) {
+  return (
+    <Card className="p-5">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
@@ -351,18 +390,6 @@ export default async function AdminStudentsPage({
                   <p><span className="font-bold text-lead-navy">Country/City:</span> {registration.countryCity || "Not provided"}</p>
                   <p><span className="font-bold text-lead-navy">Submitted:</span> {formatDate(registration.createdAt)}</p>
                 </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="p-8 text-center">
-            <h2 className="font-heading text-2xl font-bold text-lead-navy">{emptyTitle}</h2>
-            <p className="mt-3 text-lead-gray">
-              {searchQuery ? "Try a different student name, parent name, email, WhatsApp, course, or schedule." : isTrialView ? "Trial class registrations will appear here." : "Students appear here after they join a course and receive an STU ID."}
-            </p>
-          </Card>
-        )}
-      </section>
-    </main>
+    </Card>
   );
 }
