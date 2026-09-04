@@ -148,6 +148,13 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode, s
   }));
 }
 
+async function getActiveBasicGroupStudentCount() {
+  const db = await getMongoDb();
+  return db.collection<StudentRegistrationDocument>(getStudentRegistrationCollectionName()).countDocuments({
+    $and: [getActiveStudentFilter(), { classType: "Basic Group" }]
+  });
+}
+
 function formatDate(value: string) {
   if (!value) return "Unknown";
   return new Intl.DateTimeFormat("en", {
@@ -201,9 +208,10 @@ export default async function AdminStudentsPage({
   }
 
   const splitActiveStudents = mode === "active" && !groupOnly;
-  const [registrations, groupRegistrations, admin] = await Promise.all([
+  const [registrations, groupRegistrations, activeGroupStudentCount, admin] = await Promise.all([
     getStudentRegistrations(searchQuery, mode, groupOnly ? "group" : splitActiveStudents ? "private" : "all"),
     splitActiveStudents ? getStudentRegistrations(searchQuery, mode, "group") : Promise.resolve([]),
+    groupOnly && mode === "active" ? getActiveBasicGroupStudentCount() : Promise.resolve(0),
     getAuthenticatedAdmin()
   ]);
   const isTrialView = mode === "trial";
@@ -236,6 +244,12 @@ export default async function AdminStudentsPage({
                 {isTrialView ? "You are viewing trial class students." : isArchivedView ? "Completed, paused, withdrawn, and inactive students." : "You are viewing current course students."}
               </p>
             </div>
+            {groupOnly && mode === "active" ? (
+              <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-lead-blue text-white"><Users className="h-5 w-5" /></span>
+                <span><span className="block text-xs font-bold uppercase tracking-[0.12em] text-lead-gray">Active Basic Group</span><strong className="font-heading text-2xl text-lead-navy">{activeGroupStudentCount} students</strong></span>
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button asChild variant={mode === "active" ? "primary" : "secondary"}><a href="/admin/students">Current</a></Button>
               {!groupOnly ? <Button asChild variant={isTrialView ? "primary" : "secondary"}><a href="/admin/students/trials">Trials</a></Button> : null}
