@@ -26,6 +26,7 @@ type StudentRegistrationDocument = {
   upgradedToStudentId?: string;
   upgradedFromTrial?: boolean;
   studentName?: string;
+  nickname?: string;
   whatsapp?: string;
   email?: string;
   normalizedWhatsapp?: string;
@@ -53,6 +54,7 @@ type StudentRegistration = {
   previousStudentId: string;
   upgradedFromTrial: boolean;
   studentName: string;
+  nickname: string;
   whatsapp: string;
   email: string;
   parentName: string;
@@ -88,6 +90,7 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode, s
     ? {
         $or: [
           "studentName",
+          "nickname",
           "studentId",
           "previousStudentId",
           "whatsapp",
@@ -127,6 +130,7 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode, s
     previousStudentId: doc.previousStudentId || "",
     upgradedFromTrial: doc.upgradedFromTrial || false,
     studentName: doc.studentName || "Unknown",
+    nickname: doc.nickname || "",
     whatsapp: doc.whatsapp || "",
     email: doc.email || "",
     parentName: doc.parentName || "",
@@ -335,6 +339,7 @@ function RegistrationCard({ registration, isTrialView, groupOnly }: { registrati
                       {!isTrialView ? <span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${registration.studentStatus === "Active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>{registration.studentStatus}</span> : null}
                     </div>
                     <p className="mt-2 text-sm font-semibold text-lead-gray">Parent: {registration.parentName}</p>
+                    {registration.nickname ? <p className="mt-1 text-sm text-lead-gray">Nickname: {registration.nickname}</p> : null}
                     {registration.whatsapp ? (
                       <a
                         href={`https://wa.me/${registration.whatsapp.replace(/\D/g, "")}`}

@@ -86,6 +86,7 @@ export async function updateStudentRegistration(formData: FormData) {
   const id = clean(formData.get("id"));
   const registration = {
     studentName: clean(formData.get("studentName")),
+    nickname: clean(formData.get("nickname")),
     whatsapp: clean(formData.get("whatsapp")),
     email: clean(formData.get("email")).toLowerCase(),
     normalizedWhatsapp: normalizeWhatsapp(clean(formData.get("whatsapp"))),
@@ -110,6 +111,7 @@ export async function updateStudentRegistration(formData: FormData) {
   if (
     !ObjectId.isValid(id) ||
     !isReasonableShortText(registration.studentName) ||
+    registration.nickname.length > 120 ||
     !isReasonableShortText(registration.whatsapp) ||
     !isValidEmail(registration.email) ||
     !isReasonableShortText(registration.parentName) ||
@@ -161,6 +163,7 @@ export async function updateStudentRegistration(formData: FormData) {
       {
         $set: {
         ...registration,
+        nickname: { $literal: registration.nickname },
         ...(upgradedStudentId
           ? {
               studentId: upgradedStudentId,

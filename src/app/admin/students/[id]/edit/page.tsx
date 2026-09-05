@@ -37,6 +37,7 @@ type StudentRegistrationDocument = {
   previousStudentId?: string;
   upgradedFromTrial?: boolean;
   studentName?: string;
+  nickname?: string;
   whatsapp?: string;
   email?: string;
   parentName?: string;
@@ -65,6 +66,7 @@ type StudentRegistration = {
   previousStudentId: string;
   upgradedFromTrial: boolean;
   studentName: string;
+  nickname: string;
   whatsapp: string;
   email: string;
   parentName: string;
@@ -118,6 +120,7 @@ async function getStudentRegistration(id: string): Promise<StudentRegistration |
     previousStudentId: doc.previousStudentId || "",
     upgradedFromTrial: doc.upgradedFromTrial || false,
     studentName: doc.studentName || "",
+    nickname: doc.nickname || "",
     whatsapp: doc.whatsapp || "",
     email: doc.email || "",
     parentName: doc.parentName || "",
@@ -306,6 +309,9 @@ export default async function EditStudentRegistrationPage({
             </Field>
             <Field label="Student Name">
               <input name="studentName" required defaultValue={registration.studentName} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+            </Field>
+            <Field label="Nickname (optional)">
+              <input name="nickname" maxLength={120} defaultValue={registration.nickname} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
             </Field>
             <Field label="WhatsApp Number">
               <input name="whatsapp" required defaultValue={registration.whatsapp} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />

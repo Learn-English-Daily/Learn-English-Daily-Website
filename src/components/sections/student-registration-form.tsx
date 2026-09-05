@@ -17,6 +17,7 @@ const copy = {
     consent: "I confirm the information is correct and agree to be contacted by LEAD.",
     fields: {
       studentName: "Student Name",
+      nickname: "Nickname (optional)",
       whatsapp: "WhatsApp Number",
       email: "Email Address",
       parentName: "Parent Name",
@@ -49,6 +50,7 @@ const copy = {
     consent: "Saya memastikan informasi sudah benar dan setuju untuk dihubungi oleh LEAD.",
     fields: {
       studentName: "Nama Siswa",
+      nickname: "Nama Panggilan (opsional)",
       whatsapp: "Nomor WhatsApp",
       email: "Alamat Email",
       parentName: "Nama Orang Tua",
@@ -90,6 +92,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
     const formData = new FormData(form);
     const payload = {
       studentName: String(formData.get("studentName") || ""),
+      nickname: String(formData.get("nickname") || ""),
       whatsapp: String(formData.get("whatsapp") || ""),
       email: String(formData.get("email") || ""),
       parentName: String(formData.get("parentName") || ""),
@@ -132,6 +135,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
     <form className="grid gap-4" onSubmit={handleSubmit}>
       <div className="grid gap-4 md:grid-cols-2">
         <TextField name="studentName" label={text.fields.studentName} requiredText={text.required} required />
+        <TextField name="nickname" label={text.fields.nickname} maxLength={120} />
         <TextField name="whatsapp" label={text.fields.whatsapp} requiredText={text.required} placeholder={text.placeholders.whatsapp} required />
         <TextField name="email" label={text.fields.email} requiredText={text.required} placeholder={text.placeholders.email} type="email" required />
         <TextField name="parentName" label={text.fields.parentName} requiredText={text.required} required />
@@ -172,6 +176,7 @@ function TextField({
   requiredText,
   placeholder,
   max,
+  maxLength,
   type = "text"
 }: {
   name: string;
@@ -180,6 +185,7 @@ function TextField({
   requiredText?: string;
   placeholder?: string;
   max?: string;
+  maxLength?: number;
   type?: "date" | "email" | "text";
 }) {
   return (
@@ -193,6 +199,7 @@ function TextField({
         type={type}
         placeholder={placeholder}
         max={max}
+        maxLength={maxLength}
         className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy"
       />
     </label>

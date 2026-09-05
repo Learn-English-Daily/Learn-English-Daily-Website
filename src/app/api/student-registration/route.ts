@@ -21,6 +21,7 @@ export const runtime = "nodejs";
 
 type StudentRegistrationPayload = {
   studentName?: string;
+  nickname?: string;
   whatsapp?: string;
   email?: string;
   parentName?: string;
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
 
   const registration = {
     studentName: clean(payload.studentName),
+    nickname: clean(payload.nickname),
     whatsapp: clean(payload.whatsapp),
     email: clean(payload.email).toLowerCase(),
     normalizedWhatsapp: normalizeWhatsapp(clean(payload.whatsapp)),
@@ -106,6 +108,7 @@ export async function POST(request: Request) {
 
   if (
     !isReasonableShortText(registration.studentName) ||
+    registration.nickname.length > 120 ||
     !isReasonableShortText(registration.whatsapp) ||
     !isValidEmail(registration.email) ||
     !isReasonableShortText(registration.parentName) ||
@@ -180,6 +183,7 @@ export async function POST(request: Request) {
           {
             $set: {
               ...savedRegistration,
+              nickname: { $literal: savedRegistration.nickname },
               previousStudentId: existingTrial.studentId || "",
               upgradedToStudentId: studentId,
               upgradedFromTrial: true,
