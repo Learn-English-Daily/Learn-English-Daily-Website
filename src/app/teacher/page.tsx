@@ -19,6 +19,7 @@ import {
   type MeetingAssessmentInput
 } from "@/lib/assessments";
 import { getRecordBillingPeriod } from "@/lib/billing-periods";
+import { getBatchClassSessionsCollectionName, hasBatchClassEnded, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 import {
   getClassSessionsCollectionName,
   getComputedClassSessionStatus,
@@ -597,6 +598,11 @@ export default async function TeacherPortalPage({
   const selectedAttendanceStudentId = firstParam(resolvedSearchParams?.studentId);
   const data = await getTeacherPortalData(teacher.id, selectedAssessmentMonth, selectedAssessmentYear);
   const today = getTodayJakarta();
+  const db = await getMongoDb();
+  const todaysGroupSessions = await db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
+    .find({ teacherId: teacher.id, sessionDate: today, status: "Scheduled", attendanceMarked: { $ne: true } })
+    .sort({ startTime: 1, meetingNumber: 1 }).toArray();
+  const groupAttendanceNeeded = todaysGroupSessions.filter((session) => hasBatchClassEnded(session)).length;
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
   const missedSessions = data.sessions.filter((session) => session.sessionDate < today);
   const needsAttendance = todaysSessions.filter((session) => session.status === "Needs Attendance");
@@ -663,8 +669,8 @@ export default async function TeacherPortalPage({
 
       <section className="container-shell grid gap-6 py-8">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length} detail="Classes scheduled today" />
-          <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={needsAttendance.length} detail="Today's classes waiting" tone="rose" />
+          <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length + todaysGroupSessions.length} detail="Private and group classes today" />
+          <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={needsAttendance.length + groupAttendanceNeeded} detail="Today's classes waiting" tone="rose" />
           <TeacherKpi icon={CalendarCheck} label="Missed" value={missedSessions.length} detail="Past unmarked classes" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Journal Missing" value={data.journalMissingCount} detail="Attendance records needing journal" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Recent Records" value={data.recentAttendance.length} detail="Your latest attendance entries" tone="blue" />
@@ -678,8 +684,9 @@ export default async function TeacherPortalPage({
               id="teacher-class-queue"
               title="Today's Class Queue"
               description="Only today's classes assigned to you appear here. Times are Indonesia WIB."
-              badge={`${todaysSessions.length} today`}
+              badge={`${todaysSessions.length + todaysGroupSessions.length} today`}
               sessions={todaysSessions}
+              groupSessions={todaysGroupSessions}
               emptyText="No classes assigned to you for today."
             />
             <TeacherSessionList
@@ -870,6 +877,7 @@ function TeacherSessionList({
   badge,
   sessions,
   emptyText,
+  groupSessions = [],
   urgent = false
 }: {
   id?: string;
@@ -877,6 +885,7 @@ function TeacherSessionList({
   description: string;
   badge: string;
   sessions: TeacherSession[];
+  groupSessions?: WithId<BatchClassSessionDocument>[];
   emptyText: string;
   urgent?: boolean;
 }) {
@@ -893,10 +902,24 @@ function TeacherSessionList({
       </div>
 
       <div className="mt-5 grid gap-4">
+        {groupSessions.map((session) => {
+          const ready = hasBatchClassEnded(session);
+          return <div key={session._id.toString()} className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-heading text-lg font-bold text-lead-navy">{session.batchName}</h3>
+              <span className="rounded-lg bg-blue-100 px-3 py-1 text-xs font-bold text-lead-blue">Group Class</span>
+              <span className={`rounded-lg px-3 py-1 text-xs font-bold ${ready ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-700"}`}>{ready ? "Needs Attendance" : "Scheduled"}</span>
+            </div>
+            <p className="mt-2 text-sm text-lead-gray">Meeting {session.meetingNumber} / {session.startTime} - {session.endTime} WIB / {session.studentSnapshot.length} students</p>
+            <p className="mt-1 text-sm text-lead-gray">{session.program}{session.topic ? ` / ${session.topic}` : ""}</p>
+            <Button asChild size="sm" variant="secondary" className="mt-3"><a href={ready ? `/teacher/group-classes#group-session-${session._id.toString()}` : "/teacher/group-classes#group-schedules"}>{ready ? "Mark Group Attendance" : "View Group Class"}</a></Button>
+            {!ready ? <p className="mt-2 text-xs text-lead-gray">Attendance opens after the class ends.</p> : null}
+          </div>;
+        })}
         {sessions.map((session) => (
           <TeacherSessionCard key={session.id} session={session} />
         ))}
-        {!sessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">{emptyText}</p> : null}
+        {!sessions.length && !groupSessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">{emptyText}</p> : null}
       </div>
     </Card>
   );

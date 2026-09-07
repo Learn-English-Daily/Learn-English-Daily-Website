@@ -86,7 +86,7 @@ export default async function TeacherGroupClassesPage() {
 
         <div className="grid gap-5">
           {open.map((session) => (
-            <Card key={session._id.toString()} className="overflow-hidden">
+            <Card id={`group-session-${session._id.toString()}`} key={session._id.toString()} className="scroll-mt-6 overflow-hidden">
               <div className="border-b border-blue-100 bg-blue-50 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div><h2 className="font-heading text-xl font-extrabold text-lead-navy">{session.batchName} / Meeting {session.meetingNumber}</h2><p className="mt-1 text-sm text-lead-gray">{displayDate(session.sessionDate)} / {session.startTime} - {session.endTime} WIB{session.topic ? ` / ${session.topic}` : ""}</p></div>
@@ -112,7 +112,7 @@ export default async function TeacherGroupClassesPage() {
           {!open.length ? <Card className="p-8 text-center"><CheckCircle2 className="mx-auto h-9 w-9 text-emerald-600" /><h2 className="mt-3 font-heading text-xl font-bold text-lead-navy">No group attendance pending</h2><p className="mt-2 text-sm text-lead-gray">Classes appear here only after their end time.</p></Card> : null}
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div id="group-schedules" className="grid scroll-mt-6 gap-5 lg:grid-cols-2">
           <SessionList title="Upcoming Schedule" sessions={future} empty="No upcoming group classes." />
           <SessionList title="Completed Classes" sessions={completed} empty="No group classes completed yet." />
         </div>
