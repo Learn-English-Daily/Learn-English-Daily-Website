@@ -398,3 +398,24 @@ export async function deleteBatchClass(formData: FormData) {
   revalidatePath("/teacher/group-classes");
   return { success: true };
 }
+
+export async function updateBatchClassTime(formData: FormData) {
+  const admin = await assertAdmin();
+  const sessionId = clean(formData.get("sessionId"));
+  const startTime = clean(formData.get("startTime"));
+  const endTime = clean(formData.get("endTime"));
+  const validTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  if (!ObjectId.isValid(sessionId) || !validTime.test(startTime) || !validTime.test(endTime) || endTime <= startTime) {
+    return { success: false, message: "Enter valid WIB times, with the end after the start." };
+  }
+  const db = await getMongoDb();
+  const result = await db.collection(getBatchClassSessionsCollectionName()).updateOne(
+    { _id: new ObjectId(sessionId), status: "Scheduled", attendanceMarked: { $ne: true } },
+    { $set: { startTime, endTime, updatedAt: new Date(), updatedBy: admin.name } }
+  );
+  if (!result.matchedCount) return { success: false, message: "Only scheduled classes without attendance can be edited. Refresh the page." };
+  revalidatePath("/admin/sessions");
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/group-classes");
+  return { success: true };
+}

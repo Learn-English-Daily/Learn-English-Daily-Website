@@ -4,7 +4,7 @@ import { CalendarClock, Gamepad2, Pencil, Search, Trash2, UserRound, Users } fro
 import type { WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
-import { cancelBatchClass, deleteBatchClass } from "@/app/admin/batches/actions";
+import { cancelBatchClass, deleteBatchClass, updateBatchClassTime } from "@/app/admin/batches/actions";
 import { BatchScheduleForm } from "@/app/admin/batches/batch-schedule-form";
 import {
   deleteClassSession,
@@ -598,8 +598,8 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
         </Card>
       </section>
       ) : (
-        <section className="container-shell grid gap-6 py-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-          <div className="grid gap-5">
+        <section className="container-shell grid gap-6 py-6">
+          <div className="grid items-start gap-5 lg:grid-cols-[0.85fr_1.15fr]">
             <Card className="p-5">
               <div className="flex items-center gap-3"><Users className="h-5 w-5 text-lead-blue" /><h2 className="font-heading text-xl font-extrabold text-lead-navy">Choose a Batch</h2></div>
               <p className="mt-2 text-sm leading-6 text-lead-gray">Select the whole group first. Students and the assigned teacher come from Batch Management automatically.</p>
@@ -608,7 +608,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                 <select name="batchId" defaultValue={selectedBatchId} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-lead-navy">
                   {groupData.batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.batchName} - {batch.program}</option>)}
                 </select>
-                <Button type="submit" variant="secondary">Open Batch Schedule</Button>
+                <Button type="submit" variant="secondary">Choose Batch to Schedule</Button>
               </form>
               {selectedBatch ? (
                 <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-lead-gray">
@@ -618,14 +618,20 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                 </div>
               ) : null}
             </Card>
-            {selectedBatch ? <Card className="p-5"><BatchScheduleForm batchId={selectedBatch.id} batchName={selectedBatch.batchName} days={selectedBatch.days} time={selectedBatch.time} scheduledMeetingNumbers={selectedBatchSessions.map((session) => session.meetingNumber)} /></Card> : null}
+            {selectedBatch ? <Card className="p-5"><BatchScheduleForm key={selectedBatch.id} batchId={selectedBatch.id} batchName={selectedBatch.batchName} days={selectedBatch.days} time={selectedBatch.time} scheduledMeetingNumbers={selectedBatchSessions.map((session) => session.meetingNumber)} /></Card> : null}
             {!selectedBatch ? <Card className="p-6 text-sm text-lead-gray">Create an active batch and assign its students before scheduling group classes.</Card> : null}
           </div>
 
-          <Card className="p-5">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="font-heading text-xl font-extrabold text-lead-navy">{selectedBatch ? `${selectedBatch.batchName} Schedule` : "Group Schedule"}</h2><p className="mt-2 text-sm text-lead-gray">Only classes for the selected batch are shown here.</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-lead-blue">{selectedBatchSessions.length} classes</span></div>
-            <div className="mt-5 max-h-[760px] space-y-3 overflow-y-auto pr-1">
-              {selectedBatchSessions.map((groupSession) => (
+          <div><h2 className="font-heading text-2xl font-extrabold text-lead-navy">All Group Schedules</h2><p className="mt-2 text-sm text-lead-gray">View each batch below. Choose a batch above only when creating classes.</p></div>
+          {Array.from(new Map([
+            ...groupData.sessions.map((session) => [session.batchId, { id: session.batchId, batchName: session.batchName }] as const),
+            ...groupData.batches.map((batch) => [batch.id, batch] as const)
+          ]).values()).sort((a, b) => a.batchName.localeCompare(b.batchName)).map((batch) => {
+            const batchSessions = groupData.sessions.filter((session) => session.batchId === batch.id).sort((a, b) => a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime));
+            return <Card key={batch.id} className="p-5">
+            <div className="flex items-start justify-between gap-3"><h3 className="font-heading text-xl font-extrabold text-lead-navy">{batch.batchName} Schedule</h3><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-lead-blue">{batchSessions.length} classes</span></div>
+            <div className="mt-5 max-h-[540px] space-y-3 overflow-y-auto pr-1">
+              {batchSessions.map((groupSession) => (
                 <div key={groupSession.id} className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div><p className="font-heading text-lg font-bold text-lead-navy">Meeting {groupSession.meetingNumber}</p><p className="mt-1 text-sm font-semibold text-lead-gray">{formatDate(groupSession.sessionDate)} / {groupSession.startTime} - {groupSession.endTime} WIB</p><p className="mt-1 text-sm text-lead-gray">{groupSession.teacherName} / {groupSession.studentCount} students{groupSession.topic ? ` / ${groupSession.topic}` : ""}</p></div>
@@ -648,11 +654,24 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                       ) : null}
                     </div>
                   </div>
+                  {groupSession.status === "Scheduled" && !groupSession.attendanceMarked ? (
+                    <details className="mt-3 rounded-lg border border-blue-100 bg-blue-50/50">
+                      <summary className="focus-ring cursor-pointer px-4 py-3 text-sm font-bold text-lead-blue">Edit class time</summary>
+                      <ActionFeedbackForm action={updateBatchClassTime} successMessage="Class time updated." className="grid gap-3 border-t border-blue-100 p-4 sm:grid-cols-2">
+                        <input type="hidden" name="sessionId" value={groupSession.id} />
+                        <Field label="From (WIB)"><input name="startTime" type="time" required defaultValue={groupSession.startTime} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2" /></Field>
+                        <Field label="To (WIB)"><input name="endTime" type="time" required defaultValue={groupSession.endTime} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2" /></Field>
+                        <p className="text-xs text-lead-gray sm:col-span-2">Updates this class only. The date, meeting number and batch's regular time stay the same.</p>
+                        <Button type="submit" size="sm" className="sm:w-fit">Save Class Time</Button>
+                      </ActionFeedbackForm>
+                    </details>
+                  ) : null}
                 </div>
               ))}
-              {!selectedBatchSessions.length ? <p className="rounded-xl bg-slate-50 p-5 text-sm text-lead-gray">No classes scheduled for this batch yet.</p> : null}
+              {!batchSessions.length ? <p className="rounded-xl bg-slate-50 p-5 text-sm text-lead-gray">No classes scheduled for this batch yet.</p> : null}
             </div>
-          </Card>
+          </Card>;
+          })}
         </section>
       )}
     </main>
