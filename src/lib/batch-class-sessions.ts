@@ -10,7 +10,33 @@ export type BatchAttendanceEntry = BatchSessionStudent & {
   attendance: "Present" | "Absent" | "Excused";
   participationStars: number;
   minutesLate: number;
+  communication: number;
+  englishSkills: number;
+  creativity: number;
+  learningHabits: number;
+  automaticCommentEn: string;
+  automaticCommentId: string;
 };
+
+export function buildGroupClassComment(entry: Pick<BatchAttendanceEntry, "communication" | "englishSkills" | "creativity" | "learningHabits">) {
+  const average = (entry.communication + entry.englishSkills + entry.creativity + entry.learningHabits) / 4;
+  if (average >= 4.5) return {
+    en: "Excellent class performance. The student communicated confidently, showed strong English skills and creativity, and demonstrated excellent learning habits.",
+    id: "Performa kelas sangat baik. Siswa berkomunikasi dengan percaya diri, menunjukkan kemampuan bahasa Inggris dan kreativitas yang kuat, serta kebiasaan belajar yang sangat baik."
+  };
+  if (average >= 3.5) return {
+    en: "Good class performance. The student is making steady progress in communication, English skills, creativity, and learning habits.",
+    id: "Performa kelas baik. Siswa menunjukkan perkembangan yang stabil dalam komunikasi, kemampuan bahasa Inggris, kreativitas, dan kebiasaan belajar."
+  };
+  if (average >= 2.5) return {
+    en: "The student is developing well and will benefit from more practice in communication, English skills, creativity, and learning habits.",
+    id: "Siswa berkembang dengan baik dan akan mendapat manfaat dari lebih banyak latihan dalam komunikasi, kemampuan bahasa Inggris, kreativitas, dan kebiasaan belajar."
+  };
+  return {
+    en: "The student needs continued guidance and regular practice to build communication, English skills, creativity, and learning habits.",
+    id: "Siswa membutuhkan bimbingan berkelanjutan dan latihan rutin untuk meningkatkan komunikasi, kemampuan bahasa Inggris, kreativitas, dan kebiasaan belajar."
+  };
+}
 
 export type BatchClassSessionDocument = {
   batchId: string;

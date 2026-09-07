@@ -1,11 +1,10 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { CalendarDays, CheckCircle2, ClipboardCheck, Clock3, LogOut, Users } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, LogOut, Users } from "lucide-react";
 import { logoutTeacher, saveBatchClassAttendance } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
-import { GroupMonthlyAssessment } from "./monthly-assessment";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,9 +31,7 @@ async function authenticatedTeacher() {
   return teacher;
 }
 
-export default async function TeacherGroupClassesPage({ searchParams }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function TeacherGroupClassesPage() {
   noStore();
   const teacher = await authenticatedTeacher();
   if (!teacher) {
@@ -93,14 +90,14 @@ export default async function TeacherGroupClassesPage({ searchParams }: {
                   <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Attendance needed</span>
                 </div>
               </div>
-              <ActionFeedbackForm action={saveBatchClassAttendance} successMessage="Group attendance saved and assessment tracker updated." className="p-5">
+              <ActionFeedbackForm action={saveBatchClassAttendance} successMessage="Group attendance and class progress saved." className="p-5">
                 <input type="hidden" name="sessionId" value={session._id.toString()} />
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[680px] text-left text-sm">
-                    <thead className="text-xs uppercase tracking-[0.12em] text-lead-gray"><tr><th className="pb-3">Student</th><th className="pb-3">Attendance</th><th className="pb-3">Stars</th><th className="pb-3">Minutes Late</th></tr></thead>
+                  <table className="w-full min-w-[1250px] text-left text-sm">
+                    <thead className="text-xs uppercase tracking-[0.12em] text-lead-gray"><tr><th className="pb-3">Student</th><th className="pb-3">Attendance</th><th className="pb-3">Stars</th><th className="pb-3">Minutes Late</th><th className="pb-3">Communication</th><th className="pb-3">English Skills</th><th className="pb-3">Creativity</th><th className="pb-3">Learning Habits</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {session.studentSnapshot.map((student, index) => (
-                        <tr key={student.studentId}><td className="py-3 pr-3"><p className="font-bold text-lead-navy">{student.studentName}</p><p className="text-xs text-lead-gray">{student.studentId}</p></td><td className="py-3 pr-3"><select name={`attendance_${index}`} defaultValue="Present" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{assessmentAttendanceStatuses.map((status) => <option key={status}>{status}</option>)}</select></td><td className="py-3 pr-3"><select name={`stars_${index}`} defaultValue="3" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{[0,1,2,3,4,5].map((stars) => <option key={stars} value={stars}>{stars} stars</option>)}</select></td><td className="py-3"><input name={`late_${index}`} type="number" min={0} max={240} defaultValue={0} className="w-full rounded-lg border border-slate-200 px-3 py-2" /></td></tr>
+                        <tr key={student.studentId}><td className="py-3 pr-3"><p className="font-bold text-lead-navy">{student.studentName}</p><p className="text-xs text-lead-gray">{student.studentId}</p></td><td className="py-3 pr-3"><select name={`attendance_${index}`} defaultValue="Present" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{assessmentAttendanceStatuses.map((status) => <option key={status}>{status}</option>)}</select></td><td className="py-3 pr-3"><select name={`stars_${index}`} defaultValue="3" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{[0,1,2,3,4,5].map((stars) => <option key={stars} value={stars}>{stars} stars</option>)}</select></td><td className="py-3 pr-3"><input name={`late_${index}`} type="number" min={0} max={240} defaultValue={0} className="w-full rounded-lg border border-slate-200 px-3 py-2" /></td>{["communication","englishSkills","creativity","learningHabits"].map((metric) => <td key={metric} className="py-3 pr-3"><select name={`${metric}_${index}`} defaultValue="3" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{[1,2,3,4,5].map((rating) => <option key={rating} value={rating}>{rating} stars</option>)}</select></td>)}</tr>
                       ))}
                     </tbody>
                   </table>
@@ -116,7 +113,6 @@ export default async function TeacherGroupClassesPage({ searchParams }: {
           <SessionList title="Upcoming Schedule" sessions={future} empty="No upcoming group classes." />
           <SessionList title="Completed Classes" sessions={completed} empty="No group classes completed yet." />
         </div>
-        <GroupMonthlyAssessment searchParams={searchParams} />
       </section>
     </main>
   );

@@ -5,11 +5,11 @@ import type { WithId } from "mongodb";
 import { CalendarCheck, ChevronDown, CircleHelp, History } from "lucide-react";
 import { TranslateJournalButton } from "@/components/parent/translate-journal-button";
 import { Card } from "@/components/ui/card";
-import { calculateAttendance, calculateParticipation, getMonthlyAssessmentsCollectionName, type AssessmentGrade, type MeetingAssessmentInput } from "@/lib/assessments";
 import {
   getStudentAttendanceCollectionName,
   type AttendanceStatus
 } from "@/lib/attendance";
+import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
@@ -46,26 +46,6 @@ type AttendanceDocument = {
   updatedAt?: Date;
 };
 
-type MonthlyAssessmentDocument = {
-  meetings?: MeetingAssessmentInput[];
-  studentId?: string;
-  studentName?: string;
-  batchName?: string;
-  program?: string;
-  teacherName?: string;
-  month?: number;
-  year?: number;
-  attendance?: { attendancePercentage?: number; completedMeetings?: number; score?: number; grade?: AssessmentGrade; label?: string };
-  participation?: { totalStars?: number; averageStars?: number; score?: number; grade?: AssessmentGrade; label?: string };
-  communication?: { score?: number; grade?: AssessmentGrade; label?: string };
-  englishSkills?: { score?: number; grade?: AssessmentGrade; label?: string };
-  confidence?: { score?: number; grade?: AssessmentGrade; label?: string };
-  creativity?: { score?: number; grade?: AssessmentGrade; label?: string };
-  learningHabits?: { score?: number; grade?: AssessmentGrade; label?: string };
-  overall?: { score?: number; grade?: AssessmentGrade; label?: string };
-  teacherComments?: { en?: string; id?: string };
-};
-
 type Student = {
   studentName: string;
   courseJoined: string;
@@ -81,24 +61,21 @@ type Attendance = {
   teacherNames: string[];
 };
 
-type MonthlyAssessment = {
+type LatestGroupClass = {
   batchName: string;
   program: string;
   teacherName: string;
-  month: number;
-  year: number;
-  attendancePercentage: number;
-  completedMeetings: number;
+  meetingNumber: number;
+  sessionDate: string;
+  attendance: "Present" | "Absent" | "Excused";
   participationStars: number;
-  communicationGrade: AssessmentGrade | "";
-  englishSkillsGrade: AssessmentGrade | "";
-  confidenceGrade: AssessmentGrade | "";
-  creativityGrade: AssessmentGrade | "";
-  learningHabitsGrade: AssessmentGrade | "";
-  overallScore: number;
-  overallGrade: AssessmentGrade | "";
-  teacherCommentEn: string;
-  teacherCommentId: string;
+  minutesLate: number;
+  communication: number;
+  englishSkills: number;
+  creativity: number;
+  learningHabits: number;
+  automaticCommentEn: string;
+  automaticCommentId: string;
 };
 
 function formatDate(value: string) {
@@ -118,34 +95,6 @@ function statusClassName(status: AttendanceStatus) {
 
 function countStatus(attendance: Attendance[], status: AttendanceStatus) {
   return attendance.filter((record) => record.status === status).length;
-}
-
-function gradeClassName(grade: AssessmentGrade | "") {
-  if (grade === "A") return "bg-emerald-50 text-emerald-700";
-  if (grade === "B") return "bg-yellow-50 text-yellow-800";
-  if (grade === "C") return "bg-rose-50 text-rose-700";
-  return "bg-slate-100 text-slate-600";
-}
-
-function monthName(month: number, year: number) {
-  return new Intl.DateTimeFormat("en", {
-    month: "long",
-    year: "numeric",
-    timeZone: "Asia/Jakarta"
-  }).format(new Date(Date.UTC(year, month - 1, 1)));
-}
-
-function currentJakartaMonth() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jakarta",
-    year: "numeric",
-    month: "2-digit"
-  }).formatToParts(new Date());
-
-  return {
-    month: Number(parts.find((part) => part.type === "month")?.value || new Date().getMonth() + 1),
-    year: Number(parts.find((part) => part.type === "year")?.value || new Date().getFullYear())
-  };
 }
 
 function jakartaDateKey(value = new Date()) {
@@ -179,11 +128,10 @@ function getCurrentPhaseAttendance(records: WithId<AttendanceDocument>[]) {
   return records.filter((record) => record.meetingDate && record.meetingDate >= phaseStartDate);
 }
 
-async function getParentPortalData(token: string): Promise<{ student: Student; attendance: Attendance[]; assessment: MonthlyAssessment | null } | null> {
+async function getParentPortalData(token: string): Promise<{ student: Student; attendance: Attendance[]; latestGroupClass: LatestGroupClass | null } | null> {
   if (!token || token.length < 20) return null;
 
   const db = await getMongoDb();
-  const currentPeriod = currentJakartaMonth();
   const studentDoc = (await db
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
     .findOne({ parentAccessToken: token })) as WithId<StudentDocument> | null;
@@ -197,16 +145,13 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
     .limit(500)
     .toArray()) as WithId<AttendanceDocument>[];
   const currentPhaseAttendanceDocs = getCurrentPhaseAttendance(attendanceDocs);
-  const assessmentDoc = (await db
-    .collection<MonthlyAssessmentDocument>(getMonthlyAssessmentsCollectionName())
-    .find({ studentId: studentDoc.studentId, month: currentPeriod.month, year: currentPeriod.year })
-    .sort({ updatedAt: -1 })
+  const latestGroupSession = studentDoc.classType === "Basic Group" ? await db
+    .collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
+    .find({ status: "Completed", attendanceMarked: true, "attendance.studentId": studentDoc.studentId })
+    .sort({ sessionDate: -1, attendanceMarkedAt: -1, meetingNumber: -1 })
     .limit(1)
-    .next()) as WithId<MonthlyAssessmentDocument> | null;
-
-  const tracker = assessmentDoc?.meetings;
-  const liveAttendance = tracker?.length ? calculateAttendance(tracker) : assessmentDoc?.attendance;
-  const liveParticipation = tracker?.length ? calculateParticipation(tracker) : assessmentDoc?.participation;
+    .next() : null;
+  const latestGroupEntry = latestGroupSession?.attendance?.find((entry) => entry.studentId === studentDoc.studentId);
 
   return {
     student: {
@@ -222,27 +167,22 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
       notes: record.notes || "",
       teacherNames: record.teacherNames || []
     })),
-    assessment: assessmentDoc
-      ? {
-          batchName: assessmentDoc.batchName || "",
-          program: assessmentDoc.program || "",
-          teacherName: assessmentDoc.teacherName || "",
-          month: assessmentDoc.month || currentPeriod.month,
-          year: assessmentDoc.year || currentPeriod.year,
-          attendancePercentage: liveAttendance?.attendancePercentage || 0,
-          completedMeetings: liveAttendance?.completedMeetings || 0,
-          participationStars: liveParticipation?.totalStars || 0,
-          communicationGrade: assessmentDoc.communication?.grade || "",
-          englishSkillsGrade: assessmentDoc.englishSkills?.grade || "",
-          confidenceGrade: liveParticipation?.grade || assessmentDoc.confidence?.grade || "",
-          creativityGrade: assessmentDoc.creativity?.grade || "",
-          learningHabitsGrade: assessmentDoc.learningHabits?.grade || "",
-          overallScore: assessmentDoc.overall?.score || 0,
-          overallGrade: assessmentDoc.overall?.grade || "",
-          teacherCommentEn: assessmentDoc.teacherComments?.en || "",
-          teacherCommentId: assessmentDoc.teacherComments?.id || ""
-        }
-      : null
+    latestGroupClass: latestGroupSession && latestGroupEntry ? {
+      batchName: latestGroupSession.batchName,
+      program: latestGroupSession.program,
+      teacherName: latestGroupSession.teacherName,
+      meetingNumber: latestGroupSession.meetingNumber,
+      sessionDate: latestGroupSession.sessionDate,
+      attendance: latestGroupEntry.attendance,
+      participationStars: latestGroupEntry.participationStars,
+      minutesLate: latestGroupEntry.minutesLate,
+      communication: latestGroupEntry.communication || 0,
+      englishSkills: latestGroupEntry.englishSkills || 0,
+      creativity: latestGroupEntry.creativity || 0,
+      learningHabits: latestGroupEntry.learningHabits || 0,
+      automaticCommentEn: latestGroupEntry.automaticCommentEn || "",
+      automaticCommentId: latestGroupEntry.automaticCommentId || ""
+    } : null
   };
 }
 
@@ -259,7 +199,7 @@ export default async function ParentAttendancePortalPage({
     notFound();
   }
 
-  const { student, attendance, assessment } = data;
+  const { student, attendance, latestGroupClass } = data;
   const isGroupStudent = student.classType === "Basic Group";
   const latestAttendance = attendance[0];
   const presentCount = countStatus(attendance, "Present");
@@ -283,7 +223,7 @@ export default async function ParentAttendancePortalPage({
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Parent Portal</p>
             <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">{isGroupStudent ? "Progress Report" : "Attendance Report"}</h1>
-            <p className="mt-2 text-sm text-lead-gray">{isGroupStudent ? "Read-only monthly progress view for parents." : "Read-only attendance view for parents."}</p>
+            <p className="mt-2 text-sm text-lead-gray">{isGroupStudent ? "Latest group class progress for parents." : "Read-only attendance view for parents."}</p>
           </div>
         </header>
 
@@ -403,65 +343,65 @@ export default async function ParentAttendancePortalPage({
         </Card>
         ) : null}
 
-        <Card className="p-5">
+        {isGroupStudent ? <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="grid h-11 w-11 place-items-center rounded-lg bg-blue-50 text-lead-blue">
               <CalendarCheck className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="font-heading text-xl font-bold text-lead-navy">Monthly Assessment</h2>
-              <p className="text-sm text-lead-gray">Current month progress report.</p>
+              <h2 className="font-heading text-xl font-bold text-lead-navy">Latest Class Progress</h2>
+              <p className="text-sm text-lead-gray">Attendance and performance from the most recently completed class.</p>
             </div>
           </div>
 
-          {assessment ? (
+          {latestGroupClass ? (
             <div className="mt-5 grid gap-5">
               <div className="rounded-lg bg-slate-50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-lead-gray">{monthName(assessment.month, assessment.year)}</p>
-                    <h3 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">{assessment.batchName || student.courseJoined}</h3>
-                    <p className="mt-1 text-sm text-lead-gray">{assessment.program || student.courseJoined} / Teacher: {assessment.teacherName || "Not assigned"}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-lead-gray">Meeting {latestGroupClass.meetingNumber} / {formatDate(latestGroupClass.sessionDate)}</p>
+                    <h3 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">{latestGroupClass.batchName || student.courseJoined}</h3>
+                    <p className="mt-1 text-sm text-lead-gray">{latestGroupClass.program || student.courseJoined} / Teacher: {latestGroupClass.teacherName || "Not assigned"}</p>
                   </div>
-                  <span className={`w-fit rounded-lg px-4 py-2 text-sm font-extrabold uppercase ${gradeClassName(assessment.overallGrade)}`}>
-                    {assessment.overallGrade ? `Overall Grade ${assessment.overallGrade} / ${assessment.overallScore}%` : "Assessment in progress"}
+                  <span className="w-fit rounded-lg bg-emerald-50 px-4 py-2 text-sm font-extrabold uppercase text-emerald-700">
+                    {latestGroupClass.attendance}
                   </span>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <AssessmentStat label="Attendance" value={`${assessment.attendancePercentage}%`} helper={`${assessment.completedMeetings}/12 meetings completed`} />
-                <AssessmentStat label="Participation" value={`${assessment.participationStars}/60`} helper="Monthly stars earned" />
-                <AssessmentStat label="Confidence" value={assessment.confidenceGrade || "-"} helper="From participation score" />
-                <AssessmentStat label="Learning Habits" value={assessment.learningHabitsGrade || "-"} helper="Attendance, punctuality, homework, respect" />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <ProgressStat label="Attendance" value={latestGroupClass.attendance} />
+                <ProgressStat label="Participation" value={`${latestGroupClass.participationStars}/5 stars`} />
+                <ProgressStat label="Minutes Late" value={`${latestGroupClass.minutesLate}`} />
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <GradePill label="Communication" grade={assessment.communicationGrade} />
-                <GradePill label="English Skills" grade={assessment.englishSkillsGrade} />
-                <GradePill label="Creativity" grade={assessment.creativityGrade} />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <ProgressStat label="Communication" value={ratingLabel(latestGroupClass.communication)} />
+                <ProgressStat label="English Skills" value={ratingLabel(latestGroupClass.englishSkills)} />
+                <ProgressStat label="Creativity" value={ratingLabel(latestGroupClass.creativity)} />
+                <ProgressStat label="Learning Habits" value={ratingLabel(latestGroupClass.learningHabits)} />
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <h3 className="font-heading text-lg font-bold text-lead-navy">Teacher Comment</h3>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-lead-gray">{assessment.teacherCommentEn || "No comment added yet."}</p>
-                  {assessment.teacherCommentEn ? (
+                  <h3 className="font-heading text-lg font-bold text-lead-navy">Automatic Class Comment</h3>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-lead-gray">{latestGroupClass.automaticCommentEn || "Performance ratings were not recorded for this class."}</p>
+                  {latestGroupClass.automaticCommentEn ? (
                     <div className="mt-4 border-t border-slate-100 pt-4">
-                      <TranslateJournalButton text={assessment.teacherCommentEn} />
+                      <TranslateJournalButton text={latestGroupClass.automaticCommentEn} />
                     </div>
                   ) : null}
                 </div>
                 <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
-                  <h3 className="font-heading text-lg font-bold text-lead-navy">Komentar Guru</h3>
-                  <p lang="id" className="mt-3 whitespace-pre-wrap text-sm leading-6 text-lead-gray">{assessment.teacherCommentId || "Belum ada komentar."}</p>
+                  <h3 className="font-heading text-lg font-bold text-lead-navy">Komentar Kelas Otomatis</h3>
+                  <p lang="id" className="mt-3 whitespace-pre-wrap text-sm leading-6 text-lead-gray">{latestGroupClass.automaticCommentId || "Penilaian performa belum dicatat untuk kelas ini."}</p>
                 </div>
               </div>
             </div>
           ) : (
-            <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance or assessment recorded for the current month yet.</p>
+            <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No group class attendance has been recorded yet.</p>
           )}
-        </Card>
+        </Card> : null}
       </section>
     </main>
   );
@@ -528,21 +468,15 @@ function meetingWord(count: number) {
   return count === 1 ? "meeting" : "meetings";
 }
 
-function AssessmentStat({ label, value, helper }: { label: string; value: string; helper: string }) {
+function ProgressStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-slate-50 p-4">
       <p className="font-heading text-2xl font-extrabold text-lead-blue">{value}</p>
       <p className="mt-1 text-sm font-bold text-lead-navy">{label}</p>
-      <p className="mt-1 text-xs leading-5 text-lead-gray">{helper}</p>
     </div>
   );
 }
 
-function GradePill({ label, grade }: { label: string; grade: AssessmentGrade | "" }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
-      <span className="text-sm font-bold text-lead-navy">{label}</span>
-      <span className={`rounded-full px-3 py-1 text-xs font-extrabold uppercase ${gradeClassName(grade)}`}>{grade || "-"}</span>
-    </div>
-  );
+function ratingLabel(rating: number) {
+  return rating ? `${rating}/5` : "Not rated";
 }

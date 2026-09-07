@@ -22,8 +22,8 @@ import {
 import { getClassSessionsCollectionName, hasClassSessionEnded, type ClassSessionDocument } from "@/lib/class-sessions";
 import {
   getBatchClassSessionsCollectionName,
-  getJakartaPeriod,
   hasBatchClassEnded,
+  buildGroupClassComment,
   type BatchAttendanceEntry,
   type BatchClassSessionDocument
 } from "@/lib/batch-class-sessions";
@@ -550,11 +550,21 @@ export async function saveBatchClassAttendance(formData: FormData) {
   const attendance: BatchAttendanceEntry[] = session.studentSnapshot.map((student, index) => {
     const status = clean(formData.get(`attendance_${index}`));
     if (!isAssessmentAttendanceStatus(status)) throw new Error(`Select attendance for ${student.studentName}.`);
+    const ratings = {
+      communication: numberInRange(formData.get(`communication_${index}`), 1, 5, 3),
+      englishSkills: numberInRange(formData.get(`englishSkills_${index}`), 1, 5, 3),
+      creativity: numberInRange(formData.get(`creativity_${index}`), 1, 5, 3),
+      learningHabits: numberInRange(formData.get(`learningHabits_${index}`), 1, 5, 3)
+    };
+    const comments = buildGroupClassComment(ratings);
     return {
       ...student,
       attendance: status,
       participationStars: numberInRange(formData.get(`stars_${index}`), 0, 5, 0),
-      minutesLate: numberInRange(formData.get(`late_${index}`), 0, 240, 0)
+      minutesLate: numberInRange(formData.get(`late_${index}`), 0, 240, 0),
+      ...ratings,
+      automaticCommentEn: comments.en,
+      automaticCommentId: comments.id
     };
   });
 
@@ -564,58 +574,7 @@ export async function saveBatchClassAttendance(formData: FormData) {
     { $set: { attendance, attendanceMarked: true, attendanceMarkedAt: now, attendanceMarkedBy: teacher.id, status: "Completed", updatedAt: now } }
   );
 
-  const period = getJakartaPeriod(session.sessionDate);
-  if (period && session.meetingNumber >= 1 && session.meetingNumber <= 12) {
-    const assessments = db.collection(getMonthlyAssessmentsCollectionName());
-    for (const entry of attendance) {
-      const existing = await assessments.findOne({ studentId: entry.studentId, month: period.month, year: period.year });
-      const meetings: MeetingAssessmentInput[] = Array.from({ length: 12 }, (_, index) => {
-        const saved = Array.isArray(existing?.meetings) ? existing.meetings[index] as MeetingAssessmentInput | undefined : undefined;
-        return saved || { attendance: "Absent", participationStars: 0, minutesLate: 0 };
-      });
-      meetings[session.meetingNumber - 1] = {
-        attendance: entry.attendance,
-        participationStars: entry.participationStars,
-        minutesLate: entry.minutesLate
-      };
-
-      const updatedReport = existing?.ratings ? buildMonthlyAssessment({ meetings, ...existing.ratings }) : null;
-      const updatedComments = updatedReport ? {
-        en: !existing?.teacherComments?.en || existing.teacherComments.en === existing.automaticComments?.en ? updatedReport.automaticComments.en : existing.teacherComments.en,
-        id: !existing?.teacherComments?.id || existing.teacherComments.id === existing.automaticComments?.id ? updatedReport.automaticComments.id : existing.teacherComments.id
-      } : null;
-
-      await assessments.updateOne(
-        { studentId: entry.studentId, month: period.month, year: period.year },
-        {
-          $set: {
-            studentId: entry.studentId,
-            studentName: entry.studentName,
-            batchId: session.batchId,
-            batchName: session.batchName,
-            program: session.program,
-            teacherId: teacher.id,
-            teacherName: teacher.name,
-            month: period.month,
-            year: period.year,
-            status: existing?.status === "finalized" ? "finalized" : "in-progress",
-            meetings,
-            attendance: calculateAttendance(meetings),
-            participation: calculateParticipation(meetings),
-            confidence: calculateParticipation(meetings),
-            ...(updatedReport || {}),
-            ...(updatedComments ? { teacherComments: updatedComments } : {}),
-            updatedAt: now
-          },
-          $setOnInsert: { createdAt: now }
-        },
-        { upsert: true }
-      );
-    }
-  }
-
   revalidatePath("/teacher/group-classes");
-  revalidatePath("/teacher/assessments");
   revalidatePath("/admin/batches");
   revalidatePath("/parent");
 }
