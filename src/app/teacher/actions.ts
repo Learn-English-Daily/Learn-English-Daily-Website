@@ -441,8 +441,12 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
     throw new Error("Student must be assigned to this batch before assessment");
   }
 
+  const savedAssessment = await db.collection(getMonthlyAssessmentsCollectionName()).findOne({ studentId, batchId, month, year });
+  const savedMeetings: MeetingAssessmentInput[] = Array.from({ length: 12 }, (_, index) =>
+    savedAssessment?.meetings?.[index] || { attendance: "Absent", participationStars: 0, minutesLate: 0 }
+  );
   const calculated = buildMonthlyAssessment({
-    meetings: parseAssessmentMeetings(formData),
+    meetings: savedMeetings,
     communication: {
       speaking: numberInRange(formData.get("speaking"), 1, 5, 3),
       pronunciation: numberInRange(formData.get("pronunciation"), 1, 5, 3),
@@ -482,8 +486,9 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
       respect: numberInRange(formData.get("respect"), 1, 5, 3)
     }
   };
-  const teacherCommentEn = clean(formData.get("teacherCommentEn")) || calculated.automaticComments.en;
-  const teacherCommentId = clean(formData.get("teacherCommentId")) || calculated.automaticComments.id;
+  const regenerateComments = formData.get("regenerateComments") === "on";
+  const teacherCommentEn = regenerateComments ? calculated.automaticComments.en : clean(formData.get("teacherCommentEn")) || calculated.automaticComments.en;
+  const teacherCommentId = regenerateComments ? calculated.automaticComments.id : clean(formData.get("teacherCommentId")) || calculated.automaticComments.id;
   const now = new Date();
 
   await db.collection(getMonthlyAssessmentsCollectionName()).updateOne(
@@ -521,6 +526,7 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
 
   revalidatePath("/teacher");
   revalidatePath("/teacher/assessments");
+  revalidatePath("/teacher/group-classes");
   revalidatePath("/admin/batches");
   revalidatePath("/parent");
 }
@@ -573,6 +579,12 @@ export async function saveBatchClassAttendance(formData: FormData) {
         minutesLate: entry.minutesLate
       };
 
+      const updatedReport = existing?.ratings ? buildMonthlyAssessment({ meetings, ...existing.ratings }) : null;
+      const updatedComments = updatedReport ? {
+        en: !existing?.teacherComments?.en || existing.teacherComments.en === existing.automaticComments?.en ? updatedReport.automaticComments.en : existing.teacherComments.en,
+        id: !existing?.teacherComments?.id || existing.teacherComments.id === existing.automaticComments?.id ? updatedReport.automaticComments.id : existing.teacherComments.id
+      } : null;
+
       await assessments.updateOne(
         { studentId: entry.studentId, month: period.month, year: period.year },
         {
@@ -591,6 +603,8 @@ export async function saveBatchClassAttendance(formData: FormData) {
             attendance: calculateAttendance(meetings),
             participation: calculateParticipation(meetings),
             confidence: calculateParticipation(meetings),
+            ...(updatedReport || {}),
+            ...(updatedComments ? { teacherComments: updatedComments } : {}),
             updatedAt: now
           },
           $setOnInsert: { createdAt: now }

@@ -32,7 +32,7 @@ export function AssessmentStudentSelector({
     const query = new URLSearchParams({
       assessmentBatchId: batchId
     });
-    router.push(`/teacher/assessments?${query.toString()}`);
+    router.push(`/teacher/group-classes?${query.toString()}#monthly-assessment`);
   }
 
   return (
@@ -69,7 +69,7 @@ export function AssessmentStudentSelector({
               return (
                 <a
                   key={student.studentId}
-                  href={`/teacher/assessments?${query.toString()}#batch-assessment`}
+                  href={`/teacher/group-classes?${query.toString()}#monthly-assessment`}
                   className={`focus-ring rounded-xl border p-3 transition ${selected ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"}`}
                 >
                   <div className="flex items-start justify-between gap-2">

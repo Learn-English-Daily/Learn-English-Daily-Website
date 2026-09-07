@@ -5,6 +5,7 @@ import { CalendarDays, CheckCircle2, ClipboardCheck, Clock3, LogOut, Users } fro
 import { logoutTeacher, saveBatchClassAttendance } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
+import { GroupMonthlyAssessment } from "./monthly-assessment";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,7 +32,9 @@ async function authenticatedTeacher() {
   return teacher;
 }
 
-export default async function TeacherGroupClassesPage() {
+export default async function TeacherGroupClassesPage({ searchParams }: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   noStore();
   const teacher = await authenticatedTeacher();
   if (!teacher) {
@@ -65,12 +68,9 @@ export default async function TeacherGroupClassesPage() {
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-lead-blue">LEAD Teacher / {teacher.name}</p>
             <h1 className="mt-2 font-heading text-3xl font-extrabold text-lead-navy">Group Classes</h1>
-            <p className="mt-2 text-sm text-lead-gray">Mark the whole batch roster once. Results flow into monthly assessments.</p>
+            <p className="mt-2 text-sm text-lead-gray">Mark group attendance and complete monthly student ratings and comments here.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href="/teacher/assessments" className="focus-ring inline-flex items-center gap-2 rounded-lg bg-lead-blue px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700">
-              <ClipboardCheck className="h-4 w-4" /> Batch Assessment
-            </a>
             <form action={logoutTeacher}><Button type="submit" variant="secondary"><LogOut className="h-4 w-4" /> Logout</Button></form>
           </div>
         </div>
@@ -116,6 +116,7 @@ export default async function TeacherGroupClassesPage() {
           <SessionList title="Upcoming Schedule" sessions={future} empty="No upcoming group classes." />
           <SessionList title="Completed Classes" sessions={completed} empty="No group classes completed yet." />
         </div>
+        <GroupMonthlyAssessment searchParams={searchParams} />
       </section>
     </main>
   );
