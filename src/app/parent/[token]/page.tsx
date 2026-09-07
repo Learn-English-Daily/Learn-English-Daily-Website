@@ -5,7 +5,7 @@ import type { WithId } from "mongodb";
 import { CalendarCheck, ChevronDown, CircleHelp, History } from "lucide-react";
 import { TranslateJournalButton } from "@/components/parent/translate-journal-button";
 import { Card } from "@/components/ui/card";
-import { getMonthlyAssessmentsCollectionName, type AssessmentGrade } from "@/lib/assessments";
+import { calculateAttendance, calculateParticipation, getMonthlyAssessmentsCollectionName, type AssessmentGrade, type MeetingAssessmentInput } from "@/lib/assessments";
 import {
   getStudentAttendanceCollectionName,
   type AttendanceStatus
@@ -47,6 +47,7 @@ type AttendanceDocument = {
 };
 
 type MonthlyAssessmentDocument = {
+  meetings?: MeetingAssessmentInput[];
   studentId?: string;
   studentName?: string;
   batchName?: string;
@@ -203,6 +204,10 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
     .limit(1)
     .next()) as WithId<MonthlyAssessmentDocument> | null;
 
+  const tracker = assessmentDoc?.meetings;
+  const liveAttendance = tracker?.length ? calculateAttendance(tracker) : assessmentDoc?.attendance;
+  const liveParticipation = tracker?.length ? calculateParticipation(tracker) : assessmentDoc?.participation;
+
   return {
     student: {
       studentName: studentDoc.studentName || "Student",
@@ -224,12 +229,12 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
           teacherName: assessmentDoc.teacherName || "",
           month: assessmentDoc.month || currentPeriod.month,
           year: assessmentDoc.year || currentPeriod.year,
-          attendancePercentage: assessmentDoc.attendance?.attendancePercentage || 0,
-          completedMeetings: assessmentDoc.attendance?.completedMeetings || 0,
-          participationStars: assessmentDoc.participation?.totalStars || 0,
+          attendancePercentage: liveAttendance?.attendancePercentage || 0,
+          completedMeetings: liveAttendance?.completedMeetings || 0,
+          participationStars: liveParticipation?.totalStars || 0,
           communicationGrade: assessmentDoc.communication?.grade || "",
           englishSkillsGrade: assessmentDoc.englishSkills?.grade || "",
-          confidenceGrade: assessmentDoc.confidence?.grade || "",
+          confidenceGrade: liveParticipation?.grade || assessmentDoc.confidence?.grade || "",
           creativityGrade: assessmentDoc.creativity?.grade || "",
           learningHabitsGrade: assessmentDoc.learningHabits?.grade || "",
           overallScore: assessmentDoc.overall?.score || 0,
@@ -419,7 +424,7 @@ export default async function ParentAttendancePortalPage({
                     <p className="mt-1 text-sm text-lead-gray">{assessment.program || student.courseJoined} / Teacher: {assessment.teacherName || "Not assigned"}</p>
                   </div>
                   <span className={`w-fit rounded-lg px-4 py-2 text-sm font-extrabold uppercase ${gradeClassName(assessment.overallGrade)}`}>
-                    Overall Grade {assessment.overallGrade || "-"} / {assessment.overallScore}%
+                    {assessment.overallGrade ? `Overall Grade ${assessment.overallGrade} / ${assessment.overallScore}%` : "Assessment in progress"}
                   </span>
                 </div>
               </div>
@@ -454,7 +459,7 @@ export default async function ParentAttendancePortalPage({
               </div>
             </div>
           ) : (
-            <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No monthly assessment has been finalized yet.</p>
+            <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No attendance or assessment recorded for the current month yet.</p>
           )}
         </Card>
       </section>

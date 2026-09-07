@@ -8,6 +8,8 @@ import { ObjectId } from "mongodb";
 import {
   assessmentAttendanceStatuses,
   buildMonthlyAssessment,
+  calculateAttendance,
+  calculateParticipation,
   getBatchesCollectionName,
   getMonthlyAssessmentsCollectionName,
   isAssessmentAttendanceStatus,
@@ -586,6 +588,9 @@ export async function saveBatchClassAttendance(formData: FormData) {
             year: period.year,
             status: existing?.status === "finalized" ? "finalized" : "in-progress",
             meetings,
+            attendance: calculateAttendance(meetings),
+            participation: calculateParticipation(meetings),
+            confidence: calculateParticipation(meetings),
             updatedAt: now
           },
           $setOnInsert: { createdAt: now }
