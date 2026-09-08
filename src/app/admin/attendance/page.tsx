@@ -21,6 +21,11 @@ import {
   type ClassSessionDocument,
   type ComputedClassSessionStatus
 } from "@/lib/class-sessions";
+import {
+  getBatchClassSessionsCollectionName,
+  hasBatchClassEnded,
+  type BatchClassSessionDocument
+} from "@/lib/batch-class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getAvailableTeachers, type TeacherOption } from "@/lib/teachers";
@@ -243,9 +248,11 @@ async function getOperationsData(db: Awaited<ReturnType<typeof getMongoDb>>) {
     status: { $in: ["Present", "Late"] },
     $or: [{ notes: { $exists: false } }, { notes: null }, { notes: "" }, { notes: { $regex: "^\\s*$" } }]
   };
-  const [reminders, sessionDocs, attendanceDocs, todayAttendanceDocs, missingJournalDocs, missingJournalCount] = await Promise.all([
+  const [privateReminders, sessionDocs, groupSessionDocs, overdueGroupSessionDocs, attendanceDocs, todayAttendanceDocs, missingJournalDocs, missingJournalCount] = await Promise.all([
     getAttendanceReminders(db, { limit: 50 }),
     db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({ sessionDate: today }).sort({ scheduledAt: 1 }).limit(100).toArray(),
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ sessionDate: today, status: { $ne: "Cancelled" } }).sort({ startTime: 1 }).limit(100).toArray(),
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: "Scheduled", attendanceMarked: { $ne: true }, sessionDate: { $lte: today } }).sort({ sessionDate: 1, startTime: 1 }).limit(300).toArray(),
     db
       .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
       .find({})
@@ -269,6 +276,21 @@ async function getOperationsData(db: Awaited<ReturnType<typeof getMongoDb>>) {
   const attendanceKeys = new Set(
     attendanceDocs.map((doc) => `${doc.studentId || ""}:${doc.meetingNumber || 0}:${getRecordBillingPeriod(doc).billingPeriod}`)
   );
+  const groupReminders: AttendanceReminder[] = overdueGroupSessionDocs
+    .filter((doc) => hasBatchClassEnded(doc))
+    .map((doc) => ({
+      id: `group-${doc._id.toString()}`,
+      studentId: doc.batchId,
+      studentName: `${doc.batchName} (Group)`,
+      meetingNumber: doc.meetingNumber,
+      sessionDate: doc.sessionDate,
+      scheduledAt: `${doc.sessionDate}T${doc.startTime}:00+07:00`,
+      endsAt: `${doc.sessionDate}T${doc.endTime}:00+07:00`,
+      teacherNames: doc.teacherName ? [doc.teacherName] : []
+    }));
+  const reminders = [...privateReminders, ...groupReminders]
+    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
+    .slice(0, 50);
   const todaySessions: TodaySession[] = sessionDocs.map((doc) => {
     const period = getRecordBillingPeriod(doc);
     const hasAttendance = attendanceKeys.has(`${doc.studentId || ""}:${doc.meetingNumber || 0}:${period.billingPeriod}`);
@@ -286,6 +308,22 @@ async function getOperationsData(db: Awaited<ReturnType<typeof getMongoDb>>) {
       })
     };
   });
+  for (const doc of groupSessionDocs) {
+    const scheduledAt = `${doc.sessionDate}T${doc.startTime}:00+07:00`;
+    todaySessions.push({
+      id: `group-${doc._id.toString()}`,
+      studentName: `${doc.batchName} (Group)`,
+      meetingNumber: doc.meetingNumber,
+      scheduledAt,
+      teacherNames: doc.teacherName ? [doc.teacherName] : [],
+      status: doc.status === "Completed" || doc.attendanceMarked
+        ? "Completed"
+        : hasBatchClassEnded(doc)
+          ? "Needs Attendance"
+          : "Scheduled"
+    });
+  }
+  todaySessions.sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   const scheduledKeys = new Set(sessionDocs.map((doc) => `${doc.studentId || ""}:${doc.meetingNumber || 0}`));
   for (const record of todayAttendanceDocs) {
     const key = `${record.studentId || ""}:${record.meetingNumber || 0}`;
