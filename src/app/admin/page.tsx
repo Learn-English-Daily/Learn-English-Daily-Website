@@ -23,6 +23,11 @@ import {
   getComputedClassSessionStatus,
   type ClassSessionDocument
 } from "@/lib/class-sessions";
+import {
+  getBatchClassSessionsCollectionName,
+  hasBatchClassEnded,
+  type BatchClassSessionDocument
+} from "@/lib/batch-class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getReviewCollectionName } from "@/lib/reviews";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, getTrialStudentFilter } from "@/lib/student-registration";
@@ -89,6 +94,7 @@ async function getDashboardData(): Promise<DashboardData> {
 
   const [
     sessionDocs,
+    groupSessionDocs,
     newInquiries,
     pendingReviews,
     currentStudents,
@@ -101,6 +107,12 @@ async function getDashboardData(): Promise<DashboardData> {
       .sort({ scheduledAt: 1 })
       .limit(200)
       .toArray() as Promise<WithId<ClassSessionDocument>[]>,
+    db
+      .collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
+      .find({ status: "Scheduled", attendanceMarked: { $ne: true } })
+      .sort({ sessionDate: 1, startTime: 1 })
+      .limit(500)
+      .toArray() as Promise<WithId<BatchClassSessionDocument>[]>,
     db.collection<LeadDocument>(leadsCollectionName).countDocuments(),
     db.collection<ReviewDocument>(getReviewCollectionName()).countDocuments({ status: "pending" }),
     db.collection(getStudentRegistrationCollectionName()).countDocuments(getActiveStudentFilter()),
@@ -108,9 +120,8 @@ async function getDashboardData(): Promise<DashboardData> {
     db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next()
   ]);
 
-  const todaySessions = sessionDocs
+  const privateTodaySessions = sessionDocs
     .filter((doc) => doc.sessionDate === today)
-    .slice(0, 5)
     .map((doc) => ({
       id: doc._id.toString(),
       studentName: doc.studentName || "Unknown",
@@ -124,7 +135,22 @@ async function getDashboardData(): Promise<DashboardData> {
       })
     }));
 
-  const needsAttendance = sessionDocs.filter(
+  const groupTodaySessions = groupSessionDocs
+    .filter((doc) => doc.sessionDate === today)
+    .map((doc) => ({
+      id: `group-${doc._id.toString()}`,
+      studentName: `${doc.batchName} (Group)`,
+      meetingNumber: doc.meetingNumber,
+      scheduledAt: `${doc.sessionDate}T${doc.startTime}:00+07:00`,
+      teacherNames: doc.teacherName ? [doc.teacherName] : [],
+      status: hasBatchClassEnded(doc) ? "Needs Attendance" : "Scheduled"
+    }));
+
+  const todaySessions = [...privateTodaySessions, ...groupTodaySessions]
+    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
+    .slice(0, 5);
+
+  const privateNeedsAttendance = sessionDocs.filter(
     (doc) =>
       getComputedClassSessionStatus({
         status: doc.status,
@@ -132,6 +158,8 @@ async function getDashboardData(): Promise<DashboardData> {
         endsAt: doc.endsAt
       }) === "Needs Attendance"
   ).length;
+  const groupNeedsAttendance = groupSessionDocs.filter((doc) => hasBatchClassEnded(doc)).length;
+  const needsAttendance = privateNeedsAttendance + groupNeedsAttendance;
 
   return {
     todaySessions,
