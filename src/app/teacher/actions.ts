@@ -551,10 +551,10 @@ export async function saveBatchClassAttendance(formData: FormData) {
     const status = clean(formData.get(`attendance_${index}`));
     if (!isAssessmentAttendanceStatus(status)) throw new Error(`Select attendance for ${student.studentName}.`);
     const ratings = {
-      communication: numberInRange(formData.get(`communication_${index}`), 1, 5, 3),
-      englishSkills: numberInRange(formData.get(`englishSkills_${index}`), 1, 5, 3),
-      creativity: numberInRange(formData.get(`creativity_${index}`), 1, 5, 3),
-      learningHabits: numberInRange(formData.get(`learningHabits_${index}`), 1, 5, 3)
+      communication: numberInRange(formData.get(`communication_${index}`), 0, 5, 0),
+      englishSkills: numberInRange(formData.get(`englishSkills_${index}`), 0, 5, 0),
+      creativity: numberInRange(formData.get(`creativity_${index}`), 0, 5, 0),
+      learningHabits: numberInRange(formData.get(`learningHabits_${index}`), 0, 5, 0)
     };
     const comments = buildGroupClassComment(ratings);
     return {
