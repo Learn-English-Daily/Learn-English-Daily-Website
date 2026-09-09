@@ -13,6 +13,8 @@ export const groupRegistrationFeeStatuses = ["pending", "paid", "waived"] as con
 export type GroupRegistrationFeeStatus = (typeof groupRegistrationFeeStatuses)[number];
 
 let groupInvoiceIndexPromise: Promise<string> | null = null;
+let currentInvoiceSync: { billingPeriod: string; expiresAt: number; promise: Promise<number> } | null = null;
+const CURRENT_INVOICE_SYNC_TTL_MS = 15 * 60 * 1000;
 
 async function ensureGroupInvoiceIndex(db: Db) {
   if (!groupInvoiceIndexPromise) {
@@ -182,7 +184,8 @@ export async function ensureGroupMonthlyInvoice(
   return invoiceId;
 }
 
-export async function ensureCurrentGroupMonthlyInvoices(db: Db) {
+async function syncCurrentGroupMonthlyInvoices(db: Db) {
+  const period = getCurrentJakartaBillingPeriod();
   const students = await db.collection<GroupStudentInvoiceProfile>(getStudentRegistrationCollectionName()).find({
     $and: [
       getActiveStudentFilter(),
@@ -191,6 +194,56 @@ export async function ensureCurrentGroupMonthlyInvoices(db: Db) {
     ]
   }).limit(5000).toArray();
 
-  await Promise.all(students.map((student) => ensureGroupMonthlyInvoice(db, student)));
+  if (!students.length) return 0;
+
+  const studentIds = students.flatMap((student) => student.studentId ? [student.studentId] : []);
+  const existingInvoices = await db.collection<{
+    studentId?: string;
+    status?: string;
+    amountDue?: number;
+    registrationFeeIncluded?: boolean;
+    registrationFeeAmount?: number;
+    source?: string;
+  }>(getStudentPaymentsCollectionName()).find({
+    studentId: { $in: studentIds },
+    billingMonth: period.month,
+    billingYear: period.year,
+    source: { $in: ["batch-monthly", "batch-assessment"] }
+  }).toArray();
+  const invoicesByStudent = new Map(existingInvoices.map((invoice) => [invoice.studentId || "", invoice]));
+
+  const studentsNeedingSync = students.filter((student) => {
+    const invoice = invoicesByStudent.get(student.studentId || "");
+    if (!invoice) return true;
+    if (invoice.status === "Paid") return false;
+
+    const feeHasNoFinalDecision = !["paid", "waived"].includes(student.groupRegistrationFeeStatus || "");
+    const feeIsBoundToInvoice = !student.groupRegistrationFeeInvoiceId || student.groupRegistrationFeeInvoiceId === invoice._id.toString();
+    const shouldIncludeFee = feeHasNoFinalDecision && feeIsBoundToInvoice;
+    const expectedAmount = getGroupMonthlyPrice(student.batchProgram || student.courseJoined || "") +
+      (shouldIncludeFee ? GROUP_REGISTRATION_FEE : 0);
+
+    return invoice.source !== "batch-monthly" ||
+      invoice.amountDue !== expectedAmount ||
+      invoice.registrationFeeIncluded !== shouldIncludeFee ||
+      (shouldIncludeFee && invoice.registrationFeeAmount !== GROUP_REGISTRATION_FEE);
+  });
+
+  await Promise.all(studentsNeedingSync.map((student) => ensureGroupMonthlyInvoice(db, student, period)));
   return students.length;
+}
+
+export async function ensureCurrentGroupMonthlyInvoices(db: Db) {
+  const now = Date.now();
+  const { billingPeriod } = getCurrentJakartaBillingPeriod();
+  if (currentInvoiceSync && currentInvoiceSync.billingPeriod === billingPeriod && currentInvoiceSync.expiresAt > now) {
+    return currentInvoiceSync.promise;
+  }
+
+  const promise = syncCurrentGroupMonthlyInvoices(db).catch((error) => {
+    currentInvoiceSync = null;
+    throw error;
+  });
+  currentInvoiceSync = { billingPeriod, expiresAt: now + CURRENT_INVOICE_SYNC_TTL_MS, promise };
+  return promise;
 }

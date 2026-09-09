@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { AlertCircle, CheckCircle2, ExternalLink, ReceiptText, Search, UploadCloud } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
@@ -532,17 +533,17 @@ export default async function FinancePaymentsPage({
             </form>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button asChild size="sm" variant={showArchived ? "secondary" : "primary"}>
-                <a href={paymentsHref({ type: studentType, query: searchQuery, studentId: selectedStudentId })}>Active Payments</a>
+                <Link href={paymentsHref({ type: studentType, query: searchQuery, studentId: selectedStudentId })}>Active Payments</Link>
               </Button>
               <Button asChild size="sm" variant={showArchived ? "primary" : "secondary"}>
-                <a href={paymentsHref({ view: "history", type: studentType, query: searchQuery, studentId: selectedStudentId })}>Archived History</a>
+                <Link href={paymentsHref({ view: "history", type: studentType, query: searchQuery, studentId: selectedStudentId })}>Archived History</Link>
               </Button>
               <span className="mx-1 hidden w-px self-stretch bg-slate-200 sm:block" aria-hidden="true" />
               {(["all", "private", "group"] as const).map((type) => (
                 <Button key={type} asChild size="sm" variant={studentType === type ? "primary" : "secondary"}>
-                  <a href={paymentsHref({ view: showArchived ? "history" : undefined, type, query: searchQuery })}>
+                  <Link href={paymentsHref({ view: showArchived ? "history" : undefined, type, query: searchQuery })}>
                     {type === "all" ? "All Students" : type === "private" ? "Private Students" : "Group Students"}
-                  </a>
+                  </Link>
                 </Button>
               ))}
             </div>
@@ -552,7 +553,7 @@ export default async function FinancePaymentsPage({
             <h2 className="font-heading text-xl font-bold text-lead-navy">Select student</h2>
             <div className="mt-4 grid gap-3">
               {students.map((student) => (
-                <a
+                <Link
                   key={student.id}
                   href={paymentsHref({ view: showArchived ? "history" : undefined, type: studentType, query: searchQuery, studentId: student.studentId })}
                   className={`focus-ring rounded-lg border p-4 transition hover:border-lead-blue hover:bg-blue-50 ${
@@ -571,7 +572,7 @@ export default async function FinancePaymentsPage({
                   <p className="mt-2 text-sm font-semibold text-lead-gray">{student.courseJoined} / {student.classType} / {student.classMode || "Mode not set"}</p>
                   <p className="mt-1 text-xs text-lead-gray">Parent: {student.parentName || "Not set"}</p>
                   {student.unpaidCount > 0 ? <p className="mt-2 text-xs font-bold text-rose-700">{student.unpaidCount} unpaid payment{student.unpaidCount === 1 ? "" : "s"} / {formatRupiah(student.totalUnpaid)}</p> : null}
-                </a>
+                </Link>
               ))}
               {!students.length ? <p className="rounded-lg bg-white p-4 text-sm text-lead-gray">No students found.</p> : null}
             </div>
