@@ -56,6 +56,8 @@ type Student = {
   totalUnpaid: number;
 };
 
+type StudentTypeFilter = "all" | "private" | "group";
+
 type PaymentDocument = {
   studentId?: string;
   studentName?: string;
@@ -136,6 +138,26 @@ function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function paymentsHref({
+  view,
+  type,
+  query,
+  studentId
+}: {
+  view?: string;
+  type?: StudentTypeFilter;
+  query?: string;
+  studentId?: string;
+}) {
+  const params = new URLSearchParams();
+  if (view === "history") params.set("view", "history");
+  if (type && type !== "all") params.set("type", type);
+  if (query) params.set("q", query);
+  if (studentId) params.set("studentId", studentId);
+  const search = params.toString();
+  return `/finance/payments${search ? `?${search}` : ""}`;
+}
+
 function formatDate(value: string) {
   if (!value) return "Not set";
   return new Intl.DateTimeFormat("en", {
@@ -189,7 +211,13 @@ function isActiveFinanceStudent(student: StudentDocument) {
   return !student.studentStatus || student.studentStatus === "Active";
 }
 
-async function getStudents(query = "", unpaidByStudent: FinancePaymentOverview["unpaidByStudent"] = {}, showArchived = false): Promise<Student[]> {
+function matchesStudentType(student: StudentDocument, studentType: StudentTypeFilter) {
+  if (studentType === "group") return student.classType === "Basic Group";
+  if (studentType === "private") return student.classType !== "Basic Group";
+  return true;
+}
+
+async function getStudents(query = "", unpaidByStudent: FinancePaymentOverview["unpaidByStudent"] = {}, showArchived = false, studentType: StudentTypeFilter = "all"): Promise<Student[]> {
   const db = await getMongoDb();
   const search = query.trim();
   const searchFilter: Filter<StudentDocument> = search
@@ -209,6 +237,7 @@ async function getStudents(query = "", unpaidByStudent: FinancePaymentOverview["
     .toArray()) as WithId<StudentDocument>[];
 
   return docs
+    .filter((doc) => matchesStudentType(doc, studentType))
     .filter((doc) => showArchived || isActiveFinanceStudent(doc) || (unpaidByStudent[doc.studentId || ""]?.count || 0) > 0)
     .map((doc) => ({
     id: doc._id.toString(),
@@ -225,10 +254,10 @@ async function getStudents(query = "", unpaidByStudent: FinancePaymentOverview["
     totalUnpaid: unpaidByStudent[doc.studentId || ""]?.total || 0
   }))
     .sort((left, right) => right.unpaidCount - left.unpaidCount || left.studentName.localeCompare(right.studentName))
-    .slice(0, search ? 20 : 8);
+    .slice(0, search ? 50 : 100);
 }
 
-async function getSelectedStudent(studentId = "", unpaidByStudent: FinancePaymentOverview["unpaidByStudent"] = {}, showArchived = false) {
+async function getSelectedStudent(studentId = "", unpaidByStudent: FinancePaymentOverview["unpaidByStudent"] = {}, showArchived = false, studentType: StudentTypeFilter = "all") {
   if (!studentId) return null;
 
   const db = await getMongoDb();
@@ -236,6 +265,7 @@ async function getSelectedStudent(studentId = "", unpaidByStudent: FinancePaymen
     $and: [{ studentId }, getCourseStudentFilter()]
   });
   if (!doc) return null;
+  if (!matchesStudentType(doc, studentType)) return null;
   if (!showArchived && !isActiveFinanceStudent(doc) && !(unpaidByStudent[doc.studentId || ""]?.count > 0)) return null;
 
   return {
@@ -382,7 +412,7 @@ async function getAuthenticatedFinanceEmployee() {
 export default async function FinancePaymentsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ q?: string | string[]; studentId?: string | string[]; view?: string | string[] }>;
+  searchParams?: Promise<{ q?: string | string[]; studentId?: string | string[]; view?: string | string[]; type?: string | string[] }>;
 }) {
   noStore();
   const financeEmployee = await getAuthenticatedFinanceEmployee();
@@ -390,6 +420,8 @@ export default async function FinancePaymentsPage({
   const searchQuery = Array.isArray(resolvedSearchParams?.q) ? resolvedSearchParams?.q[0] || "" : resolvedSearchParams?.q || "";
   const selectedStudentId = Array.isArray(resolvedSearchParams?.studentId) ? resolvedSearchParams?.studentId[0] || "" : resolvedSearchParams?.studentId || "";
   const viewMode = Array.isArray(resolvedSearchParams?.view) ? resolvedSearchParams?.view[0] || "" : resolvedSearchParams?.view || "";
+  const rawStudentType = Array.isArray(resolvedSearchParams?.type) ? resolvedSearchParams?.type[0] || "" : resolvedSearchParams?.type || "";
+  const studentType: StudentTypeFilter = rawStudentType === "group" || rawStudentType === "private" ? rawStudentType : "all";
   const showArchived = viewMode === "history";
 
   if (!financeEmployee) {
@@ -410,8 +442,8 @@ export default async function FinancePaymentsPage({
   const closedPeriodKeys = await getClosedBillingPeriodKeys(db);
   const financeOverview = await getFinancePaymentOverview(closedPeriodKeys);
   const [students, selectedStudent] = await Promise.all([
-    getStudents(searchQuery, financeOverview.unpaidByStudent, showArchived),
-    getSelectedStudent(selectedStudentId, financeOverview.unpaidByStudent, showArchived)
+    getStudents(searchQuery, financeOverview.unpaidByStudent, showArchived, studentType),
+    getSelectedStudent(selectedStudentId, financeOverview.unpaidByStudent, showArchived, studentType)
   ]);
   const { summary: financeSummary, pendingReceiptStudents } = financeOverview;
   const isGroupStudent = selectedStudent?.classType === "Basic Group";
@@ -482,6 +514,7 @@ export default async function FinancePaymentsPage({
           <Card className="p-4">
             <form action="/finance/payments" className="flex flex-col gap-3 md:flex-row">
               <input type="hidden" name="view" value={showArchived ? "history" : "active"} />
+              <input type="hidden" name="type" value={studentType} />
               <label className="relative flex-1">
                 <span className="sr-only">Search students</span>
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
@@ -497,13 +530,21 @@ export default async function FinancePaymentsPage({
                 Search
               </Button>
             </form>
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button asChild size="sm" variant={showArchived ? "secondary" : "primary"}>
-                <a href={`/finance/payments${selectedStudentId ? `?studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Active Payments</a>
+                <a href={paymentsHref({ type: studentType, query: searchQuery, studentId: selectedStudentId })}>Active Payments</a>
               </Button>
               <Button asChild size="sm" variant={showArchived ? "primary" : "secondary"}>
-                <a href={`/finance/payments?view=history${selectedStudentId ? `&studentId=${encodeURIComponent(selectedStudentId)}` : ""}`}>Archived History</a>
+                <a href={paymentsHref({ view: "history", type: studentType, query: searchQuery, studentId: selectedStudentId })}>Archived History</a>
               </Button>
+              <span className="mx-1 hidden w-px self-stretch bg-slate-200 sm:block" aria-hidden="true" />
+              {(["all", "private", "group"] as const).map((type) => (
+                <Button key={type} asChild size="sm" variant={studentType === type ? "primary" : "secondary"}>
+                  <a href={paymentsHref({ view: showArchived ? "history" : undefined, type, query: searchQuery })}>
+                    {type === "all" ? "All Students" : type === "private" ? "Private Students" : "Group Students"}
+                  </a>
+                </Button>
+              ))}
             </div>
           </Card>
 
@@ -513,7 +554,7 @@ export default async function FinancePaymentsPage({
               {students.map((student) => (
                 <a
                   key={student.id}
-                  href={`/finance/payments?studentId=${encodeURIComponent(student.studentId)}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}${showArchived ? "&view=history" : ""}`}
+                  href={paymentsHref({ view: showArchived ? "history" : undefined, type: studentType, query: searchQuery, studentId: student.studentId })}
                   className={`focus-ring rounded-lg border p-4 transition hover:border-lead-blue hover:bg-blue-50 ${
                     selectedStudent?.studentId === student.studentId ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white"
                   }`}
