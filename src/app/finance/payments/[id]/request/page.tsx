@@ -34,6 +34,9 @@ type PaymentDocument = {
   billingMonth?: number;
   billingYear?: number;
   batchName?: string;
+  baseAmountDue?: number;
+  registrationFeeIncluded?: boolean;
+  registrationFeeAmount?: number;
 };
 
 type StudentDocument = {
@@ -61,6 +64,9 @@ type PaymentRequest = {
   billingMonth: number;
   billingYear: number;
   batchName: string;
+  baseAmountDue: number;
+  registrationFeeIncluded: boolean;
+  registrationFeeAmount: number;
 };
 
 function formatDate(value: string) {
@@ -101,7 +107,10 @@ async function getPaymentRequest(id: string): Promise<PaymentRequest | null> {
     source: payment.source || "",
     billingMonth: payment.billingMonth || 0,
     billingYear: payment.billingYear || 0,
-    batchName: payment.batchName || ""
+    batchName: payment.batchName || "",
+    baseAmountDue: payment.baseAmountDue || 0,
+    registrationFeeIncluded: payment.registrationFeeIncluded === true,
+    registrationFeeAmount: payment.registrationFeeAmount || 0
   };
 }
 
@@ -210,6 +219,12 @@ export default async function PaymentRequestPage({
               </div>
               <p className="font-heading text-4xl font-extrabold text-lead-navy">{formatRupiah(payment.amountDue)}</p>
             </div>
+            {payment.registrationFeeIncluded ? (
+              <div className="mt-4 grid gap-2 border-t border-blue-100 pt-4 text-sm sm:grid-cols-2">
+                <p className="text-lead-gray">Monthly group course fee <strong className="float-right text-lead-navy">{formatRupiah(payment.baseAmountDue)}</strong></p>
+                <p className="text-lead-gray">One-time registration fee <strong className="float-right text-lead-navy">{formatRupiah(payment.registrationFeeAmount)}</strong></p>
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-lg border border-slate-200 p-5">
@@ -248,7 +263,9 @@ export default async function PaymentRequestPage({
             status: payment.status,
             isGroupInvoice,
             billingLabel,
-            batchName: payment.batchName
+            batchName: payment.batchName,
+            baseAmountDue: payment.baseAmountDue ? formatRupiah(payment.baseAmountDue) : undefined,
+            registrationFeeAmount: payment.registrationFeeIncluded ? formatRupiah(payment.registrationFeeAmount) : undefined
           }}
         />
       </div>

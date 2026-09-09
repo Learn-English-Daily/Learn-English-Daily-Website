@@ -8,6 +8,10 @@ export const groupMonthlyPrices: Record<string, number> = {
   "Fluent English": 260000
 };
 
+export const GROUP_REGISTRATION_FEE = 50000;
+export const groupRegistrationFeeStatuses = ["pending", "paid", "waived"] as const;
+export type GroupRegistrationFeeStatus = (typeof groupRegistrationFeeStatuses)[number];
+
 let groupInvoiceIndexPromise: Promise<string> | null = null;
 
 async function ensureGroupInvoiceIndex(db: Db) {
@@ -29,6 +33,7 @@ type GroupStudentInvoiceProfile = {
   activeBatchId?: string;
   activeBatchName?: string;
   batchProgram?: string;
+  groupRegistrationFeeStatus?: GroupRegistrationFeeStatus;
 };
 
 export function getGroupMonthlyPrice(program: string) {
@@ -67,6 +72,25 @@ export async function ensureGroupMonthlyInvoice(
     billingYear: period.year,
     source: { $in: ["batch-monthly", "batch-assessment"] }
   });
+  const firstGroupInvoice = await payments.findOne(
+    {
+      studentId: student.studentId,
+      source: { $in: ["batch-monthly", "batch-assessment"] }
+    },
+    { sort: { createdAt: 1, _id: 1 } }
+  );
+
+  const registrationFeeIncluded = student.groupRegistrationFeeStatus === "pending" && (
+    !firstGroupInvoice || Boolean(existing?._id && firstGroupInvoice._id.equals(existing._id))
+  );
+  const registrationFeeAmount = registrationFeeIncluded ? GROUP_REGISTRATION_FEE : 0;
+  const totalAmountDue = amountDue + registrationFeeAmount;
+  const invoiceLineItems = [
+    { type: "monthly-course-fee", label: "Monthly group course fee", amount: amountDue },
+    ...(registrationFeeIncluded
+      ? [{ type: "group-registration-fee", label: "One-time registration fee", amount: registrationFeeAmount }]
+      : [])
+  ];
 
   if (existing) {
     const preservePaidAmount = existing.status === "Paid";
@@ -84,8 +108,12 @@ export async function ensureGroupMonthlyInvoice(
           billingYear: period.year,
           billingPeriod: period.billingPeriod,
           includedMeetings: 12,
+          baseAmountDue: amountDue,
+          registrationFeeIncluded,
+          registrationFeeAmount,
+          invoiceLineItems,
           attendanceStatus: "Monthly group package - 12 meetings",
-          ...(!preservePaidAmount ? { amountDue, source: "batch-monthly" } : {}),
+          ...(!preservePaidAmount ? { amountDue: totalAmountDue, source: "batch-monthly" } : {}),
           updatedAt: now
         }
       }
@@ -105,7 +133,11 @@ export async function ensureGroupMonthlyInvoice(
         batchName: student.activeBatchName || "",
         billingPeriod: period.billingPeriod,
         includedMeetings: 12,
-        amountDue,
+        baseAmountDue: amountDue,
+        registrationFeeIncluded,
+        registrationFeeAmount,
+        invoiceLineItems,
+        amountDue: totalAmountDue,
         attendanceStatus: "Monthly group package - 12 meetings",
         updatedAt: now
       },

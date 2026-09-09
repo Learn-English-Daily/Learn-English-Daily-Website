@@ -17,6 +17,8 @@ type PaymentRequestData = {
   isGroupInvoice?: boolean;
   billingLabel?: string;
   batchName?: string;
+  baseAmountDue?: string;
+  registrationFeeAmount?: string;
 };
 
 function safeFilePart(value: string) {
@@ -102,6 +104,13 @@ export function PaymentRequestActions({ receipt }: { receipt: PaymentRequestData
       pdf.setTextColor(navy);
       pdf.setFontSize(24);
       pdf.text(receipt.amountDue, pageWidth - 25, 148, { align: "right" });
+
+      if (receipt.registrationFeeAmount && receipt.baseAmountDue) {
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(gray);
+        pdf.text(`Monthly course fee: ${receipt.baseAmountDue}`, 25, 151);
+        pdf.text(`One-time registration fee: ${receipt.registrationFeeAmount}`, 25, 155);
+      }
 
       pdf.setDrawColor("#E2E8F0");
       pdf.roundedRect(18, 171, pageWidth - 36, 38, 3, 3, "S");

@@ -163,6 +163,13 @@ export async function POST(request: Request) {
       studentId,
       studentIdType: joinedStudent ? "student" : "trial",
       studentStatus: "Active",
+      ...(registration.classType === "Basic Group"
+        ? {
+            groupRegistrationFeeStatus: "pending" as const,
+            groupRegistrationFeeAmount: 50000,
+            groupRegistrationFeeCreated: "One-time Basic Group enrollment fee"
+          }
+        : {}),
       parentAccessToken: generateParentAccessToken(),
       updatedAt: now
     };

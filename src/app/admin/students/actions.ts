@@ -34,6 +34,8 @@ type EditableStudentDocument = {
   courseHistory?: CourseHistoryEntry[];
   studentStatus?: StudentStatus;
   statusHistory?: StudentStatusHistoryEntry[];
+  classType?: string;
+  groupRegistrationFeeStatus?: "pending" | "paid" | "waived";
   [key: string]: unknown;
 };
 
@@ -145,6 +147,7 @@ export async function updateStudentRegistration(formData: FormData) {
     existingRegistration?.courseJoined && existingRegistration.courseJoined !== registration.courseJoined
   );
   const now = new Date();
+  const isNewGroupEnrollment = registration.classType === "Basic Group" && existingRegistration?.classType !== "Basic Group";
   const courseHistoryEntry: CourseHistoryEntry | null = courseChanged
     ? {
         fromCourse: existingRegistration?.courseJoined || "",
@@ -177,6 +180,13 @@ export async function updateStudentRegistration(formData: FormData) {
               studentIdType: isJoiningCourse ? "student" : existingRegistration?.studentIdType || "trial"
             }),
           updatedAt: now,
+          ...(isNewGroupEnrollment
+            ? {
+                groupRegistrationFeeStatus: "pending",
+                groupRegistrationFeeAmount: 50000,
+                groupRegistrationFeeCreated: "One-time Basic Group enrollment fee"
+              }
+            : {}),
           ...(courseHistoryEntry
             ? { courseHistory: { $concatArrays: [{ $ifNull: ["$courseHistory", []] }, [courseHistoryEntry]] } }
             : {})
@@ -202,7 +212,10 @@ export async function updateStudentRegistration(formData: FormData) {
     classMode: registration.classMode,
     activeBatchId: typeof existingRegistration?.activeBatchId === "string" ? existingRegistration.activeBatchId : "",
     activeBatchName: typeof existingRegistration?.activeBatchName === "string" ? existingRegistration.activeBatchName : "",
-    batchProgram: typeof existingRegistration?.batchProgram === "string" ? existingRegistration.batchProgram : ""
+    batchProgram: typeof existingRegistration?.batchProgram === "string" ? existingRegistration.batchProgram : "",
+    groupRegistrationFeeStatus: isNewGroupEnrollment
+      ? "pending"
+      : existingRegistration?.groupRegistrationFeeStatus
   });
 
   if (currentStudentId) {

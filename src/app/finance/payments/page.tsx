@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { logoutFinance } from "@/app/finance/actions";
 import { FinanceLoginForm } from "@/app/finance/login-form";
-import { updateStudentPaymentStatus } from "@/app/finance/payments/actions";
+import { updateStudentPaymentStatus, waiveGroupRegistrationFee } from "@/app/finance/payments/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { FinancePageHeader } from "@/components/finance/finance-page-header";
 import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
@@ -78,6 +78,9 @@ type PaymentDocument = {
   amountPerMeeting?: number;
   batchName?: string;
   attendanceStatus?: string;
+  baseAmountDue?: number;
+  registrationFeeIncluded?: boolean;
+  registrationFeeAmount?: number;
   createdAt?: Date;
 };
 
@@ -99,6 +102,9 @@ type Payment = {
   amountPerMeeting: number;
   batchName: string;
   attendanceStatus: string;
+  baseAmountDue: number;
+  registrationFeeIncluded: boolean;
+  registrationFeeAmount: number;
   classMode: string;
   createdAt: string;
 };
@@ -283,6 +289,9 @@ async function getPayments(student: Student, showArchived = false, closedPeriodK
     amountPerMeeting: doc.amountPerMeeting || 0,
     batchName: doc.batchName || "",
     attendanceStatus: doc.attendanceStatus || "",
+    baseAmountDue: doc.baseAmountDue || 0,
+    registrationFeeIncluded: doc.registrationFeeIncluded === true,
+    registrationFeeAmount: doc.registrationFeeAmount || 0,
     classMode: doc.classMode || student.classMode || "",
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : ""
   }));
@@ -599,6 +608,12 @@ export default async function FinancePaymentsPage({
                               : `${formatDate(payment.meetingDate)} / ${formatRupiah(payment.amountDue)}`}
                           </p>
                           <p className="mt-1 text-xs text-lead-gray">Paid date: {payment.paidDate ? formatDate(payment.paidDate) : "Not paid yet"} / Method: {payment.paymentMethod || "Not set"}</p>
+                          {payment.registrationFeeIncluded ? (
+                            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                              <p className="font-bold">First group invoice includes one-time registration</p>
+                              <p className="mt-1">Monthly course fee: {formatRupiah(payment.baseAmountDue)} + Registration fee: {formatRupiah(payment.registrationFeeAmount)}</p>
+                            </div>
+                          ) : null}
                           {payment.notes ? <p className="mt-2 text-sm leading-6 text-lead-gray">{payment.notes}</p> : null}
                           {payment.status === "Unpaid" && !showArchived ? (
                             <Button asChild variant="secondary" size="sm" className="mt-3">
@@ -610,7 +625,8 @@ export default async function FinancePaymentsPage({
                           ) : null}
                         </div>
                         {!showArchived ? (
-                        <ActionFeedbackForm action={updateStudentPaymentStatus} successMessage="Payment updated successfully." className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
+                        <div className="lg:min-w-[360px]">
+                        <ActionFeedbackForm action={updateStudentPaymentStatus} successMessage="Payment updated successfully." className="grid gap-2 sm:grid-cols-2">
                           <input type="hidden" name="id" value={payment.id} />
                           <select name="status" defaultValue={payment.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
                             {paymentStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -640,6 +656,14 @@ export default async function FinancePaymentsPage({
                           </div>
                           <Button type="submit" size="sm" className="sm:col-span-2">Update</Button>
                         </ActionFeedbackForm>
+                        {payment.registrationFeeIncluded && payment.status === "Unpaid" && !showArchived ? (
+                          <ActionFeedbackForm action={waiveGroupRegistrationFee} successMessage="Registration fee waived." className="mt-3 grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:grid-cols-[1fr_auto]">
+                            <input type="hidden" name="id" value={payment.id} />
+                            <input name="reason" required minLength={3} placeholder="Reason for waiving registration fee" className="focus-ring rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-lead-navy" />
+                            <Button type="submit" variant="secondary" className="text-amber-800">Waive Rp50,000 fee</Button>
+                          </ActionFeedbackForm>
+                        ) : null}
+                        </div>
                         ) : null}
                       </div>
                     </div>

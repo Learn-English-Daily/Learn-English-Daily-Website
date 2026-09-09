@@ -39,6 +39,8 @@ async function assertFinance() {
   if (!employee?.username || !isValidFinanceSession(employee.id, employee.username, session)) {
     throw new Error("Unauthorized");
   }
+
+  return employee;
 }
 
 export async function updateStudentPaymentStatus(formData: FormData) {
@@ -69,6 +71,9 @@ export async function updateStudentPaymentStatus(formData: FormData) {
     billingMonth?: number;
     billingYear?: number;
     meetingDate?: string;
+    registrationFeeIncluded?: boolean;
+    registrationFeeAmount?: number;
+    baseAmountDue?: number;
   }>(getStudentPaymentsCollectionName()).findOne({ _id: new ObjectId(id) });
 
   const period = getRecordBillingPeriod(existingPayment || {});
@@ -112,8 +117,102 @@ export async function updateStudentPaymentStatus(formData: FormData) {
     }
   );
 
+  if (status === "Paid" && existingPayment?.registrationFeeIncluded && existingPayment.studentId) {
+    await db.collection(getStudentRegistrationCollectionName()).updateOne(
+      { studentId: existingPayment.studentId },
+      {
+        $set: {
+          groupRegistrationFeeStatus: "paid",
+          groupRegistrationFeePaidAt: new Date(),
+          groupRegistrationFeeInvoiceId: id,
+          updatedAt: new Date()
+        }
+      }
+    );
+  } else if (status === "Unpaid" && existingPayment?.registrationFeeIncluded && existingPayment.studentId) {
+    await db.collection(getStudentRegistrationCollectionName()).updateOne(
+      { studentId: existingPayment.studentId },
+      {
+        $set: {
+          groupRegistrationFeeStatus: "pending",
+          groupRegistrationFeeInvoiceId: id,
+          updatedAt: new Date()
+        },
+        $unset: { groupRegistrationFeePaidAt: "" }
+      }
+    );
+  }
+
   revalidatePath("/finance/payments");
   revalidatePath("/ceo/finance");
+}
+
+export async function waiveGroupRegistrationFee(formData: FormData) {
+  const financeEmployee = await assertFinance();
+
+  const id = clean(formData.get("id"));
+  const reason = clean(formData.get("reason"));
+  if (!ObjectId.isValid(id) || reason.length < 3) {
+    return { success: false, message: "Enter a short reason before waiving the registration fee." };
+  }
+
+  const db = await getMongoDb();
+  const payment = await db.collection<{
+    studentId?: string;
+    status?: PaymentStatus;
+    registrationFeeIncluded?: boolean;
+    registrationFeeAmount?: number;
+    baseAmountDue?: number;
+    billingMonth?: number;
+    billingYear?: number;
+    meetingDate?: string;
+  }>(getStudentPaymentsCollectionName()).findOne({ _id: new ObjectId(id) });
+
+  if (!payment?.studentId || !payment.registrationFeeIncluded || payment.status === "Paid") {
+    return { success: false, message: "Only an unpaid invoice containing a registration fee can be waived." };
+  }
+  if (await isBillingPeriodClosed(db, getRecordBillingPeriod(payment))) {
+    return { success: false, message: "This month is closed. The invoice cannot be changed." };
+  }
+
+  const baseAmountDue = payment.baseAmountDue || 0;
+  const now = new Date();
+  const waiverResult = await db.collection(getStudentPaymentsCollectionName()).updateOne(
+    { _id: new ObjectId(id), status: { $ne: "Paid" }, registrationFeeIncluded: true },
+    {
+      $set: {
+        amountDue: baseAmountDue,
+        registrationFeeIncluded: false,
+        registrationFeeAmount: 0,
+        invoiceLineItems: [{ type: "monthly-course-fee", label: "Monthly group course fee", amount: baseAmountDue }],
+        registrationFeeWaived: true,
+        registrationFeeWaiverReason: reason,
+        registrationFeeWaivedAt: now,
+        updatedAt: now
+      }
+    }
+  );
+  if (!waiverResult.modifiedCount) {
+    return { success: false, message: "The invoice changed before the waiver was saved. Refresh and try again." };
+  }
+  await db.collection(getStudentRegistrationCollectionName()).updateOne(
+    { studentId: payment.studentId },
+    {
+      $set: {
+        groupRegistrationFeeStatus: "waived",
+        groupRegistrationFeeWaiverReason: reason,
+        groupRegistrationFeeWaivedAt: now,
+        groupRegistrationFeeWaivedByEmployeeId: financeEmployee.id,
+        groupRegistrationFeeWaivedByName: financeEmployee.name,
+        groupRegistrationFeeInvoiceId: id,
+        updatedAt: now
+      }
+    }
+  );
+
+  revalidatePath("/finance/payments");
+  revalidatePath("/ceo/finance");
+  return { success: true };
 }
 
 export async function closeMonthlyBalance(formData: FormData) {
