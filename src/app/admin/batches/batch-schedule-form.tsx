@@ -44,7 +44,7 @@ export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMee
         <input type="hidden" name="batchId" value={batchId} />
         <input type="hidden" name="scheduleMode" value={mode} />
         <label className="grid gap-2 text-sm font-bold text-lead-navy">Class Mode
-          <select name="classMode" defaultValue="Online" required className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100">
+          <select name="classMode" defaultValue="Offline" required className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100">
             <option value="Online">Online</option>
             <option value="Offline">Offline</option>
           </select>

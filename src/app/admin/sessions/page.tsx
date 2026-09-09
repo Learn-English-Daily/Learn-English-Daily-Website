@@ -187,7 +187,7 @@ async function getGroupSchedulingData() {
       sessionDate: session.sessionDate,
       startTime: session.startTime,
       endTime: session.endTime,
-      classMode: session.classMode || "Online",
+      classMode: session.classMode || "Offline",
       topic: session.topic || "",
       teacherName: session.teacherName || "Not assigned",
       studentCount: session.studentSnapshot?.length || 0,
@@ -658,13 +658,15 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                   </div>
                   {groupSession.status === "Scheduled" && !groupSession.attendanceMarked ? (
                     <details className="mt-3 rounded-lg border border-blue-100 bg-blue-50/50">
-                      <summary className="focus-ring cursor-pointer px-4 py-3 text-sm font-bold text-lead-blue">Edit class time</summary>
-                      <ActionFeedbackForm action={updateBatchClassTime} successMessage="Class time updated." className="grid gap-3 border-t border-blue-100 p-4 sm:grid-cols-2">
+                      <summary className="focus-ring cursor-pointer px-4 py-3 text-sm font-bold text-lead-blue">Edit class</summary>
+                      <ActionFeedbackForm action={updateBatchClassTime} successMessage="Group class updated." className="grid gap-3 border-t border-blue-100 p-4 sm:grid-cols-2">
                         <input type="hidden" name="sessionId" value={groupSession.id} />
+                        <Field label="Class Date"><input name="sessionDate" type="date" required defaultValue={groupSession.sessionDate} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2" /></Field>
+                        <Field label="Class Mode"><select name="classMode" required defaultValue={groupSession.classMode || "Offline"} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2"><option value="Offline">Offline</option><option value="Online">Online</option></select></Field>
                         <Field label="From (WIB)"><input name="startTime" type="time" required defaultValue={groupSession.startTime} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2" /></Field>
                         <Field label="To (WIB)"><input name="endTime" type="time" required defaultValue={groupSession.endTime} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2" /></Field>
-                        <p className="text-xs text-lead-gray sm:col-span-2">Updates this class only. The date, meeting number and batch's regular time stay the same.</p>
-                        <Button type="submit" size="sm" className="sm:w-fit">Save Class Time</Button>
+                        <p className="text-xs text-lead-gray sm:col-span-2">Updates this class only. Its meeting number and the batch's regular schedule stay unchanged.</p>
+                        <Button type="submit" size="sm" className="sm:w-fit">Save Class</Button>
                       </ActionFeedbackForm>
                     </details>
                   ) : null}

@@ -407,19 +407,22 @@ export async function deleteBatchClass(formData: FormData) {
 export async function updateBatchClassTime(formData: FormData) {
   const admin = await assertAdmin();
   const sessionId = clean(formData.get("sessionId"));
+  const sessionDate = clean(formData.get("sessionDate"));
   const startTime = clean(formData.get("startTime"));
   const endTime = clean(formData.get("endTime"));
+  const classMode = clean(formData.get("classMode"));
   const validTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-  if (!ObjectId.isValid(sessionId) || !validTime.test(startTime) || !validTime.test(endTime) || endTime <= startTime) {
-    return { success: false, message: "Enter valid WIB times, with the end after the start." };
+  if (!ObjectId.isValid(sessionId) || !/^\d{4}-\d{2}-\d{2}$/.test(sessionDate) || !validTime.test(startTime) || !validTime.test(endTime) || endTime <= startTime || !isClassMode(classMode)) {
+    return { success: false, message: "Enter a valid class date, WIB time range, and class mode." };
   }
   const db = await getMongoDb();
   const result = await db.collection(getBatchClassSessionsCollectionName()).updateOne(
     { _id: new ObjectId(sessionId), status: "Scheduled", attendanceMarked: { $ne: true } },
-    { $set: { startTime, endTime, updatedAt: new Date(), updatedBy: admin.name } }
+    { $set: { sessionDate, startTime, endTime, classMode, updatedAt: new Date(), updatedBy: admin.name } }
   );
   if (!result.matchedCount) return { success: false, message: "Only scheduled classes without attendance can be edited. Refresh the page." };
   revalidatePath("/admin/sessions");
+  revalidatePath("/admin");
   revalidatePath("/teacher");
   revalidatePath("/teacher/group-classes");
   return { success: true };

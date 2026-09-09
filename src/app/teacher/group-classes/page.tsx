@@ -86,7 +86,7 @@ export default async function TeacherGroupClassesPage() {
             <Card id={`group-session-${session._id.toString()}`} key={session._id.toString()} className="scroll-mt-6 overflow-hidden">
               <div className="border-b border-blue-100 bg-blue-50 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><h2 className="font-heading text-xl font-extrabold text-lead-navy">{session.batchName} / Meeting {session.meetingNumber}</h2><p className="mt-1 text-sm text-lead-gray">{displayDate(session.sessionDate)} / {session.startTime} - {session.endTime} WIB / {session.classMode || "Online"}{session.topic ? ` / ${session.topic}` : ""}</p></div>
+                  <div><h2 className="font-heading text-xl font-extrabold text-lead-navy">{session.batchName} / Meeting {session.meetingNumber}</h2><p className="mt-1 text-sm text-lead-gray">{displayDate(session.sessionDate)} / {session.startTime} - {session.endTime} WIB / {session.classMode || "Offline"}{session.topic ? ` / ${session.topic}` : ""}</p></div>
                   <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Attendance needed</span>
                 </div>
               </div>
@@ -124,5 +124,5 @@ function Metric({ label, value, icon: Icon, tone }: { label: string; value: numb
 }
 
 function SessionList({ title, sessions, empty }: { title: string; sessions: Array<BatchClassSessionDocument & { _id: { toString(): string } }>; empty: string }) {
-  return <Card className="p-5"><h2 className="font-heading text-xl font-extrabold text-lead-navy">{title}</h2><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{sessions.map((session) => <div key={session._id.toString()} className="rounded-xl bg-slate-50 p-3"><p className="font-bold text-lead-navy">{session.batchName} / Meeting {session.meetingNumber}</p><p className="mt-1 flex items-center gap-1 text-xs text-lead-gray"><Clock3 className="h-3.5 w-3.5" /> {displayDate(session.sessionDate)} / {session.startTime} - {session.endTime} WIB / {session.classMode || "Online"}</p></div>)}{!sessions.length ? <p className="text-sm text-lead-gray">{empty}</p> : null}</div></Card>;
+  return <Card className="p-5"><h2 className="font-heading text-xl font-extrabold text-lead-navy">{title}</h2><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{sessions.map((session) => <div key={session._id.toString()} className="rounded-xl bg-slate-50 p-3"><p className="font-bold text-lead-navy">{session.batchName} / Meeting {session.meetingNumber}</p><p className="mt-1 flex items-center gap-1 text-xs text-lead-gray"><Clock3 className="h-3.5 w-3.5" /> {displayDate(session.sessionDate)} / {session.startTime} - {session.endTime} WIB / {session.classMode || "Offline"}</p></div>)}{!sessions.length ? <p className="text-sm text-lead-gray">{empty}</p> : null}</div></Card>;
 }
