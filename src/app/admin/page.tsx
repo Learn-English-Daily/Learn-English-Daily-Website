@@ -1,12 +1,12 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { redirect } from "next/navigation";
 import {
   AlertCircle,
   ArrowRight,
   CalendarCheck,
   CalendarClock,
   Inbox,
+  Layers3,
   Star,
   Users
 } from "lucide-react";
@@ -30,6 +30,7 @@ import {
 } from "@/lib/batch-class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getReviewCollectionName } from "@/lib/reviews";
+import { getBatchesCollectionName } from "@/lib/assessments";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, getTrialStudentFilter } from "@/lib/student-registration";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,7 @@ type DashboardData = {
   pendingReviews: number;
   currentStudents: number;
   trialStudents: number;
+  activeBatches: number;
   latestInquiry: {
     name: string;
     goal: string;
@@ -87,7 +89,7 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-async function getDashboardData(): Promise<DashboardData> {
+async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
   const db = await getMongoDb();
   const today = getTodayJakarta();
   const leadsCollectionName = process.env.MONGODB_COLLECTION || "leads";
@@ -99,9 +101,10 @@ async function getDashboardData(): Promise<DashboardData> {
     pendingReviews,
     currentStudents,
     trialStudents,
+    activeBatches,
     latestInquiry
   ] = await Promise.all([
-    db
+    groupOnly ? Promise.resolve([] as WithId<ClassSessionDocument>[]) : db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
       .find({ status: { $ne: "Completed" } })
       .sort({ scheduledAt: 1 })
@@ -109,15 +112,16 @@ async function getDashboardData(): Promise<DashboardData> {
       .toArray() as Promise<WithId<ClassSessionDocument>[]>,
     db
       .collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
-      .find({ status: "Scheduled", attendanceMarked: { $ne: true } })
+      .find({ status: { $ne: "Cancelled" } })
       .sort({ sessionDate: 1, startTime: 1 })
       .limit(500)
       .toArray() as Promise<WithId<BatchClassSessionDocument>[]>,
-    db.collection<LeadDocument>(leadsCollectionName).countDocuments(),
-    db.collection<ReviewDocument>(getReviewCollectionName()).countDocuments({ status: "pending" }),
-    db.collection(getStudentRegistrationCollectionName()).countDocuments(getActiveStudentFilter()),
-    db.collection(getStudentRegistrationCollectionName()).countDocuments(getTrialStudentFilter()),
-    db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next()
+    groupOnly ? Promise.resolve(0) : db.collection<LeadDocument>(leadsCollectionName).countDocuments(),
+    groupOnly ? Promise.resolve(0) : db.collection<ReviewDocument>(getReviewCollectionName()).countDocuments({ status: "pending" }),
+    db.collection(getStudentRegistrationCollectionName()).countDocuments(groupOnly ? { $and: [getActiveStudentFilter(), { classType: "Basic Group" }] } : getActiveStudentFilter()),
+    groupOnly ? Promise.resolve(0) : db.collection(getStudentRegistrationCollectionName()).countDocuments(getTrialStudentFilter()),
+    db.collection(getBatchesCollectionName()).countDocuments({ status: "active" }),
+    groupOnly ? Promise.resolve(null) : db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next()
   ]);
 
   const privateTodaySessions = sessionDocs
@@ -143,7 +147,7 @@ async function getDashboardData(): Promise<DashboardData> {
       meetingNumber: doc.meetingNumber,
       scheduledAt: `${doc.sessionDate}T${doc.startTime}:00+07:00`,
       teacherNames: doc.teacherName ? [doc.teacherName] : [],
-      status: hasBatchClassEnded(doc) ? "Needs Attendance" : "Scheduled"
+      status: doc.status === "Completed" || doc.attendanceMarked ? "Completed" : hasBatchClassEnded(doc) ? "Needs Attendance" : "Scheduled"
     }));
 
   const todaySessions = [...privateTodaySessions, ...groupTodaySessions]
@@ -158,7 +162,7 @@ async function getDashboardData(): Promise<DashboardData> {
         endsAt: doc.endsAt
       }) === "Needs Attendance"
   ).length;
-  const groupNeedsAttendance = groupSessionDocs.filter((doc) => hasBatchClassEnded(doc)).length;
+  const groupNeedsAttendance = groupSessionDocs.filter((doc) => doc.status === "Scheduled" && !doc.attendanceMarked && hasBatchClassEnded(doc)).length;
   const needsAttendance = privateNeedsAttendance + groupNeedsAttendance;
 
   return {
@@ -168,6 +172,7 @@ async function getDashboardData(): Promise<DashboardData> {
     pendingReviews,
     currentStudents,
     trialStudents,
+    activeBatches,
     latestInquiry: latestInquiry
       ? {
           name: latestInquiry.name || "Unknown",
@@ -211,16 +216,15 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
-
-  const [data, admin] = await Promise.all([getDashboardData(), getAuthenticatedAdmin()]);
+  const groupOnly = isGroupStudentAdminSession(session);
+  const [data, admin] = await Promise.all([getDashboardData(groupOnly), getAuthenticatedAdmin()]);
 
   return (
     <main className="min-h-screen bg-lead-soft">
       <AdminPageHeader
         active="dashboard"
-        title="Admin dashboard"
-        description="Start here after login: see today's classes, follow-ups, payments, inquiries, and reviews in one place."
+        title={groupOnly ? "Group administration" : "Admin dashboard"}
+        description={groupOnly ? "Manage group students, batches, and class schedules from one place." : "Start here after login: see today's classes, follow-ups, payments, inquiries, and reviews in one place."}
         userName={admin?.name}
         username={admin?.username}
         logoutAction={logoutAdmin}
@@ -230,8 +234,8 @@ export default async function AdminDashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DashboardKpi icon={CalendarClock} label="Today's classes" value={data.todaySessions.length} detail="Scheduled for today" href="/admin/sessions" />
           <DashboardKpi icon={AlertCircle} label="Need attendance" value={data.needsAttendance} detail="Past classes not closed" href="/admin/sessions" tone="rose" />
-          <DashboardKpi icon={Star} label="Pending reviews" value={data.pendingReviews} detail="Waiting approval" href="/admin/reviews" tone="blue" />
-          <DashboardKpi icon={Users} label="Current students" value={data.currentStudents} detail="Active registrations" href="/admin/students" tone="blue" />
+          {groupOnly ? <DashboardKpi icon={Layers3} label="Active batches" value={data.activeBatches} detail="Current group batches" href="/admin/batches" tone="blue" /> : <DashboardKpi icon={Star} label="Pending reviews" value={data.pendingReviews} detail="Waiting approval" href="/admin/reviews" tone="blue" />}
+          <DashboardKpi icon={Users} label={groupOnly ? "Group students" : "Current students"} value={data.currentStudents} detail="Active registrations" href="/admin/students" tone="blue" />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -270,25 +274,25 @@ export default async function AdminDashboardPage() {
             <Card className="p-5">
               <h2 className="font-heading text-xl font-extrabold text-lead-navy">Quick actions</h2>
               <div className="mt-4 grid gap-3">
-                <QuickAction href="/admin/sessions" label="Schedule class" icon={CalendarClock} />
-                <QuickAction href="/admin/attendance" label="Monitor attendance" icon={CalendarCheck} />
-                <QuickAction href="/admin/students" label="View students" icon={Users} />
-                <QuickAction href="/admin/inquiries" label="View inquiries" icon={Inbox} />
+                <QuickAction href={groupOnly ? "/admin/sessions?type=group" : "/admin/sessions"} label={groupOnly ? "Schedule group classes" : "Schedule class"} icon={CalendarClock} />
+                {groupOnly ? <QuickAction href="/admin/batches" label="Manage batches" icon={Layers3} /> : <QuickAction href="/admin/attendance" label="Monitor attendance" icon={CalendarCheck} />}
+                <QuickAction href="/admin/students" label={groupOnly ? "View group students" : "View students"} icon={Users} />
+                {!groupOnly ? <QuickAction href="/admin/inquiries" label="View inquiries" icon={Inbox} /> : null}
               </div>
             </Card>
 
-            <Card className="p-5">
+            {!groupOnly ? <Card className="p-5">
               <h2 className="font-heading text-xl font-extrabold text-lead-navy">Pipeline</h2>
               <div className="mt-4 grid gap-3 text-sm">
                 <PipelineItem label="Current students" value={data.currentStudents} href="/admin/students" />
                 <PipelineItem label="Trial students" value={data.trialStudents} href="/admin/students/trials" />
                 <PipelineItem label="Total inquiries" value={data.newInquiries} href="/admin/inquiries" />
               </div>
-            </Card>
+            </Card> : null}
           </div>
         </div>
 
-        <div className="grid gap-6">
+        {!groupOnly ? <div className="grid gap-6">
           <InsightCard
             icon={Inbox}
             title="Latest inquiry"
@@ -297,7 +301,7 @@ export default async function AdminDashboardPage() {
             empty="No inquiries yet."
             lines={data.latestInquiry ? [data.latestInquiry.name, data.latestInquiry.goal] : []}
           />
-        </div>
+        </div> : null}
       </section>
     </main>
   );

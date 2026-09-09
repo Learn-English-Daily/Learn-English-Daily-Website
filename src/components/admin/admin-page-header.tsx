@@ -44,7 +44,7 @@ export function AdminPageHeader({
   logoutAction: () => void | Promise<void>;
 }) {
   const access = getAdminAccessForUsername(username || "");
-  const visibleNavItems = adminNavItems.filter((item) => access === "full" || ["sessions", "students", "batches"].includes(item.key));
+  const visibleNavItems = adminNavItems.filter((item) => access === "full" || ["dashboard", "sessions", "students", "batches"].includes(item.key));
 
   return (
     <header className="border-b border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
@@ -72,7 +72,7 @@ export function AdminPageHeader({
           </form>
         </div>
 
-        <nav className={`mt-6 grid gap-3 sm:grid-cols-2 ${access === "full" ? "lg:grid-cols-4 xl:grid-cols-7" : "max-w-xl"}`} aria-label="Admin navigation">
+        <nav className={`mt-6 grid gap-3 ${access === "full" ? "sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7" : "grid-cols-4 overflow-x-auto pb-2"}`} aria-label="Admin navigation">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;
@@ -82,7 +82,7 @@ export function AdminPageHeader({
                 key={item.key}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                className={`focus-ring group rounded-2xl border p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:shadow-soft ${
+                className={`focus-ring group rounded-2xl border p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:shadow-soft ${access === "group-students" ? "min-w-[150px]" : ""} ${
                   isActive
                     ? "border-lead-blue bg-lead-blue text-white"
                     : "border-white/80 bg-white/90 text-lead-navy hover:border-blue-100"

@@ -7,7 +7,6 @@ import { getAdminEmployeeByUsername } from "@/lib/admin-employees";
 import { recordEmployeeLogin } from "@/lib/employee-login-audit";
 import { getMongoDb } from "@/lib/mongodb";
 import { normalizeEmployeeUsername } from "@/lib/teachers";
-import { getAdminAccessForUsername } from "@/lib/admin-permissions";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -46,7 +45,7 @@ export async function loginAdmin(_: unknown, formData: FormData) {
   cookieStore.set(ADMIN_ID_COOKIE, admin.id, cookieOptions);
   cookieStore.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(admin.id, admin.username), cookieOptions);
 
-  redirect(getAdminAccessForUsername(admin.username) === "group-students" ? "/admin/batches" : "/admin");
+  redirect("/admin");
 }
 
 export async function logoutAdmin() {
