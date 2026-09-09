@@ -18,7 +18,8 @@ import { getMongoDb } from "@/lib/mongodb";
 import { ensureGroupMonthlyInvoice } from "@/lib/group-monthly-invoices";
 import {
   getActiveStudentFilter,
-  getStudentRegistrationCollectionName
+  getStudentRegistrationCollectionName,
+  isClassMode
 } from "@/lib/student-registration";
 import { resolveAvailableTeacher } from "@/lib/teachers";
 
@@ -279,9 +280,11 @@ export async function scheduleBatchClasses(formData: FormData) {
   const requestedFirstDate = clean(formData.get("firstDate"));
   const requestedStartTime = clean(formData.get("startTime"));
   const requestedEndTime = clean(formData.get("endTime"));
+  const classMode = clean(formData.get("classMode"));
   const topic = clean(formData.get("topic"));
 
   if (!ObjectId.isValid(batchId)) throw new Error("Select a valid batch.");
+  if (!isClassMode(classMode)) throw new Error("Select Online or Offline for this group schedule.");
 
   const db = await getMongoDb();
   const batch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), status: "active" });
@@ -346,6 +349,7 @@ export async function scheduleBatchClasses(formData: FormData) {
     sessionDate,
     startTime,
     endTime,
+    classMode,
     teacherId: String(batch.teacherId || ""),
     teacherName: String(batch.teacherName || ""),
     topic,
@@ -358,6 +362,7 @@ export async function scheduleBatchClasses(formData: FormData) {
   })));
 
   revalidatePath("/admin/batches");
+  revalidatePath("/admin/sessions");
   revalidatePath("/teacher/group-classes");
 }
 

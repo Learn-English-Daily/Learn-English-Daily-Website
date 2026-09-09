@@ -46,6 +46,7 @@ export type BatchClassSessionDocument = {
   sessionDate: string;
   startTime: string;
   endTime: string;
+  classMode: "Online" | "Offline";
   teacherId: string;
   teacherName: string;
   topic: string;

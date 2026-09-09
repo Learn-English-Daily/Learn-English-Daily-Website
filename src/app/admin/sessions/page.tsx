@@ -127,6 +127,7 @@ type GroupClassSession = {
   sessionDate: string;
   startTime: string;
   endTime: string;
+  classMode: string;
   topic: string;
   teacherName: string;
   studentCount: number;
@@ -186,6 +187,7 @@ async function getGroupSchedulingData() {
       sessionDate: session.sessionDate,
       startTime: session.startTime,
       endTime: session.endTime,
+      classMode: session.classMode || "Online",
       topic: session.topic || "",
       teacherName: session.teacherName || "Not assigned",
       studentCount: session.studentSnapshot?.length || 0,
@@ -634,7 +636,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
               {batchSessions.map((groupSession) => (
                 <div key={groupSession.id} className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div><p className="font-heading text-lg font-bold text-lead-navy">Meeting {groupSession.meetingNumber}</p><p className="mt-1 text-sm font-semibold text-lead-gray">{formatDate(groupSession.sessionDate)} / {groupSession.startTime} - {groupSession.endTime} WIB</p><p className="mt-1 text-sm text-lead-gray">{groupSession.teacherName} / {groupSession.studentCount} students{groupSession.topic ? ` / ${groupSession.topic}` : ""}</p></div>
+                    <div><p className="font-heading text-lg font-bold text-lead-navy">Meeting {groupSession.meetingNumber}</p><p className="mt-1 text-sm font-semibold text-lead-gray">{formatDate(groupSession.sessionDate)} / {groupSession.startTime} - {groupSession.endTime} WIB</p><p className="mt-1 text-sm text-lead-gray">{groupSession.classMode} / {groupSession.teacherName} / {groupSession.studentCount} students{groupSession.topic ? ` / ${groupSession.topic}` : ""}</p></div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-full px-3 py-1 text-xs font-bold ${groupSession.status === "Completed" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-lead-blue"}`}>{groupSession.status}</span>
                       {groupSession.status === "Scheduled" && !groupSession.attendanceMarked ? (

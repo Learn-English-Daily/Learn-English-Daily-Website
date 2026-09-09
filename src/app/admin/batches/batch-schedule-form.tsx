@@ -43,6 +43,12 @@ export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMee
       <ActionFeedbackForm action={scheduleBatchClasses} successMessage={isSeries ? "Remaining group classes scheduled." : "Group class scheduled."} className="mt-4 grid gap-4 sm:grid-cols-2">
         <input type="hidden" name="batchId" value={batchId} />
         <input type="hidden" name="scheduleMode" value={mode} />
+        <label className="grid gap-2 text-sm font-bold text-lead-navy">Class Mode
+          <select name="classMode" defaultValue="Online" required className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100">
+            <option value="Online">Online</option>
+            <option value="Offline">Offline</option>
+          </select>
+        </label>
         {isSeries ? <input type="hidden" name="firstMeetingNumber" value="1" /> : (
           <label className="grid gap-2 text-sm font-bold text-lead-navy">Meeting Number<input name="firstMeetingNumber" type="number" min={1} max={12} defaultValue={1} required className="rounded-lg border border-slate-200 px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100" /></label>
         )}
