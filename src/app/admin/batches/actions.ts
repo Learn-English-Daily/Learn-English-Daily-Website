@@ -227,6 +227,7 @@ export async function assignStudentToBatch(formData: FormData) {
     classType?: string;
     classMode?: string;
     groupRegistrationFeeStatus?: "pending" | "paid" | "waived";
+    groupRegistrationFeeInvoiceId?: string;
   }>(getStudentRegistrationCollectionName()).findOne({ studentId });
   if (assignedStudent) {
     await ensureGroupMonthlyInvoice(db, {

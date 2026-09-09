@@ -36,6 +36,7 @@ type EditableStudentDocument = {
   statusHistory?: StudentStatusHistoryEntry[];
   classType?: string;
   groupRegistrationFeeStatus?: "pending" | "paid" | "waived";
+  groupRegistrationFeeInvoiceId?: string;
   [key: string]: unknown;
 };
 
@@ -215,7 +216,10 @@ export async function updateStudentRegistration(formData: FormData) {
     batchProgram: typeof existingRegistration?.batchProgram === "string" ? existingRegistration.batchProgram : "",
     groupRegistrationFeeStatus: isNewGroupEnrollment
       ? "pending"
-      : existingRegistration?.groupRegistrationFeeStatus
+      : existingRegistration?.groupRegistrationFeeStatus,
+    groupRegistrationFeeInvoiceId: isNewGroupEnrollment
+      ? undefined
+      : existingRegistration?.groupRegistrationFeeInvoiceId
   });
 
   if (currentStudentId) {

@@ -34,6 +34,7 @@ type GroupStudentInvoiceProfile = {
   activeBatchName?: string;
   batchProgram?: string;
   groupRegistrationFeeStatus?: GroupRegistrationFeeStatus;
+  groupRegistrationFeeInvoiceId?: string;
 };
 
 export function getGroupMonthlyPrice(program: string) {
@@ -72,17 +73,10 @@ export async function ensureGroupMonthlyInvoice(
     billingYear: period.year,
     source: { $in: ["batch-monthly", "batch-assessment"] }
   });
-  const firstGroupInvoice = await payments.findOne(
-    {
-      studentId: student.studentId,
-      source: { $in: ["batch-monthly", "batch-assessment"] }
-    },
-    { sort: { createdAt: 1, _id: 1 } }
-  );
-
-  const registrationFeeIncluded = student.groupRegistrationFeeStatus === "pending" && (
-    !firstGroupInvoice || Boolean(existing?._id && firstGroupInvoice._id.equals(existing._id))
-  );
+  const feeHasNoFinalDecision = !["paid", "waived"].includes(student.groupRegistrationFeeStatus || "");
+  const feeIsBoundToThisInvoice = !student.groupRegistrationFeeInvoiceId ||
+    Boolean(existing?._id && existing._id.toString() === student.groupRegistrationFeeInvoiceId);
+  const registrationFeeIncluded = existing?.status !== "Paid" && feeHasNoFinalDecision && feeIsBoundToThisInvoice;
   const registrationFeeAmount = registrationFeeIncluded ? GROUP_REGISTRATION_FEE : 0;
   const totalAmountDue = amountDue + registrationFeeAmount;
   const invoiceLineItems = [
@@ -118,6 +112,19 @@ export async function ensureGroupMonthlyInvoice(
         }
       }
     );
+    if (registrationFeeIncluded) {
+      await db.collection(getStudentRegistrationCollectionName()).updateOne(
+        { studentId: student.studentId },
+        {
+          $set: {
+            groupRegistrationFeeStatus: "pending",
+            groupRegistrationFeeAmount: GROUP_REGISTRATION_FEE,
+            groupRegistrationFeeInvoiceId: existing._id.toString(),
+            updatedAt: now
+          }
+        }
+      );
+    }
     return existing._id;
   }
 
@@ -158,7 +165,21 @@ export async function ensureGroupMonthlyInvoice(
     },
     { upsert: true }
   );
-  return result.upsertedId;
+  const invoiceId = result.upsertedId;
+  if (registrationFeeIncluded && invoiceId) {
+    await db.collection(getStudentRegistrationCollectionName()).updateOne(
+      { studentId: student.studentId },
+      {
+        $set: {
+          groupRegistrationFeeStatus: "pending",
+          groupRegistrationFeeAmount: GROUP_REGISTRATION_FEE,
+          groupRegistrationFeeInvoiceId: invoiceId.toString(),
+          updatedAt: now
+        }
+      }
+    );
+  }
+  return invoiceId;
 }
 
 export async function ensureCurrentGroupMonthlyInvoices(db: Db) {
