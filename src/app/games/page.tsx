@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Sunrise, Trophy } from "lucide-react";
+import { ArrowRight, BookOpen, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Sunrise, Trophy } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  {
+    title: "Reading Detective",
+    description: "Enter your name, rebuild mixed-up stories, explore illustrated clues, and solve a complete reading mission.",
+    status: "Available",
+    icon: BookOpen,
+    accent: "border-blue-100 bg-blue-50 text-lead-blue",
+    available: true,
+    href: "/games/reading-detective"
+  },
   {
     title: "Daily Routine Level Up",
     description: "Enter your name, become the character, explore a home, build a timeline, set clocks, and create your own daily routine.",

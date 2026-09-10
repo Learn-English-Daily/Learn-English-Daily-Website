@@ -6,6 +6,7 @@ export type GameType =
   | "vocabulary-match"
   | "sentence-builder"
   | "tongue-twister-battle"
+  | "reading-detective"
   | "transportation-adventure"
   | "pet-rescue-adventure"
   | "action-hero"

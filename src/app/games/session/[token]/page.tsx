@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowRight, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, PawPrint, Puzzle, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpen, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, PawPrint, Puzzle, Sparkles } from "lucide-react";
 import { ActionHeroGame } from "@/app/games/action-hero/action-hero-game";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
@@ -12,6 +12,7 @@ import { VocabularyMatchGame } from "@/app/games/vocabulary-match/vocabulary-mat
 import { TransportationAdventureGame } from "@/app/games/transportation-adventure/transportation-adventure-game";
 import { PetRescueAdventure } from "@/app/games/pet-rescue-adventure/pet-rescue-adventure";
 import { TellingTimeGame } from "@/components/games/telling-time/telling-time-game";
+import { ReadingDetectiveGame } from "@/components/games/reading-detective/reading-detective-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -84,6 +85,7 @@ export default async function GameSessionPage({
   const isVocabularyMatch = activeGame === "vocabulary-match";
   const isSentenceBuilder = activeGame === "sentence-builder";
   const isTongueTwisterBattle = activeGame === "tongue-twister-battle";
+  const isReadingDetective = activeGame === "reading-detective";
   const isTransportationAdventure = activeGame === "transportation-adventure";
   const isPetRescueAdventure = activeGame === "pet-rescue-adventure";
   const isActionHero = activeGame === "action-hero";
@@ -96,6 +98,7 @@ export default async function GameSessionPage({
     !isVocabularyMatch &&
     !isSentenceBuilder &&
     !isTongueTwisterBattle &&
+    !isReadingDetective &&
     !isTransportationAdventure &&
     !isPetRescueAdventure &&
     !isActionHero &&
@@ -112,8 +115,10 @@ export default async function GameSessionPage({
             ? "Sentence Builder"
             : isTongueTwisterBattle
               ? "Tongue Twister Battle"
-              : isTransportationAdventure
-                ? "Transportation Adventure"
+              : isReadingDetective
+                ? "Reading Detective"
+                : isTransportationAdventure
+                  ? "Transportation Adventure"
                 : isPetRescueAdventure
                   ? "Pet Rescue Adventure"
                   : isActionHero
@@ -133,6 +138,8 @@ export default async function GameSessionPage({
     ? "Build clear English sentences from shuffled word cards before the class game window ends."
     : isTongueTwisterBattle
     ? "Race through tongue twisters and improve speaking control before the class game window ends."
+    : isReadingDetective
+    ? "Rebuild stories, investigate evidence, and solve a complete reading mission."
     : isTransportationAdventure
     ? "Travel through five English stages with Wisey before the class game window ends."
     : isPetRescueAdventure
@@ -142,7 +149,7 @@ export default async function GameSessionPage({
     : isTellingTime
     ? "Move a real analog clock and help Bill complete his whole day."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isReadingDetective ? BookOpen : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -207,6 +214,8 @@ export default async function GameSessionPage({
           <SentenceBuilderGame />
         ) : isTongueTwisterBattle ? (
           <TongueTwisterBattleGame />
+        ) : isReadingDetective ? (
+          <ReadingDetectiveGame />
         ) : isTransportationAdventure ? (
           <TransportationAdventureGame />
         ) : isPetRescueAdventure ? (
@@ -225,6 +234,13 @@ export default async function GameSessionPage({
 
 function GameHub({ token }: { token: string }) {
   const games = [
+    {
+      title: "Reading Detective",
+      description: "Rebuild stories, explore scenes, and uncover reading clues.",
+      href: `/games/session/${encodeURIComponent(token)}?game=reading-detective`,
+      icon: BookOpen,
+      accent: "border-blue-100 bg-blue-50 text-lead-blue"
+    },
     {
       title: "Telling Time",
       description: "Move an analog clock and help Bill complete his daily schedule.",
