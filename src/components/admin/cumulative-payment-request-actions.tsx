@@ -147,7 +147,7 @@ export function CumulativePaymentRequestActions({ receipt }: { receipt: Cumulati
       pdf.text("Lead@learn-english-daily.com / +62 815-7816-1241", 18, y + 15);
 
       const studentFileName = safeFilePart(receipt.studentName) || "Student";
-      pdf.save(`LEAD-Cumulative-Payment-Request-${studentFileName}.pdf`);
+      pdf.save(`${studentFileName}-LEAD-Cumulative-Payment-Request.pdf`);
     } finally {
       setDownloading(false);
     }

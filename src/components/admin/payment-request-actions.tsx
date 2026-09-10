@@ -141,8 +141,8 @@ export function PaymentRequestActions({ receipt }: { receipt: PaymentRequestData
 
       const studentFileName = safeFilePart(receipt.studentName) || "Student";
       pdf.save(receipt.isGroupInvoice
-        ? `LEAD-Group-Monthly-Invoice-${studentFileName}.pdf`
-        : `LEAD-Payment-Request-${studentFileName}-Meeting-${receipt.meetingNumber}.pdf`);
+        ? `${studentFileName}-LEAD-Group-Monthly-Invoice.pdf`
+        : `${studentFileName}-LEAD-Payment-Request-Meeting-${receipt.meetingNumber}.pdf`);
     } finally {
       setDownloading(false);
     }
