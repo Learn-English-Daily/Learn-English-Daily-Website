@@ -43,6 +43,7 @@ type BatchDocument = {
 type StudentDocument = {
   studentId?: string;
   studentName?: string;
+  email?: string;
   courseJoined?: string;
   classType?: string;
   classMode?: string;
@@ -66,6 +67,7 @@ type Student = {
   id: string;
   studentId: string;
   studentName: string;
+  email: string;
   courseJoined: string;
   classType: string;
   classMode: string;
@@ -115,6 +117,7 @@ async function getBatchPageData() {
       id: student._id.toString(),
       studentId: student.studentId || "",
       studentName: student.studentName || "Unknown",
+      email: student.email || "",
       courseJoined: student.courseJoined || "",
       classType: student.classType || "",
       classMode: student.classMode || "Online",
@@ -258,11 +261,12 @@ export default async function AdminBatchesPage() {
                     <SectionTitle icon={Users} title={`Students in ${batch.batchName}`} description={`These ${batchStudents.length} students belong to this batch. They will appear together in the teacher's group attendance roster.`} />
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[560px] text-left text-sm">
+                    <table className="w-full min-w-[720px] text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase tracking-[0.12em] text-lead-gray">
                         <tr>
                           <th className="px-5 py-3">Student ID</th>
                           <th className="px-5 py-3">Name</th>
+                          <th className="px-5 py-3">Email</th>
                           <th className="px-5 py-3">Action</th>
                         </tr>
                       </thead>
@@ -275,6 +279,9 @@ export default async function AdminBatchesPage() {
                                 <p className="text-xs text-lead-gray">{student.classMode} / {student.classType}</p>
                               </td>
                               <td className="px-5 py-4">
+                                {student.email ? <a href={`mailto:${student.email}`} className="font-semibold text-lead-blue hover:text-blue-700 hover:underline">{student.email}</a> : <span className="text-lead-gray">Not set</span>}
+                              </td>
+                              <td className="px-5 py-4">
                                 <ActionFeedbackForm action={removeStudentFromBatch} successMessage="Student removed.">
                                   <input type="hidden" name="batchId" value={batch.id} />
                                   <input type="hidden" name="studentId" value={student.studentId} />
@@ -285,7 +292,7 @@ export default async function AdminBatchesPage() {
                         ))}
                         {!batchStudents.length ? (
                           <tr>
-                            <td colSpan={3} className="px-5 py-6 text-center text-sm text-lead-gray">No students assigned yet.</td>
+                            <td colSpan={4} className="px-5 py-6 text-center text-sm text-lead-gray">No students assigned yet.</td>
                           </tr>
                         ) : null}
                       </tbody>
