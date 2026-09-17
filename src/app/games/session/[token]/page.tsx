@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowRight, BookOpen, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, PawPrint, Puzzle, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpen, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, PawPrint, Puzzle, Sparkles, Users } from "lucide-react";
 import { ActionHeroGame } from "@/app/games/action-hero/action-hero-game";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
@@ -13,6 +13,7 @@ import { TransportationAdventureGame } from "@/app/games/transportation-adventur
 import { PetRescueAdventure } from "@/app/games/pet-rescue-adventure/pet-rescue-adventure";
 import { TellingTimeGame } from "@/components/games/telling-time/telling-time-game";
 import { ReadingDetectiveGame } from "@/components/games/reading-detective/reading-detective-game";
+import { ProfileQuestGame } from "@/components/games/profile-quest/profile-quest-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -90,6 +91,7 @@ export default async function GameSessionPage({
   const isPetRescueAdventure = activeGame === "pet-rescue-adventure";
   const isActionHero = activeGame === "action-hero";
   const isTellingTime = activeGame === "telling-time";
+  const isProfileQuest = activeGame === "profile-quest";
   const shouldShowHub =
     gameSession?.gameType === "games-hub" &&
     !isEscapeRoom &&
@@ -102,7 +104,8 @@ export default async function GameSessionPage({
     !isTransportationAdventure &&
     !isPetRescueAdventure &&
     !isActionHero &&
-    !isTellingTime;
+    !isTellingTime &&
+    !isProfileQuest;
   const gameTitle = shouldShowHub
     ? "LEAD Class Games"
     : isEscapeRoom
@@ -125,6 +128,8 @@ export default async function GameSessionPage({
                     ? "Action Hero"
                     : isTellingTime
                       ? "Telling Time"
+                    : isProfileQuest
+                      ? "Profile Quest"
               : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
@@ -147,9 +152,11 @@ export default async function GameSessionPage({
     : isActionHero
     ? "Control Bill and perform action verbs in a real interactive LEAD world."
     : isTellingTime
-    ? "Move a real analog clock and help Bill complete his whole day."
+    ? "Enter student and teacher names, move a real analog clock, and complete a personalized day."
+    : isProfileQuest
+    ? "Create a profile, interview new friends, remember clues, and introduce someone in English."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isReadingDetective ? BookOpen : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isProfileQuest ? Users : isReadingDetective ? BookOpen : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -224,6 +231,8 @@ export default async function GameSessionPage({
           <ActionHeroGame />
         ) : isTellingTime ? (
           <TellingTimeGame />
+        ) : isProfileQuest ? (
+          <ProfileQuestGame />
         ) : (
           <SpeechCompetitionGame />
         )}
@@ -235,6 +244,13 @@ export default async function GameSessionPage({
 function GameHub({ token }: { token: string }) {
   const games = [
     {
+      title: "Profile Quest",
+      description: "Explore a school, interview new friends, remember clues, and present an introduction.",
+      href: `/games/session/${encodeURIComponent(token)}?game=profile-quest`,
+      icon: Users,
+      accent: "border-blue-100 bg-blue-50 text-lead-blue"
+    },
+    {
       title: "Reading Detective",
       description: "Rebuild stories, explore scenes, and uncover reading clues.",
       href: `/games/session/${encodeURIComponent(token)}?game=reading-detective`,
@@ -243,7 +259,7 @@ function GameHub({ token }: { token: string }) {
     },
     {
       title: "Telling Time",
-      description: "Move an analog clock and help Bill complete his daily schedule.",
+      description: "Move an analog clock and complete a personalized daily schedule.",
       href: `/games/session/${encodeURIComponent(token)}?game=telling-time`,
       icon: Clock,
       accent: "border-amber-100 bg-amber-50 text-amber-700"

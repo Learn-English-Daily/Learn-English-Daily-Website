@@ -1,52 +1,813 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Check, RotateCcw, Star, Volume2 } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  RotateCcw,
+  Star,
+  UserRound,
+  Volume2,
+} from "lucide-react";
 import { InteractiveClock, type ClockTime } from "./interactive-clock";
 
 type Scene = "morning" | "afternoon" | "evening" | "night";
 type Mission = ClockTime & { prompt: string; action: string; scene: Scene };
 
-const LEVELS = ["Explore", "O'Clock", "Thirty", "About You", "Listen & Set", "Read the Clock", "Drop the Times", "Plan the Day", "Time Clues", "Find the Clock"];
-const HOURS = ["twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven"];
+const LEVELS = [
+  "Explore",
+  "O'Clock",
+  "Thirty",
+  "About You",
+  "Listen & Set",
+  "Read the Clock",
+  "Drop the Times",
+  "Plan the Day",
+  "Time Clues",
+  "Find the Clock",
+];
+const HOURS = [
+  "twelve",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+];
 const GROUPS: Record<number, Mission[]> = {
-  1: [m(5,0,"Set the clock to five o'clock."),m(8,0,"Set the clock to eight o'clock."),m(10,0,"Set the clock to ten o'clock.")],
-  2: [m(2,30,"Set the clock to two thirty."),m(4,30,"Set the clock to four thirty."),m(8,30,"Set the clock to eight thirty.","Practice thirty","night")],
-  4: [m(9,0,"Listen, remember, and set the time.","Listen carefully"),m(2,30,"Listen, remember, and set the time.","Listen carefully","afternoon"),m(7,30,"Listen, remember, and set the time.","Listen carefully","evening")],
-  8: [m(12,15,"What time is 15 minutes after twelve o'clock?","Solve the clue"),m(4,20,"What time is 20 minutes after four o'clock?","Solve the clue","afternoon"),m(7,30,"What time is 30 minutes after seven o'clock?","Solve the clue","evening"),m(11,40,"What time is it when 20 minutes remain until twelve o'clock?","Solve the clue","evening"),m(5,30,"What time is it when 30 minutes remain until six o'clock?","Solve the clue","evening")]
+  1: [
+    m(5, 0, "Set the clock to five o'clock."),
+    m(8, 0, "Set the clock to eight o'clock."),
+    m(10, 0, "Set the clock to ten o'clock."),
+  ],
+  2: [
+    m(2, 30, "Set the clock to two thirty."),
+    m(4, 30, "Set the clock to four thirty."),
+    m(8, 30, "Set the clock to eight thirty.", "Practice thirty", "night"),
+  ],
+  4: [
+    m(9, 0, "Listen, remember, and set the time.", "Listen carefully"),
+    m(
+      2,
+      30,
+      "Listen, remember, and set the time.",
+      "Listen carefully",
+      "afternoon",
+    ),
+    m(
+      7,
+      30,
+      "Listen, remember, and set the time.",
+      "Listen carefully",
+      "evening",
+    ),
+  ],
+  8: [
+    m(
+      12,
+      15,
+      "What time is 15 minutes after twelve o'clock?",
+      "Solve the clue",
+    ),
+    m(
+      4,
+      20,
+      "What time is 20 minutes after four o'clock?",
+      "Solve the clue",
+      "afternoon",
+    ),
+    m(
+      7,
+      30,
+      "What time is 30 minutes after seven o'clock?",
+      "Solve the clue",
+      "evening",
+    ),
+    m(
+      11,
+      40,
+      "What time is it when 20 minutes remain until twelve o'clock?",
+      "Solve the clue",
+      "evening",
+    ),
+    m(
+      5,
+      30,
+      "What time is it when 30 minutes remain until six o'clock?",
+      "Solve the clue",
+      "evening",
+    ),
+  ],
 };
-const PERSONAL = [["When do you wake up?","I wake up at"],["When do you eat breakfast?","I eat breakfast at"],["When do you go to school?","I go to school at"],["When do you have lunch?","I have lunch at"],["When do you play?","I play at"],["When do you take your English class at LEAD with Ms Ina?","I take my English class at LEAD with Ms Ina at"],["When do you have dinner?","I have dinner at"],["When do you go to bed?","I go to bed at"]] as const;
-const READ_CLOCKS: ClockTime[] = [{hour:3,minute:30},{hour:9,minute:0},{hour:6,minute:15}];
-const MATCH_CLOCKS: ClockTime[] = [{hour:4,minute:0},{hour:6,minute:30},{hour:9,minute:15},{hour:2,minute:45}];
-const PLANNER = [["When does Bill wake up?","⏰"],["When does Bill eat breakfast?","🥣"],["When does Bill go to school?","🎒"],["When does Bill have lunch?","🍎"],["When does Bill play?","⚽"],["When does Bill take his English class at LEAD with Ms Ina?","📘"],["When does Bill have dinner?","🍽️"],["When does Bill go to bed?","🛏️"]];
-const TIME_OPTIONS = Array.from({length:12},(_,hour)=>Array.from({length:12},(_,step)=>`${hour+1}:${String(step*5).padStart(2,"0")}`)).flat();
-const FIND_CLOCKS = [{hour:2,minute:15},{hour:2,minute:45},{hour:3,minute:15}];
+const READ_CLOCKS: ClockTime[] = [
+  { hour: 3, minute: 30 },
+  { hour: 9, minute: 0 },
+  { hour: 6, minute: 15 },
+];
+const MATCH_CLOCKS: ClockTime[] = [
+  { hour: 4, minute: 0 },
+  { hour: 6, minute: 30 },
+  { hour: 9, minute: 15 },
+  { hour: 2, minute: 45 },
+];
+const TIME_OPTIONS = Array.from({ length: 12 }, (_, hour) =>
+  Array.from(
+    { length: 12 },
+    (_, step) => `${hour + 1}:${String(step * 5).padStart(2, "0")}`,
+  ),
+).flat();
+const FIND_CLOCKS = [
+  { hour: 2, minute: 15 },
+  { hour: 2, minute: 45 },
+  { hour: 3, minute: 15 },
+];
 
-function m(hour:number,minute:number,prompt:string,action="Practice time",scene:Scene="morning"):Mission{return{hour,minute,prompt,action,scene};}
-function digital(time:ClockTime){return`${time.hour}:${String(time.minute).padStart(2,"0")}`;}
-function timeWords(time:ClockTime){const minute=time.minute===0?" o'clock":time.minute===15?" fifteen":time.minute===30?" thirty":time.minute===45?" forty-five":` ${String(time.minute).padStart(2,"0")}`;return`${HOURS[time.hour%12]}${minute}`;}
-function sentence(time:ClockTime){return`It is ${timeWords(time)}.`;}
-
-function Bill({action,scene}:{action:string;scene:Scene}){return <div className="relative mx-auto h-52 w-44" aria-label={`Bill: ${action}`}><div className={`absolute inset-x-4 bottom-0 h-8 rounded-[50%] blur-sm ${scene==="night"?"bg-indigo-950/30":"bg-slate-400/20"}`}/><div className="absolute left-[58px] top-2 h-20 w-20 rounded-full border-4 border-amber-700 bg-amber-300 shadow-lg"><div className="absolute left-3 top-8 h-3 w-3 rounded-full bg-slate-900"/><div className="absolute right-3 top-8 h-3 w-3 rounded-full bg-slate-900"/><div className="absolute left-7 top-12 h-3 w-6 rounded-b-full border-b-2 border-slate-800"/><div className="absolute -left-2 top-0 h-7 w-24 rounded-t-full bg-slate-900"/></div><div className="absolute left-12 top-[76px] grid h-24 w-24 place-items-center rounded-[28px_28px_16px_16px] bg-blue-600 shadow-lg"><span className="rounded bg-white px-2 py-1 text-sm font-black text-blue-700">LEAD</span></div><div className="absolute bottom-1 left-14 h-12 w-7 rounded-b-xl bg-slate-800"/><div className="absolute bottom-1 right-10 h-12 w-7 rounded-b-xl bg-slate-800"/><div className="absolute bottom-0 left-9 h-4 w-12 rounded-full bg-white"/><div className="absolute bottom-0 right-4 h-4 w-12 rounded-full bg-white"/><div className="absolute -right-5 top-24 max-w-28 rounded-2xl rounded-bl-sm bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-lg">{action}</div></div>}
-
-export function TellingTimeGame(){
-  const[level,setLevel]=useState(0),[step,setStep]=useState(0);const[clock,setClock]=useState<ClockTime>({hour:3,minute:0});const[stars,setStars]=useState(0);const[feedback,setFeedback]=useState("Drag the clock hands and explore."),[finished,setFinished]=useState(false);const[selected,setSelected]=useState<string|null>(null);const[matched,setMatched]=useState<Record<string,string>>({}),[plan,setPlan]=useState<Record<string,string>>({});
-  const mission=GROUPS[level]?.[step],personalQuestion=level===3?PERSONAL[step]:undefined;const scene:Scene=mission?.scene||(level<4?"morning":level<5?"afternoon":"evening");const progress=((level+step/Math.max(GROUPS[level]?.length||PERSONAL.length,1))/LEVELS.length)*100;
-  function speak(text:string){if(!("speechSynthesis"in window))return;window.speechSynthesis.cancel();const voice=new SpeechSynthesisUtterance(text);voice.lang="en-US";voice.rate=.85;window.speechSynthesis.speak(voice)}
-  function go(next=level+1){setLevel(next);setStep(0);setClock({hour:12,minute:0});setFeedback("New challenge ready!")}
-  function finishStep(){const group=GROUPS[level]||[];setStars(v=>v+1);if(step+1<group.length){setStep(v=>v+1);setClock({hour:12,minute:0});setFeedback("Great! Try the next one.")}else setTimeout(()=>go(),500)}
-  function check(){if(!mission)return;if(clock.hour===mission.hour&&clock.minute===mission.minute){setFeedback(`Awesome! ${sentence(mission)}`);speak(sentence(mission));finishStep()}else if(clock.minute!==mission.minute)setFeedback("Almost! Check where the minute hand points.");else setFeedback("Close! Check the hour hand.")}
-  function savePersonal(){if(!personalQuestion)return;const answer=`${personalQuestion[1]} ${timeWords(clock)}.`;setStars(v=>v+1);speak(answer);if(step+1<PERSONAL.length){setStep(v=>v+1);setClock({hour:12,minute:0});setFeedback("Nice answer! Tell us about the next part of your day.")}else setTimeout(()=>go(4),600)}
-  function completeSpecial(next:number){setStars(v=>v+2);setFeedback("Challenge complete!");setTimeout(()=>go(next),600)}
-  if(finished)return <div className="overflow-hidden rounded-[32px] bg-[radial-gradient(circle_at_top,#3b82f6,#0f172a_68%)] p-8 text-center text-white shadow-2xl sm:p-12"><div className="mx-auto grid h-28 w-28 place-items-center rounded-full bg-yellow-400 text-6xl shadow-[0_0_50px_#facc15]">🏆</div><p className="mt-7 font-bold uppercase tracking-[.2em] text-yellow-300">LEAD · Learn English Daily</p><h2 className="mt-3 font-heading text-5xl font-black">TIME MASTER</h2><p className="mt-4 text-xl">You completed every time challenge!</p><p className="mt-3 text-yellow-300">{stars} stars earned</p><button onClick={()=>{setLevel(0);setStep(0);setClock({hour:3,minute:0});setStars(0);setFinished(false);setMatched({});setPlan({});setFeedback("Drag the clock hands and explore.")}} className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-4 font-bold text-blue-700"><RotateCcw className="h-5 w-5"/>Play Again</button><p className="mt-8 text-sm text-blue-100">Speak English with Confidence</p></div>;
-  const title=level===0?"Meet the analog clock":level===3?personalQuestion?.[0]:level===5?"What time is on the clock?":level===6?"Match clocks and times":level===7?"Build Bill's schedule":level===9?"Which clock shows 2:15?":mission?.prompt;
-  const instruction=level===3?"Set the analog clock to your own answer. There is no right or wrong time.":level===5?"Read the analog clock and tap the correct digital time.":level===6?"Drag a time onto its clock. On mobile, tap the time and then tap the clock.":level===7?"Choose a time for each activity in Bill's day. There are no right or wrong answers.":level===9?"Study the minute hands carefully and choose the correct clock.":"Move the hands directly on the analog clock.";
-  return <div className="overflow-hidden rounded-[32px] border border-blue-100 bg-white shadow-xl"><header className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 px-5 py-4 text-white sm:px-7"><div><p className="text-xs font-black tracking-[.18em] text-yellow-300">LEAD · FUN LEARNING</p><h2 className="text-xl font-black">Telling Time</h2></div><div className="flex gap-3"><span className="rounded-xl bg-white/10 px-3 py-2 text-sm font-bold"><Star className="mr-1 inline h-4 w-4 fill-yellow-300 text-yellow-300"/>{stars}</span><span className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold">{level+1}/{LEVELS.length}</span></div><div className="h-2 w-full overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-yellow-400 transition-all" style={{width:`${progress}%`}}/></div></header><div className={`grid min-h-[690px] gap-5 p-4 sm:p-7 lg:grid-cols-[minmax(260px,.75fr)_minmax(400px,1.25fr)] ${scene==="morning"?"bg-[linear-gradient(#dbeafe,#fef3c7)]":scene==="afternoon"?"bg-[linear-gradient(#bae6fd,#dcfce7)]":scene==="night"?"bg-[linear-gradient(#312e81,#0f172a)]":"bg-[linear-gradient(#fed7aa,#ddd6fe)]"}`}><aside className="flex flex-col rounded-3xl bg-white/90 p-5 shadow-lg"><p className="text-xs font-black uppercase tracking-[.16em] text-blue-600">Level {level+1} · {LEVELS[level]}</p><h3 className="mt-2 font-heading text-2xl font-black text-slate-900">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-600">{instruction}</p><Bill action={personalQuestion?.[0]||mission?.action||"You can do it!"} scene={scene}/><div className="mt-auto rounded-2xl border border-blue-100 bg-blue-50 p-4"><p className="font-bold text-slate-800">Wisey says</p><p className="mt-1 text-sm text-slate-600">{feedback}</p></div></aside><main className="rounded-3xl bg-white/95 p-4 shadow-lg sm:p-6">{level===5?<ReadClock step={step} onAnswer={v=>{const expected=digital(READ_CLOCKS[step]);if(v!==expected){setFeedback("Look again at both hands.");return}setStars(s=>s+1);setFeedback(`Correct! It is ${timeWords(READ_CLOCKS[step])}.`);if(step<2)setStep(s=>s+1);else completeSpecial(6)}}/>:level===6?<Matching selected={selected} setSelected={setSelected} matched={matched} onWrong={()=>setFeedback("That time belongs to a different clock.")} onMatch={(key,v)=>{const next={...matched,[key]:v};setMatched(next);setSelected(null);if(Object.keys(next).length===MATCH_CLOCKS.length)completeSpecial(7)}}/>:level===7?<Planner selected={selected} setSelected={setSelected} plan={plan} times={TIME_OPTIONS} onPlace={(activity,v)=>{const next={...plan,[activity]:v};setPlan(next);setSelected(null);setFeedback(`${v} saved for Bill's schedule.`);if(Object.keys(next).length===PLANNER.length)completeSpecial(8)}}/>:level===9?<FindClock onChoose={index=>{if(index===0){setStars(s=>s+2);setFinished(true)}else setFeedback("Close. Look for fifteen minutes after two.")}}/>:<ClockChallenge clock={clock} setClock={setClock} level={level} mission={mission} speak={speak} onCheck={level===0?()=>go(1):level===3?savePersonal:check}/>}</main></div></div>
+function m(
+  hour: number,
+  minute: number,
+  prompt: string,
+  action = "Practice time",
+  scene: Scene = "morning",
+): Mission {
+  return { hour, minute, prompt, action, scene };
+}
+function digital(time: ClockTime) {
+  return `${time.hour}:${String(time.minute).padStart(2, "0")}`;
+}
+function timeWords(time: ClockTime) {
+  const minute =
+    time.minute === 0
+      ? " o'clock"
+      : time.minute === 15
+        ? " fifteen"
+        : time.minute === 30
+          ? " thirty"
+          : time.minute === 45
+            ? " forty-five"
+            : ` ${String(time.minute).padStart(2, "0")}`;
+  return `${HOURS[time.hour % 12]}${minute}`;
+}
+function sentence(time: ClockTime) {
+  return `It is ${timeWords(time)}.`;
+}
+function cleanName(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 30)
+    .replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
+}
+function personalQuestions(teacherName: string) {
+  return [
+    ["When do you wake up?", "I wake up at"],
+    ["When do you eat breakfast?", "I eat breakfast at"],
+    ["When do you go to school?", "I go to school at"],
+    ["When do you have lunch?", "I have lunch at"],
+    ["When do you play?", "I play at"],
+    [
+      `When do you take your English class at LEAD with ${teacherName}?`,
+      `I take my English class at LEAD with ${teacherName} at`,
+    ],
+    ["When do you have dinner?", "I have dinner at"],
+    ["When do you go to bed?", "I go to bed at"],
+  ] as const;
+}
+function plannerQuestions(studentName: string, teacherName: string) {
+  return [
+    [`When does ${studentName} wake up?`, "Morning"],
+    [`When does ${studentName} eat breakfast?`, "Breakfast"],
+    [`When does ${studentName} go to school?`, "School"],
+    [`When does ${studentName} have lunch?`, "Lunch"],
+    [`When does ${studentName} play?`, "Play"],
+    [
+      `When does ${studentName} take an English class at LEAD with ${teacherName}?`,
+      "English",
+    ],
+    [`When does ${studentName} have dinner?`, "Dinner"],
+    [`When does ${studentName} go to bed?`, "Bedtime"],
+  ];
 }
 
-function ClockChallenge({clock,setClock,level,mission,speak,onCheck}:{clock:ClockTime;setClock:(v:ClockTime)=>void;level:number;mission?:Mission;speak:(v:string)=>void;onCheck:()=>void}){return <><InteractiveClock {...clock} onChange={setClock}/><div className="mt-5 rounded-2xl bg-slate-950 p-4 text-center text-white"><p className="font-heading text-4xl font-black tabular-nums">{digital(clock)}</p><p className="mt-1 text-lg text-blue-100">“{sentence(clock)}”</p><button onClick={()=>speak(sentence(clock))} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-bold"><Volume2 className="h-4 w-4"/>Listen & say it</button></div>{level===4&&mission&&<button onClick={()=>speak(sentence(mission))} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 p-4 font-bold text-white"><Volume2 className="h-5 w-5"/>Listen to the secret time</button>}<button onClick={onCheck} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 p-4 text-lg font-bold text-white"><Check className="h-5 w-5"/>{level===0?"Start the Game":level===3?"Save My Answer":"Check Time"}{level===0&&<ArrowRight className="h-5 w-5"/>}</button></>}
+function GameCharacter({
+  name,
+  action,
+  scene,
+}: {
+  name: string;
+  action: string;
+  scene: Scene;
+}) {
+  return (
+    <div
+      className="relative mx-auto h-52 w-44"
+      aria-label={`${name}: ${action}`}
+    >
+      <div
+        className={`absolute inset-x-4 bottom-0 h-8 rounded-[50%] blur-sm ${scene === "night" ? "bg-indigo-950/30" : "bg-slate-400/20"}`}
+      />
+      <div className="absolute left-[58px] top-2 h-20 w-20 rounded-full border-4 border-amber-700 bg-amber-300 shadow-lg">
+        <div className="absolute left-3 top-8 h-3 w-3 rounded-full bg-slate-900" />
+        <div className="absolute right-3 top-8 h-3 w-3 rounded-full bg-slate-900" />
+        <div className="absolute left-7 top-12 h-3 w-6 rounded-b-full border-b-2 border-slate-800" />
+        <div className="absolute -left-2 top-0 h-7 w-24 rounded-t-full bg-slate-900" />
+      </div>
+      <div className="absolute left-12 top-[76px] grid h-24 w-24 place-items-center rounded-[28px_28px_16px_16px] bg-blue-600 shadow-lg">
+        <span className="rounded bg-white px-2 py-1 text-sm font-black text-blue-700">
+          LEAD
+        </span>
+      </div>
+      <div className="absolute bottom-1 left-14 h-12 w-7 rounded-b-xl bg-slate-800" />
+      <div className="absolute bottom-1 right-10 h-12 w-7 rounded-b-xl bg-slate-800" />
+      <div className="absolute bottom-0 left-9 h-4 w-12 rounded-full bg-white" />
+      <div className="absolute bottom-0 right-4 h-4 w-12 rounded-full bg-white" />
+      <div className="absolute -right-5 top-24 max-w-28 rounded-2xl rounded-bl-sm bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-lg">
+        {action}
+      </div>
+      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded-full bg-slate-950 px-2 py-1 text-[10px] font-black text-white">
+        {name}
+      </span>
+    </div>
+  );
+}
 
-function ReadClock({step,onAnswer}:{step:number;onAnswer:(v:string)=>void}){const target=READ_CLOCKS[step],choices=step===0?["3:00","3:30","6:15"]:step===1?["9:00","12:45","9:30"]:["6:30","3:15","6:15"];return <div className="flex min-h-[590px] flex-col justify-center"><InteractiveClock {...target} interactive={false}/><div className="mt-5 grid grid-cols-3 gap-3">{choices.map(v=><button key={v} onClick={()=>onAnswer(v)} className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-4 text-xl font-black hover:border-blue-500">{v}</button>)}</div><p className="mt-4 text-center font-bold text-slate-500">Question {step+1} of 3</p></div>}
-function Matching({selected,setSelected,matched,onMatch,onWrong}:{selected:string|null;setSelected:(v:string|null)=>void;matched:Record<string,string>;onMatch:(k:string,v:string)=>void;onWrong:()=>void}){const times=["2:45","9:15","4:00","6:30"];function tryIt(key:string,v:string){if(digital(MATCH_CLOCKS[Number(key)])!==v){onWrong();return}onMatch(key,v)}return <><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{times.filter(v=>!Object.values(matched).includes(v)).map(v=><button draggable onDragStart={e=>e.dataTransfer.setData("text/plain",v)} onClick={()=>setSelected(v)} key={v} className={`rounded-2xl border-2 p-4 text-xl font-black ${selected===v?"border-yellow-400 bg-yellow-50":"border-blue-100 bg-blue-50"}`}>{v}</button>)}</div><div className="mt-5 grid grid-cols-2 gap-4">{MATCH_CLOCKS.map((time,index)=>{const key=String(index);return <button key={key} onClick={()=>selected&&tryIt(key,selected)} onDragOver={e=>e.preventDefault()} onDrop={e=>tryIt(key,e.dataTransfer.getData("text/plain"))} className="rounded-2xl border-2 border-dashed border-slate-200 p-3"><InteractiveClock {...time} compact interactive={false}/><strong>{matched[key]||"Drop time"}</strong></button>})}</div></>}
-function Planner({selected:_selected,setSelected:_setSelected,plan,times,onPlace}:{selected:string|null;setSelected:(v:string|null)=>void;plan:Record<string,string>;times:string[];onPlace:(a:string,v:string)=>void}){return <div className="grid gap-3">{PLANNER.map(([activity,icon])=><div key={activity} className={`flex items-center gap-4 rounded-2xl border-2 p-3 text-left transition ${plan[activity]?"border-emerald-200 bg-emerald-50":"border-slate-200 bg-white"}`}><span className="text-3xl">{icon}</span><strong className="flex-1 text-sm sm:text-base">{activity}</strong><select value={plan[activity]||""} onChange={event=>event.target.value&&onPlace(activity,event.target.value)} className="min-w-28 rounded-xl border border-slate-200 bg-white px-3 py-3 font-black text-slate-800" aria-label={`Select time for ${activity}`}><option value="">Select time</option>{times.map(time=><option key={time} value={time}>{time}</option>)}</select>{plan[activity]&&<Check aria-label="Time saved" className="h-5 w-5 shrink-0 text-emerald-600"/>}</div>)}</div>}
-function FindClock({onChoose}:{onChoose:(i:number)=>void}){return <div className="grid min-h-[590px] grid-cols-1 place-content-center gap-4 sm:grid-cols-3">{FIND_CLOCKS.map((time,index)=><button key={index} onClick={()=>onChoose(index)} className="rounded-2xl border-2 border-blue-100 p-3 hover:border-blue-500"><InteractiveClock {...time} compact interactive={false}/><span className="font-bold">Clock {index+1}</span></button>)}</div>}
+export function TellingTimeGame() {
+  const [started, setStarted] = useState(false),
+    [studentInput, setStudentInput] = useState(""),
+    [teacherInput, setTeacherInput] = useState("");
+  const [studentName, setStudentName] = useState(""),
+    [teacherName, setTeacherName] = useState("");
+  const [level, setLevel] = useState(0),
+    [step, setStep] = useState(0);
+  const [clock, setClock] = useState<ClockTime>({ hour: 3, minute: 0 });
+  const [stars, setStars] = useState(0);
+  const [feedback, setFeedbackRaw] = useState(
+      "Drag the clock hands and explore.",
+    ),
+    [finished, setFinished] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [matched, setMatched] = useState<Record<string, string>>({}),
+    [plan, setPlan] = useState<Record<string, string>>({});
+  const personal = personalQuestions(teacherName),
+    planner = plannerQuestions(studentName, teacherName);
+  const mission = GROUPS[level]?.[step],
+    personalQuestion = level === 3 ? personal[step] : undefined;
+  const scene: Scene =
+    mission?.scene ||
+    (level < 4 ? "morning" : level < 5 ? "afternoon" : "evening");
+  const progress =
+    ((level + step / Math.max(GROUPS[level]?.length || personal.length, 1)) /
+      LEVELS.length) *
+    100;
+  function setFeedback(value: string) {
+    setFeedbackRaw(value);
+  }
+  function speak(text: string) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const voice = new SpeechSynthesisUtterance(text);
+    voice.lang = "en-US";
+    voice.rate = 0.85;
+    window.speechSynthesis.speak(voice);
+  }
+  function go(next = level + 1) {
+    setLevel(next);
+    setStep(0);
+    setClock({ hour: 12, minute: 0 });
+    setFeedback("New challenge ready!");
+  }
+  function finishStep() {
+    const group = GROUPS[level] || [];
+    setStars((v) => v + 1);
+    if (step + 1 < group.length) {
+      setStep((v) => v + 1);
+      setClock({ hour: 12, minute: 0 });
+      setFeedback("Great! Try the next one.");
+    } else setTimeout(() => go(), 500);
+  }
+  function check() {
+    if (!mission) return;
+    if (clock.hour === mission.hour && clock.minute === mission.minute) {
+      setFeedback(`Awesome! ${sentence(mission)}`);
+      speak(sentence(mission));
+      finishStep();
+    } else if (clock.minute !== mission.minute)
+      setFeedback("Almost! Check where the minute hand points.");
+    else setFeedback("Close! Check the hour hand.");
+  }
+  function savePersonal() {
+    if (!personalQuestion) return;
+    const answer = `${personalQuestion[1]} ${timeWords(clock)}.`;
+    setStars((v) => v + 1);
+    speak(answer);
+    if (step + 1 < personal.length) {
+      setStep((v) => v + 1);
+      setClock({ hour: 12, minute: 0 });
+      setFeedback("Nice answer! Tell us about the next part of your day.");
+    } else setTimeout(() => go(4), 600);
+  }
+  function completeSpecial(next: number) {
+    setStars((v) => v + 2);
+    setFeedback("Challenge complete!");
+    setTimeout(() => go(next), 600);
+  }
+  function reset(keepNames: boolean) {
+    setLevel(0);
+    setStep(0);
+    setClock({ hour: 3, minute: 0 });
+    setStars(0);
+    setFinished(false);
+    setMatched({});
+    setPlan({});
+    setFeedback("Drag the clock hands and explore.");
+    if (!keepNames) {
+      setStarted(false);
+      setStudentName("");
+      setTeacherName("");
+      setStudentInput("");
+      setTeacherInput("");
+    }
+  }
+  if (!started)
+    return (
+      <GameSetup
+        student={studentInput}
+        teacher={teacherInput}
+        setStudent={setStudentInput}
+        setTeacher={setTeacherInput}
+        onStart={() => {
+          const student = cleanName(studentInput),
+            teacher = cleanName(teacherInput);
+          if (!student || !teacher) return;
+          setStudentName(student);
+          setTeacherName(teacher);
+          setStarted(true);
+          setFeedback(`Welcome, ${student}! Move the clock hands to begin.`);
+        }}
+      />
+    );
+  if (finished)
+    return (
+      <div className="overflow-hidden rounded-[32px] bg-[radial-gradient(circle_at_top,#3b82f6,#0f172a_68%)] p-8 text-center text-white shadow-2xl sm:p-12">
+        <div className="mx-auto grid h-28 w-28 place-items-center rounded-full bg-yellow-400 text-5xl font-black text-blue-900 shadow-[0_0_50px_#facc15]">
+          12
+        </div>
+        <p className="mt-7 font-bold uppercase tracking-[.2em] text-yellow-300">
+          LEAD · Learn English Daily
+        </p>
+        <h2 className="mt-3 font-heading text-5xl font-black">TIME MASTER</h2>
+        <p className="mt-4 text-xl">
+          Great work, {studentName}! You completed every time challenge.
+        </p>
+        <p className="mt-3 text-yellow-300">{stars} stars earned</p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <button
+            onClick={() => reset(true)}
+            className="inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-4 font-bold text-blue-700"
+          >
+            <RotateCcw className="h-5 w-5" />
+            Play Again
+          </button>
+          <button
+            onClick={() => reset(false)}
+            className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-6 py-4 font-bold text-white"
+          >
+            <UserRound className="h-5 w-5" />
+            Change Student
+          </button>
+        </div>
+        <p className="mt-8 text-sm text-blue-100">
+          Speak English with Confidence
+        </p>
+      </div>
+    );
+  const title =
+    level === 0
+      ? `Welcome, ${studentName}!`
+      : level === 3
+        ? personalQuestion?.[0]
+        : level === 5
+          ? "What time is on the clock?"
+          : level === 6
+            ? "Match clocks and times"
+            : level === 7
+              ? `Build ${studentName}'s schedule`
+              : level === 9
+                ? "Which clock shows 2:15?"
+                : mission?.prompt;
+  const instruction =
+    level === 3
+      ? "Set the analog clock to your own answer. There is no right or wrong time."
+      : level === 5
+        ? "Read the analog clock and tap the correct digital time."
+        : level === 6
+          ? "Drag a time onto its clock. On mobile, tap the time and then tap the clock."
+          : level === 7
+            ? `Choose a time for each activity in ${studentName}'s day. There are no right or wrong answers.`
+            : level === 9
+              ? "Study the minute hands carefully and choose the correct clock."
+              : "Move the hands directly on the analog clock.";
+  return (
+    <div className="overflow-hidden rounded-[32px] border border-blue-100 bg-white shadow-xl">
+      <header className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 px-5 py-4 text-white sm:px-7">
+        <div>
+          <p className="text-xs font-black tracking-[.18em] text-yellow-300">
+            LEAD · FUN LEARNING
+          </p>
+          <h2 className="text-xl font-black">Telling Time</h2>
+        </div>
+        <div className="flex gap-3">
+          <span className="rounded-xl bg-white/10 px-3 py-2 text-sm font-bold">
+            <Star className="mr-1 inline h-4 w-4 fill-yellow-300 text-yellow-300" />
+            {stars}
+          </span>
+          <span className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold">
+            {level + 1}/{LEVELS.length}
+          </span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-white/15">
+          <div
+            className="h-full rounded-full bg-yellow-400 transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </header>
+      <div
+        className={`grid min-h-[690px] gap-5 p-4 sm:p-7 lg:grid-cols-[minmax(260px,.75fr)_minmax(400px,1.25fr)] ${scene === "morning" ? "bg-[linear-gradient(#dbeafe,#fef3c7)]" : scene === "afternoon" ? "bg-[linear-gradient(#bae6fd,#dcfce7)]" : scene === "night" ? "bg-[linear-gradient(#312e81,#0f172a)]" : "bg-[linear-gradient(#fed7aa,#ddd6fe)]"}`}
+      >
+        <aside className="flex flex-col rounded-3xl bg-white/90 p-5 shadow-lg">
+          <p className="text-xs font-black uppercase tracking-[.16em] text-blue-600">
+            Level {level + 1} · {LEVELS[level]}
+          </p>
+          <h3 className="mt-2 font-heading text-2xl font-black text-slate-900">
+            {title}
+          </h3>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{instruction}</p>
+          <GameCharacter
+            name={studentName}
+            action={
+              personalQuestion?.[0] || mission?.action || "You can do it!"
+            }
+            scene={scene}
+          />
+          <div className="mt-auto rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <p className="font-bold text-slate-800">Wisey says</p>
+            <p className="mt-1 text-sm text-slate-600">{feedback}</p>
+          </div>
+        </aside>
+        <main className="rounded-3xl bg-white/95 p-4 shadow-lg sm:p-6">
+          {level === 5 ? (
+            <ReadClock
+              step={step}
+              onAnswer={(v) => {
+                const expected = digital(READ_CLOCKS[step]);
+                if (v !== expected) {
+                  setFeedback("Look again at both hands.");
+                  return;
+                }
+                setStars((s) => s + 1);
+                setFeedback(`Correct! It is ${timeWords(READ_CLOCKS[step])}.`);
+                if (step < 2) setStep((s) => s + 1);
+                else completeSpecial(6);
+              }}
+            />
+          ) : level === 6 ? (
+            <Matching
+              selected={selected}
+              setSelected={setSelected}
+              matched={matched}
+              onWrong={() =>
+                setFeedback("That time belongs to a different clock.")
+              }
+              onMatch={(key, v) => {
+                const next = { ...matched, [key]: v };
+                setMatched(next);
+                setSelected(null);
+                if (Object.keys(next).length === MATCH_CLOCKS.length)
+                  completeSpecial(7);
+              }}
+            />
+          ) : level === 7 ? (
+            <Planner
+              items={planner}
+              plan={plan}
+              times={TIME_OPTIONS}
+              onPlace={(activity, v) => {
+                const next = { ...plan, [activity]: v };
+                setPlan(next);
+                setSelected(null);
+                setFeedback(`${v} saved for ${studentName}'s schedule.`);
+                if (Object.keys(next).length === planner.length)
+                  completeSpecial(8);
+              }}
+            />
+          ) : level === 9 ? (
+            <FindClock
+              onChoose={(index) => {
+                if (index === 0) {
+                  setStars((s) => s + 2);
+                  setFinished(true);
+                } else
+                  setFeedback("Close. Look for fifteen minutes after two.");
+              }}
+            />
+          ) : (
+            <ClockChallenge
+              clock={clock}
+              setClock={setClock}
+              level={level}
+              mission={mission}
+              speak={speak}
+              onCheck={
+                level === 0 ? () => go(1) : level === 3 ? savePersonal : check
+              }
+            />
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function GameSetup({
+  student,
+  teacher,
+  setStudent,
+  setTeacher,
+  onStart,
+}: {
+  student: string;
+  teacher: string;
+  setStudent: (value: string) => void;
+  setTeacher: (value: string) => void;
+  onStart: () => void;
+}) {
+  const ready = Boolean(student.trim() && teacher.trim());
+  return (
+    <section className="relative overflow-hidden rounded-[32px] bg-[radial-gradient(circle_at_80%_10%,rgba(250,204,21,.28),transparent_25%),linear-gradient(145deg,#0f172a,#1d4ed8)] p-6 text-white shadow-2xl sm:p-10">
+      <div className="mx-auto grid max-w-4xl items-center gap-8 lg:grid-cols-2">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[.2em] text-yellow-300">
+            LEAD presents
+          </p>
+          <h2 className="mt-4 font-heading text-5xl font-black">
+            Telling Time
+          </h2>
+          <p className="mt-4 text-lg text-blue-100">
+            Move the clock hands and build your own daily schedule.
+          </p>
+          <p className="mt-3 font-bold text-yellow-300">
+            Speak English with Confidence
+          </p>
+        </div>
+        <div className="rounded-3xl bg-white p-6 text-slate-900 shadow-xl">
+          <label className="block font-black">
+            What is the student&apos;s name?
+          </label>
+          <input
+            autoFocus
+            value={student}
+            maxLength={30}
+            onChange={(event) => setStudent(event.target.value)}
+            placeholder="Student name"
+            className="mt-2 h-12 w-full rounded-xl border-2 border-blue-100 px-4 font-bold outline-none focus:border-blue-500"
+          />
+          <label className="mt-4 block font-black">
+            What is the teacher&apos;s name?
+          </label>
+          <input
+            value={teacher}
+            maxLength={30}
+            onChange={(event) => setTeacher(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && ready && onStart()}
+            placeholder="Teacher name"
+            className="mt-2 h-12 w-full rounded-xl border-2 border-blue-100 px-4 font-bold outline-none focus:border-blue-500"
+          />
+          <button
+            disabled={!ready}
+            onClick={onStart}
+            className="mt-5 flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-4 font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            START GAME <ArrowRight className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ClockChallenge({
+  clock,
+  setClock,
+  level,
+  mission,
+  speak,
+  onCheck,
+}: {
+  clock: ClockTime;
+  setClock: (v: ClockTime) => void;
+  level: number;
+  mission?: Mission;
+  speak: (v: string) => void;
+  onCheck: () => void;
+}) {
+  return (
+    <>
+      <InteractiveClock {...clock} onChange={setClock} />
+      <div className="mt-5 rounded-2xl bg-slate-950 p-4 text-center text-white">
+        <p className="font-heading text-4xl font-black tabular-nums">
+          {digital(clock)}
+        </p>
+        <p className="mt-1 text-lg text-blue-100">“{sentence(clock)}”</p>
+        <button
+          onClick={() => speak(sentence(clock))}
+          className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-bold"
+        >
+          <Volume2 className="h-4 w-4" />
+          Listen & say it
+        </button>
+      </div>
+      {level === 4 && mission && (
+        <button
+          onClick={() => speak(sentence(mission))}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 p-4 font-bold text-white"
+        >
+          <Volume2 className="h-5 w-5" />
+          Listen to the secret time
+        </button>
+      )}
+      <button
+        onClick={onCheck}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 p-4 text-lg font-bold text-white"
+      >
+        <Check className="h-5 w-5" />
+        {level === 0
+          ? "Start the Game"
+          : level === 3
+            ? "Save My Answer"
+            : "Check Time"}
+        {level === 0 && <ArrowRight className="h-5 w-5" />}
+      </button>
+    </>
+  );
+}
+
+function ReadClock({
+  step,
+  onAnswer,
+}: {
+  step: number;
+  onAnswer: (v: string) => void;
+}) {
+  const target = READ_CLOCKS[step],
+    choices =
+      step === 0
+        ? ["3:00", "3:30", "6:15"]
+        : step === 1
+          ? ["9:00", "12:45", "9:30"]
+          : ["6:30", "3:15", "6:15"];
+  return (
+    <div className="flex min-h-[590px] flex-col justify-center">
+      <InteractiveClock {...target} interactive={false} />
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        {choices.map((v) => (
+          <button
+            key={v}
+            onClick={() => onAnswer(v)}
+            className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-4 text-xl font-black hover:border-blue-500"
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+      <p className="mt-4 text-center font-bold text-slate-500">
+        Question {step + 1} of 3
+      </p>
+    </div>
+  );
+}
+function Matching({
+  selected,
+  setSelected,
+  matched,
+  onMatch,
+  onWrong,
+}: {
+  selected: string | null;
+  setSelected: (v: string | null) => void;
+  matched: Record<string, string>;
+  onMatch: (k: string, v: string) => void;
+  onWrong: () => void;
+}) {
+  const times = ["2:45", "9:15", "4:00", "6:30"];
+  function tryIt(key: string, v: string) {
+    if (digital(MATCH_CLOCKS[Number(key)]) !== v) {
+      onWrong();
+      return;
+    }
+    onMatch(key, v);
+  }
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {times
+          .filter((v) => !Object.values(matched).includes(v))
+          .map((v) => (
+            <button
+              draggable
+              onDragStart={(e) => e.dataTransfer.setData("text/plain", v)}
+              onClick={() => setSelected(v)}
+              key={v}
+              className={`rounded-2xl border-2 p-4 text-xl font-black ${selected === v ? "border-yellow-400 bg-yellow-50" : "border-blue-100 bg-blue-50"}`}
+            >
+              {v}
+            </button>
+          ))}
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-4">
+        {MATCH_CLOCKS.map((time, index) => {
+          const key = String(index);
+          return (
+            <button
+              key={key}
+              onClick={() => selected && tryIt(key, selected)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => tryIt(key, e.dataTransfer.getData("text/plain"))}
+              className="rounded-2xl border-2 border-dashed border-slate-200 p-3"
+            >
+              <InteractiveClock {...time} compact interactive={false} />
+              <strong>{matched[key] || "Drop time"}</strong>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+function Planner({
+  items,
+  plan,
+  times,
+  onPlace,
+}: {
+  items: string[][];
+  plan: Record<string, string>;
+  times: string[];
+  onPlace: (a: string, v: string) => void;
+}) {
+  return (
+    <div className="grid gap-3">
+      {items.map(([activity, icon]) => (
+        <div
+          key={activity}
+          className={`flex items-center gap-4 rounded-2xl border-2 p-3 text-left transition ${plan[activity] ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}
+        >
+          <span className="text-3xl">{icon}</span>
+          <strong className="flex-1 text-sm sm:text-base">{activity}</strong>
+          <select
+            value={plan[activity] || ""}
+            onChange={(event) =>
+              event.target.value && onPlace(activity, event.target.value)
+            }
+            className="min-w-28 rounded-xl border border-slate-200 bg-white px-3 py-3 font-black text-slate-800"
+            aria-label={`Select time for ${activity}`}
+          >
+            <option value="">Select time</option>
+            {times.map((time) => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </select>
+          {plan[activity] && (
+            <Check
+              aria-label="Time saved"
+              className="h-5 w-5 shrink-0 text-emerald-600"
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+function FindClock({ onChoose }: { onChoose: (i: number) => void }) {
+  return (
+    <div className="grid min-h-[590px] grid-cols-1 place-content-center gap-4 sm:grid-cols-3">
+      {FIND_CLOCKS.map((time, index) => (
+        <button
+          key={index}
+          onClick={() => onChoose(index)}
+          className="rounded-2xl border-2 border-blue-100 p-3 hover:border-blue-500"
+        >
+          <InteractiveClock {...time} compact interactive={false} />
+          <span className="font-bold">Clock {index + 1}</span>
+        </button>
+      ))}
+    </div>
+  );
+}

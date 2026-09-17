@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, BookOpen, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Sunrise, Trophy } from "lucide-react";
+import { ArrowRight, BookOpen, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Sunrise, Trophy, Users } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,6 +27,15 @@ export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
   {
+    title: "Profile Quest",
+    description: "Create your profile, explore a school, interview new friends, remember clues, and present a complete introduction.",
+    status: "Available",
+    icon: Users,
+    accent: "border-blue-100 bg-blue-50 text-lead-blue",
+    available: true,
+    href: "/games/profile-quest"
+  },
+  {
     title: "Reading Detective",
     description: "Enter your name, rebuild mixed-up stories, explore illustrated clues, and solve a complete reading mission.",
     status: "Available",
@@ -46,7 +55,7 @@ const games: GameCard[] = [
   },
   {
     title: "Telling Time",
-    description: "Move a real analog clock and help Bill complete his schedule from morning to bedtime.",
+    description: "Enter student and teacher names, move a real analog clock, and build a personalized schedule from morning to bedtime.",
     status: "Available",
     icon: Clock3,
     accent: "border-amber-100 bg-amber-50 text-amber-700",
