@@ -1,11 +1,13 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { CEO_SESSION_COOKIE, createCeoSessionToken, createMasterCeoSessionToken, getCeoPassword } from "@/lib/ceo-auth";
+import { constantTimeEqual, PORTAL_SESSION_TTL_SECONDS } from "@/lib/auth-security";
 import { getMasterEmployeeByUsername, getMasterPassword } from "@/lib/master-auth";
 import { recordEmployeeLogin } from "@/lib/employee-login-audit";
 import { getMongoDb } from "@/lib/mongodb";
+import { isRateLimited } from "@/lib/request-security";
 import { normalizeEmployeeUsername } from "@/lib/teachers";
 
 function clean(value: unknown) {
@@ -15,6 +17,10 @@ function clean(value: unknown) {
 export async function loginCeo(_: unknown, formData: FormData) {
   const username = normalizeEmployeeUsername(clean(formData.get("username")));
   const password = clean(formData.get("password"));
+
+  if (await isRateLimited(await headers(), "login-ceo", 10, 15 * 60 * 1000)) {
+    return { error: "Too many login attempts. Try again in 15 minutes." };
+  }
 
   if (username) {
     const db = await getMongoDb();
@@ -29,7 +35,7 @@ export async function loginCeo(_: unknown, formData: FormData) {
       return { error: "Master password is not configured yet." };
     }
 
-    if (password !== masterPassword) {
+    if (!constantTimeEqual(password, masterPassword)) {
       return { error: "Invalid password." };
     }
 
@@ -40,7 +46,7 @@ export async function loginCeo(_: unknown, formData: FormData) {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 8,
+      maxAge: PORTAL_SESSION_TTL_SECONDS,
       path: "/ceo"
     });
 
@@ -53,7 +59,7 @@ export async function loginCeo(_: unknown, formData: FormData) {
     return { error: "CEO password is not configured." };
   }
 
-  if (password !== ceoPassword) {
+  if (!constantTimeEqual(password, ceoPassword)) {
     return { error: "Invalid password." };
   }
 
@@ -62,7 +68,7 @@ export async function loginCeo(_: unknown, formData: FormData) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 8,
+    maxAge: PORTAL_SESSION_TTL_SECONDS,
     path: "/ceo"
   });
 
@@ -71,6 +77,6 @@ export async function loginCeo(_: unknown, formData: FormData) {
 
 export async function logoutCeo() {
   const cookieStore = await cookies();
-  cookieStore.delete(CEO_SESSION_COOKIE);
+  cookieStore.set(CEO_SESSION_COOKIE, "", { maxAge: 0, path: "/ceo" });
   redirect("/ceo");
 }

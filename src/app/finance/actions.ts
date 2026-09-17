@@ -1,8 +1,10 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getMongoDb } from "@/lib/mongodb";
+import { isRateLimited } from "@/lib/request-security";
+import { constantTimeEqual, PORTAL_SESSION_TTL_SECONDS } from "@/lib/auth-security";
 import {
   createFinanceSessionToken,
   FINANCE_ID_COOKIE,
@@ -21,6 +23,10 @@ export async function loginFinance(_: unknown, formData: FormData) {
   const username = normalizeEmployeeUsername(clean(formData.get("username")));
   const password = clean(formData.get("password"));
 
+  if (await isRateLimited(await headers(), "login-finance", 10, 15 * 60 * 1000)) {
+    return { error: "Too many login attempts. Try again in 15 minutes." };
+  }
+
   const db = await getMongoDb();
   const employee = await getFinanceEmployeeByUsername(db, username);
 
@@ -33,7 +39,7 @@ export async function loginFinance(_: unknown, formData: FormData) {
     return { error: "This finance password is not configured yet." };
   }
 
-  if (password !== financePassword) {
+  if (!constantTimeEqual(password, financePassword)) {
     return { error: "Invalid password." };
   }
 
@@ -44,7 +50,7 @@ export async function loginFinance(_: unknown, formData: FormData) {
     httpOnly: true,
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 8,
+    maxAge: PORTAL_SESSION_TTL_SECONDS,
     path: "/finance"
   };
 
@@ -56,7 +62,7 @@ export async function loginFinance(_: unknown, formData: FormData) {
 
 export async function logoutFinance() {
   const cookieStore = await cookies();
-  cookieStore.delete(FINANCE_ID_COOKIE);
-  cookieStore.delete(FINANCE_SESSION_COOKIE);
+  cookieStore.set(FINANCE_ID_COOKIE, "", { maxAge: 0, path: "/finance" });
+  cookieStore.set(FINANCE_SESSION_COOKIE, "", { maxAge: 0, path: "/finance" });
   redirect("/finance");
 }

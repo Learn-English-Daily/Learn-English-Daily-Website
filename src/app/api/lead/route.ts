@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { notifyNewLead } from "@/lib/admin-notifications";
 import { getMongoDb } from "@/lib/mongodb";
+import { isRateLimited, requestBodyTooLarge } from "@/lib/request-security";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,12 @@ function clean(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  if (requestBodyTooLarge(request)) {
+    return NextResponse.json({ ok: false, error: "Request is too large." }, { status: 413 });
+  }
+  if (await isRateLimited(request.headers, "lead", 10, 10 * 60 * 1000)) {
+    return NextResponse.json({ ok: false, error: "Too many submissions. Please try again later." }, { status: 429, headers: { "Retry-After": "600" } });
+  }
   const payload = (await request.json().catch(() => null)) as LeadPayload | null;
   if (!payload) {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });

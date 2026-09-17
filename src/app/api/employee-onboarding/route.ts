@@ -11,6 +11,7 @@ import {
 } from "@/lib/employee-onboarding";
 import { normalizeEmployeeUsername } from "@/lib/teachers";
 import { getMongoDb } from "@/lib/mongodb";
+import { isRateLimited, requestBodyTooLarge } from "@/lib/request-security";
 
 export const runtime = "nodejs";
 
@@ -120,6 +121,16 @@ async function generateUniqueUsername(db: Awaited<ReturnType<typeof getMongoDb>>
 }
 
 export async function POST(request: Request) {
+  if (requestBodyTooLarge(request, 64_000)) {
+    return NextResponse.json({ ok: false, error: "Request is too large." }, { status: 413 });
+  }
+  if (await isRateLimited(request.headers, "employee-onboarding", 5, 60 * 60 * 1000)) {
+    return NextResponse.json(
+      { ok: false, error: "Too many submissions. Please try again later." },
+      { status: 429, headers: { "Retry-After": "3600" } }
+    );
+  }
+
   const payload = (await request.json().catch(() => null)) as EmployeeOnboardingPayload | null;
   if (!payload) {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });

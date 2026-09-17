@@ -1,5 +1,5 @@
-import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { createExpiringSignature, verifyExpiringSignature } from "@/lib/auth-security";
 import { getAdminEmployeeById, type AdminEmployee } from "@/lib/admin-employees";
 import { getMasterPassword } from "@/lib/master-auth";
 import { getMongoDb } from "@/lib/mongodb";
@@ -31,44 +31,38 @@ function decodeTokenPart(value: string) {
   }
 }
 
-function signAdminSession(employeeId: string, username: string) {
+function getAdminSessionSecret(employeeId: string, username: string) {
   const password = getAdminPassword(username);
   const secret = process.env.ADMIN_SESSION_SECRET || password;
 
   if (!employeeId || !username || !password || !secret) {
-    return "";
+    return { message: "", secret: "" };
   }
 
-  return createHmac("sha256", secret).update(`lead-admin:${employeeId}:${username}:${password}`).digest("hex");
+  return { message: `lead-admin:${employeeId}:${username}:${password}`, secret };
 }
 
 export function createAdminSessionToken(employeeId: string, username: string) {
-  const signature = signAdminSession(employeeId, username);
-
-  if (!signature) {
+  const session = getAdminSessionSecret(employeeId, username);
+  if (!session.secret) {
     return "";
   }
-
-  return `${encodeTokenPart(employeeId)}.${encodeTokenPart(username)}.${signature}`;
+  const { expiresAt, signature } = createExpiringSignature(session.message, session.secret);
+  return `${encodeTokenPart(employeeId)}.${encodeTokenPart(username)}.${expiresAt}.${signature}`;
 }
 
 export function parseAdminSession(value = "") {
-  const [employeeIdPart, usernamePart, signature = ""] = value.split(".");
+  const [employeeIdPart, usernamePart, expiresAt = "", signature = ""] = value.split(".");
   const employeeId = decodeTokenPart(employeeIdPart || "");
   const username = decodeTokenPart(usernamePart || "");
 
-  return { employeeId, username, signature };
+  return { employeeId, username, expiresAt, signature };
 }
 
 export function isValidAdminSession(value?: string) {
-  const { employeeId, username, signature } = parseAdminSession(value || "");
-  const expectedSignature = employeeId && username ? signAdminSession(employeeId, username) : "";
-
-  if (!signature || !expectedSignature || signature.length !== expectedSignature.length) {
-    return false;
-  }
-
-  return timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+  const { employeeId, username, expiresAt, signature } = parseAdminSession(value || "");
+  const session = employeeId && username ? getAdminSessionSecret(employeeId, username) : { message: "", secret: "" };
+  return Boolean(session.secret && verifyExpiringSignature(session.message, session.secret, expiresAt, signature));
 }
 
 export async function getAuthenticatedAdmin(): Promise<AdminEmployee | null> {

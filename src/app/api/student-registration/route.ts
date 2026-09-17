@@ -5,6 +5,7 @@ import { getMongoDb } from "@/lib/mongodb";
 import { ensureGroupMonthlyInvoice } from "@/lib/group-monthly-invoices";
 import { generateParentAccessToken } from "@/lib/parent-access";
 import { isValidDateOfBirth } from "@/lib/student-age";
+import { isRateLimited, requestBodyTooLarge } from "@/lib/request-security";
 import {
   getStudentIdCountersCollectionName,
   getStudentRegistrationCollectionName,
@@ -79,6 +80,12 @@ async function getNextStudentId(prefix: "STU" | "TR") {
 }
 
 export async function POST(request: Request) {
+  if (requestBodyTooLarge(request)) {
+    return NextResponse.json({ ok: false, error: "Request is too large." }, { status: 413 });
+  }
+  if (await isRateLimited(request.headers, "student-registration", 5, 60 * 60 * 1000)) {
+    return NextResponse.json({ ok: false, error: "Too many submissions. Please try again later." }, { status: 429, headers: { "Retry-After": "3600" } });
+  }
   const payload = (await request.json().catch(() => null)) as StudentRegistrationPayload | null;
   if (!payload) {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });

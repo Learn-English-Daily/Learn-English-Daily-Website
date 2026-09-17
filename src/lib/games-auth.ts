@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createExpiringSignature, verifyExpiringSignature } from "@/lib/auth-security";
 
 export const GAMES_SESSION_COOKIE = "lead_games_session";
 
@@ -18,15 +18,13 @@ export function createGamesSessionToken() {
     return "";
   }
 
-  return createHmac("sha256", secret).update(`lead-games:${password}`).digest("hex");
+  const { expiresAt, signature } = createExpiringSignature(`lead-games:${password}`, secret);
+  return `${expiresAt}.${signature}`;
 }
 
 export function isValidGamesSession(value?: string) {
-  const expected = createGamesSessionToken();
-
-  if (!value || !expected || value.length !== expected.length) {
-    return false;
-  }
-
-  return timingSafeEqual(Buffer.from(value), Buffer.from(expected));
+  const password = getGamesPassword();
+  const secret = process.env.GAME_SESSION_SECRET || password;
+  const [expiresAt = "", signature = ""] = (value || "").split(".");
+  return Boolean(password && secret && verifyExpiringSignature(`lead-games:${password}`, secret, expiresAt, signature));
 }

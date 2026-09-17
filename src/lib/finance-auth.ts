@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createExpiringSignature, verifyExpiringSignature } from "@/lib/auth-security";
 import { getMasterPassword } from "@/lib/master-auth";
 
 export const FINANCE_SESSION_COOKIE = "lead_finance_session";
@@ -20,15 +20,13 @@ export function createFinanceSessionToken(employeeId: string, username: string) 
     return "";
   }
 
-  return createHmac("sha256", secret).update(`lead-finance:${employeeId}:${username}:${password}`).digest("hex");
+  const { expiresAt, signature } = createExpiringSignature(`lead-finance:${employeeId}:${username}:${password}`, secret);
+  return `${expiresAt}.${signature}`;
 }
 
 export function isValidFinanceSession(employeeId?: string, username?: string, value?: string) {
-  const expected = employeeId && username ? createFinanceSessionToken(employeeId, username) : "";
-
-  if (!value || !expected || value.length !== expected.length) {
-    return false;
-  }
-
-  return timingSafeEqual(Buffer.from(value), Buffer.from(expected));
+  const password = username ? getFinancePassword(username) : "";
+  const secret = process.env.FINANCE_SESSION_SECRET || password;
+  const [expiresAt = "", signature = ""] = (value || "").split(".");
+  return Boolean(employeeId && username && password && secret && verifyExpiringSignature(`lead-finance:${employeeId}:${username}:${password}`, secret, expiresAt, signature));
 }

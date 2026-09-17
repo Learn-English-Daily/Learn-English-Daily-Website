@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createExpiringSignature, verifyExpiringSignature } from "@/lib/auth-security";
 import { getMasterPassword } from "@/lib/master-auth";
 
 export const CEO_SESSION_COOKIE = "lead_ceo_session";
@@ -19,7 +19,8 @@ export function createCeoSessionToken() {
     return "";
   }
 
-  return createHmac("sha256", secret).update(`lead-ceo:${password}`).digest("hex");
+  const { expiresAt, signature } = createExpiringSignature(`lead-ceo:${password}`, secret);
+  return `${expiresAt}.${signature}`;
 }
 
 function encodeTokenPart(value: string) {
@@ -34,51 +35,45 @@ function decodeTokenPart(value: string) {
   }
 }
 
-function signMasterCeoSession(employeeId: string, username: string) {
+function getMasterCeoSessionSecret(employeeId: string, username: string) {
   const password = getMasterPassword(username);
   const secret = process.env.CEO_SESSION_SECRET || process.env.MASTER_SESSION_SECRET || password;
 
   if (!employeeId || !username || !password || !secret) {
-    return "";
+    return { message: "", secret: "" };
   }
 
-  return createHmac("sha256", secret).update(`lead-ceo-master:${employeeId}:${username}:${password}`).digest("hex");
+  return { message: `lead-ceo-master:${employeeId}:${username}:${password}`, secret };
 }
 
 export function createMasterCeoSessionToken(employeeId: string, username: string) {
-  const signature = signMasterCeoSession(employeeId, username);
-  if (!signature) return "";
-  return `master.${encodeTokenPart(employeeId)}.${encodeTokenPart(username)}.${signature}`;
+  const session = getMasterCeoSessionSecret(employeeId, username);
+  if (!session.secret) return "";
+  const { expiresAt, signature } = createExpiringSignature(session.message, session.secret);
+  return `master.${encodeTokenPart(employeeId)}.${encodeTokenPart(username)}.${expiresAt}.${signature}`;
 }
 
 export function parseMasterCeoSession(value = "") {
-  const [prefix, employeeIdPart, usernamePart, signature = ""] = value.split(".");
-  if (prefix !== "master") return { employeeId: "", username: "", signature: "" };
+  const [prefix, employeeIdPart, usernamePart, expiresAt = "", signature = ""] = value.split(".");
+  if (prefix !== "master") return { employeeId: "", username: "", expiresAt: "", signature: "" };
 
   return {
     employeeId: decodeTokenPart(employeeIdPart || ""),
     username: decodeTokenPart(usernamePart || ""),
+    expiresAt,
     signature
   };
 }
 
 export function isValidCeoSession(value?: string) {
   if (value?.startsWith("master.")) {
-    const { employeeId, username, signature } = parseMasterCeoSession(value);
-    const expectedSignature = employeeId && username ? signMasterCeoSession(employeeId, username) : "";
-
-    if (!signature || !expectedSignature || signature.length !== expectedSignature.length) {
-      return false;
-    }
-
-    return timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+    const { employeeId, username, expiresAt, signature } = parseMasterCeoSession(value);
+    const session = employeeId && username ? getMasterCeoSessionSecret(employeeId, username) : { message: "", secret: "" };
+    return Boolean(session.secret && verifyExpiringSignature(session.message, session.secret, expiresAt, signature));
   }
 
-  const expected = createCeoSessionToken();
-
-  if (!value || !expected || value.length !== expected.length) {
-    return false;
-  }
-
-  return timingSafeEqual(Buffer.from(value), Buffer.from(expected));
+  const password = getCeoPassword();
+  const secret = process.env.CEO_SESSION_SECRET || password;
+  const [expiresAt = "", signature = ""] = (value || "").split(".");
+  return Boolean(password && secret && verifyExpiringSignature(`lead-ceo:${password}`, secret, expiresAt, signature));
 }

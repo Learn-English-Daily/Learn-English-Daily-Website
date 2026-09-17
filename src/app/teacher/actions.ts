@@ -2,7 +2,8 @@
 
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { constantTimeEqual, PORTAL_SESSION_TTL_SECONDS } from "@/lib/auth-security";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
 import {
@@ -38,6 +39,7 @@ import {
   type AttendanceStatus
 } from "@/lib/attendance";
 import { getMongoDb } from "@/lib/mongodb";
+import { isRateLimited } from "@/lib/request-security";
 import { recordEmployeeLogin } from "@/lib/employee-login-audit";
 import { getStudentPaymentsCollectionName, getSuggestedPerMeetingPrice } from "@/lib/payments";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, isClassMode } from "@/lib/student-registration";
@@ -189,6 +191,10 @@ export async function loginTeacher(_: unknown, formData: FormData) {
   const username = normalizeEmployeeUsername(clean(formData.get("username")) || clean(formData.get("teacherId")));
   const password = clean(formData.get("password"));
 
+  if (await isRateLimited(await headers(), "login-teacher", 10, 15 * 60 * 1000)) {
+    return { error: "Too many login attempts. Try again in 15 minutes." };
+  }
+
   const db = await getMongoDb();
   const teacher = await getEmployeeTeacherByUsername(db, username);
 
@@ -205,7 +211,7 @@ export async function loginTeacher(_: unknown, formData: FormData) {
     return { error: "This teacher password is not configured yet." };
   }
 
-  if (password !== teacherPassword) {
+  if (!constantTimeEqual(password, teacherPassword)) {
     return { error: "Invalid password." };
   }
 
@@ -216,7 +222,7 @@ export async function loginTeacher(_: unknown, formData: FormData) {
     httpOnly: true,
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 8,
+    maxAge: PORTAL_SESSION_TTL_SECONDS,
     path: "/teacher"
   };
 
@@ -228,8 +234,8 @@ export async function loginTeacher(_: unknown, formData: FormData) {
 
 export async function logoutTeacher() {
   const cookieStore = await cookies();
-  cookieStore.delete(TEACHER_ID_COOKIE);
-  cookieStore.delete(TEACHER_SESSION_COOKIE);
+  cookieStore.set(TEACHER_ID_COOKIE, "", { maxAge: 0, path: "/teacher" });
+  cookieStore.set(TEACHER_SESSION_COOKIE, "", { maxAge: 0, path: "/teacher" });
   redirect("/teacher");
 }
 
