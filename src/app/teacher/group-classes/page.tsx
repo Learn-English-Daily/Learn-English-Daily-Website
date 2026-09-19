@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { assessmentAttendanceStatuses } from "@/lib/assessments";
 import { getBatchClassSessionsCollectionName, hasBatchClassEnded, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
+import { getBatchAttendanceRoster } from "@/lib/batch-attendance-roster";
 import { getMongoDb } from "@/lib/mongodb";
 import { isValidTeacherSession, TEACHER_ID_COOKIE, TEACHER_SESSION_COOKIE } from "@/lib/teacher-auth";
 import { getEmployeeTeacherById } from "@/lib/teachers";
@@ -57,6 +58,10 @@ export default async function TeacherGroupClassesPage() {
   const open = sessions.filter((session) => session.status === "Scheduled" && hasBatchClassEnded(session, now)).reverse();
   const future = sessions.filter((session) => session.status === "Scheduled" && !hasBatchClassEnded(session, now)).reverse();
   const completed = sessions.filter((session) => session.status === "Completed").slice(0, 12);
+  const rosters = new Map(await Promise.all([...new Set(open.map((session) => session.batchId))].map(async (batchId) =>
+    [batchId, await getBatchAttendanceRoster(db, batchId)] as const
+  )));
+  for (const session of open) session.studentSnapshot = rosters.get(session.batchId) || [];
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -92,6 +97,7 @@ export default async function TeacherGroupClassesPage() {
               </div>
               <ActionFeedbackForm action={saveBatchClassAttendance} successMessage="Group attendance and class progress saved." className="p-5">
                 <input type="hidden" name="sessionId" value={session._id.toString()} />
+                <input type="hidden" name="rosterStudentIds" value={JSON.stringify(session.studentSnapshot.map((student) => student.studentId))} />
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1250px] text-left text-sm">
                     <thead className="text-xs uppercase tracking-[0.12em] text-lead-gray"><tr><th className="pb-3">Student</th><th className="pb-3">Attendance</th><th className="pb-3">Stars</th><th className="pb-3">Minutes Late</th><th className="pb-3">Communication</th><th className="pb-3">English Skills</th><th className="pb-3">Creativity</th><th className="pb-3">Learning Habits</th></tr></thead>

@@ -39,6 +39,7 @@ import {
   type AttendanceStatus
 } from "@/lib/attendance";
 import { getMongoDb } from "@/lib/mongodb";
+import { getBatchAttendanceRoster } from "@/lib/batch-attendance-roster";
 import { isRateLimited } from "@/lib/request-security";
 import { recordEmployeeLogin } from "@/lib/employee-login-audit";
 import { getStudentPaymentsCollectionName, getSuggestedPerMeetingPrice } from "@/lib/payments";
@@ -553,7 +554,13 @@ export async function saveBatchClassAttendance(formData: FormData) {
   if (!session) throw new Error("Scheduled group class not found for this teacher.");
   if (!hasBatchClassEnded(session)) throw new Error("Attendance can only be marked after the class end time (WIB).");
 
-  const attendance: BatchAttendanceEntry[] = session.studentSnapshot.map((student, index) => {
+  const roster = await getBatchAttendanceRoster(db, session.batchId);
+  if (clean(formData.get("rosterStudentIds")) !== JSON.stringify(roster.map((student) => student.studentId))) {
+    throw new Error("Batch students have changed. Refresh the page before marking attendance.");
+  }
+  if (!roster.length) throw new Error("This batch has no current students to mark attendance for.");
+
+  const attendance: BatchAttendanceEntry[] = roster.map((student, index) => {
     const status = clean(formData.get(`attendance_${index}`));
     if (!isAssessmentAttendanceStatus(status)) throw new Error(`Select attendance for ${student.studentName}.`);
     const ratings = {
@@ -577,7 +584,7 @@ export async function saveBatchClassAttendance(formData: FormData) {
   const now = new Date();
   await sessions.updateOne(
     { _id: session._id, status: "Scheduled" },
-    { $set: { attendance, attendanceMarked: true, attendanceMarkedAt: now, attendanceMarkedBy: teacher.id, status: "Completed", updatedAt: now } }
+    { $set: { studentSnapshot: roster, attendance, attendanceMarked: true, attendanceMarkedAt: now, attendanceMarkedBy: teacher.id, status: "Completed", updatedAt: now } }
   );
 
   revalidatePath("/teacher/group-classes");
