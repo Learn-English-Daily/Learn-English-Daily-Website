@@ -11,7 +11,8 @@ export type GameType =
   | "pet-rescue-adventure"
   | "action-hero"
   | "telling-time"
-  | "profile-quest";
+  | "profile-quest"
+  | "career-quest";
 
 export type GameSessionDocument = {
   token?: string;

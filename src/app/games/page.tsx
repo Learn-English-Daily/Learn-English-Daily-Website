@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, BookOpen, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Sunrise, Trophy, Users } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, PawPrint, Puzzle, Sparkles, Sunrise, Trophy, Users } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "Career Quest", description: "Explore Career City, perform eight real job missions, solve situations, and speak about your future career.", status: "Available", icon: BriefcaseBusiness, accent: "border-yellow-100 bg-yellow-50 text-amber-700", available: true, href: "/games/career-quest" },
   {
     title: "Profile Quest",
     description: "Create your profile, explore a school, interview new friends, remember clues, and present a complete introduction.",

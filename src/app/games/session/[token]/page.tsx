@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowRight, BookOpen, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, PawPrint, Puzzle, Sparkles, Users } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, PawPrint, Puzzle, Sparkles, Users } from "lucide-react";
 import { ActionHeroGame } from "@/app/games/action-hero/action-hero-game";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
@@ -14,6 +14,7 @@ import { PetRescueAdventure } from "@/app/games/pet-rescue-adventure/pet-rescue-
 import { TellingTimeGame } from "@/components/games/telling-time/telling-time-game";
 import { ReadingDetectiveGame } from "@/components/games/reading-detective/reading-detective-game";
 import { ProfileQuestGame } from "@/components/games/profile-quest/profile-quest-game";
+import { CareerQuestGame } from "@/components/games/career-quest/career-quest-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -92,6 +93,7 @@ export default async function GameSessionPage({
   const isActionHero = activeGame === "action-hero";
   const isTellingTime = activeGame === "telling-time";
   const isProfileQuest = activeGame === "profile-quest";
+  const isCareerQuest = activeGame === "career-quest";
   const shouldShowHub =
     gameSession?.gameType === "games-hub" &&
     !isEscapeRoom &&
@@ -105,7 +107,8 @@ export default async function GameSessionPage({
     !isPetRescueAdventure &&
     !isActionHero &&
     !isTellingTime &&
-    !isProfileQuest;
+    !isProfileQuest &&
+    !isCareerQuest;
   const gameTitle = shouldShowHub
     ? "LEAD Class Games"
     : isEscapeRoom
@@ -130,6 +133,8 @@ export default async function GameSessionPage({
                       ? "Telling Time"
                     : isProfileQuest
                       ? "Profile Quest"
+                    : isCareerQuest
+                      ? "Career Quest"
               : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
@@ -155,8 +160,10 @@ export default async function GameSessionPage({
     ? "Enter student and teacher names, move a real analog clock, and complete a personalized day."
     : isProfileQuest
     ? "Create a profile, interview new friends, remember clues, and introduce someone in English."
+    : isCareerQuest
+    ? "Explore Career City, perform eight jobs, solve situations, and speak about a future career."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isProfileQuest ? Users : isReadingDetective ? BookOpen : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isCareerQuest ? BriefcaseBusiness : isProfileQuest ? Users : isReadingDetective ? BookOpen : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -233,6 +240,8 @@ export default async function GameSessionPage({
           <TellingTimeGame />
         ) : isProfileQuest ? (
           <ProfileQuestGame />
+        ) : isCareerQuest ? (
+          <CareerQuestGame />
         ) : (
           <SpeechCompetitionGame />
         )}
@@ -243,6 +252,7 @@ export default async function GameSessionPage({
 
 function GameHub({ token }: { token: string }) {
   const games = [
+    { title: "Career Quest", description: "Explore Career City, master eight jobs, and speak about a future career.", href: `/games/session/${encodeURIComponent(token)}?game=career-quest`, icon: BriefcaseBusiness, accent: "border-yellow-100 bg-yellow-50 text-amber-700" },
     {
       title: "Profile Quest",
       description: "Explore a school, interview new friends, remember clues, and present an introduction.",
