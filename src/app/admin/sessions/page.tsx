@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { CalendarClock, Gamepad2, Pencil, Search, Trash2, UserRound, Users } from "lucide-react";
 import type { WithId } from "mongodb";
@@ -16,6 +17,7 @@ import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { GchatSessionMessage } from "@/app/admin/sessions/gchat-session-message";
 import { TemporaryMeetLink } from "@/app/admin/sessions/temporary-meet-link";
 import { PrivateSessionForm } from "@/app/admin/sessions/private-session-form";
+import { PrivateSessionImport } from "@/app/admin/sessions/private-session-import";
 import { AdminLoginForm } from "@/app/admin/login-form";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -425,15 +427,15 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
         <Card className="p-3">
           <div className="grid gap-3 sm:grid-cols-2">
             {!groupOnly ? (
-              <a href="/admin/sessions?type=private" className={`focus-ring flex items-center gap-4 rounded-xl border p-4 transition ${schedulingType === "private" ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white hover:border-blue-300"}`}>
+              <Link href="/admin/sessions?type=private" className={`focus-ring flex items-center gap-4 rounded-xl border p-4 transition ${schedulingType === "private" ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white hover:border-blue-300"}`}>
                 <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-lead-blue shadow-sm"><UserRound className="h-5 w-5" /></div>
                 <div><p className="font-heading text-lg font-extrabold text-lead-navy">Private 1-to-1 Classes</p><p className="mt-1 text-sm text-lead-gray">Schedule one individual student at a time.</p></div>
-              </a>
+              </Link>
             ) : null}
-            <a href="/admin/sessions?type=group" className={`focus-ring flex items-center gap-4 rounded-xl border p-4 transition ${schedulingType === "group" ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white hover:border-blue-300"}`}>
+            <Link href="/admin/sessions?type=group" className={`focus-ring flex items-center gap-4 rounded-xl border p-4 transition ${schedulingType === "group" ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white hover:border-blue-300"}`}>
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-lead-blue shadow-sm"><Users className="h-5 w-5" /></div>
               <div><p className="font-heading text-lg font-extrabold text-lead-navy">Group Batch Classes</p><p className="mt-1 text-sm text-lead-gray">Schedule one batch roster for 1 or 12 meetings.</p></div>
-            </a>
+            </Link>
           </div>
         </Card>
       </section>
@@ -450,6 +452,10 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
               <PrivateSessionForm students={students} teachers={teachers} defaultDate={getIndonesiaDateInput(1)} />
             </div>
           </Card>
+          <Card className="p-5">
+            <PrivateSessionImport students={students} teachers={teachers} />
+          </Card>
+
 
           <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
             <SummaryCard label="Needs attendance" value={needsAttendance.length} tone="text-rose-600" />
@@ -475,7 +481,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                 <input id="session-student-search" name="q" defaultValue={sessionSearch} placeholder="Search student name or ID, e.g. STU002" className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-lead-navy" />
               </div>
               <Button type="submit"><Search className="h-4 w-4" /> Search</Button>
-              {sessionSearch ? <Button asChild type="button" variant="secondary"><a href="/admin/sessions?type=private">Clear</a></Button> : null}
+              {sessionSearch ? <Button asChild type="button" variant="secondary"><Link href="/admin/sessions?type=private">Clear</Link></Button> : null}
             </div>
             {sessionSearch ? <p className="mt-2 text-xs font-semibold text-lead-gray">Showing scheduled classes matching “{sessionSearch}”.</p> : null}
           </form>
@@ -665,7 +671,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                         <Field label="Class Mode"><select name="classMode" required defaultValue={groupSession.classMode || "Offline"} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2"><option value="Offline">Offline</option><option value="Online">Online</option></select></Field>
                         <Field label="From (WIB)"><input name="startTime" type="time" required defaultValue={groupSession.startTime} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2" /></Field>
                         <Field label="To (WIB)"><input name="endTime" type="time" required defaultValue={groupSession.endTime} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-2" /></Field>
-                        <p className="text-xs text-lead-gray sm:col-span-2">Updates this class only. Its meeting number and the batch's regular schedule stay unchanged.</p>
+                        <p className="text-xs text-lead-gray sm:col-span-2">Updates this class only. Its meeting number and the batch&apos;s regular schedule stay unchanged.</p>
                         <Button type="submit" size="sm" className="sm:w-fit">Save Class</Button>
                       </ActionFeedbackForm>
                     </details>
