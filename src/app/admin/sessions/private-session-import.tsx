@@ -33,7 +33,8 @@ function cellText(value: unknown) {
 }
 
 function normalizeTime(value: unknown) {
-  if (value instanceof Date) return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+  // Excel time-only cells are UTC-based serial values, not local timestamps.
+  if (value instanceof Date) return `${String(value.getUTCHours()).padStart(2, "0")}:${String(value.getUTCMinutes()).padStart(2, "0")}`;
   const text = cellText(value);
   const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(text);
   return match ? `${match[1].padStart(2, "0")}:${match[2]}` : text;
