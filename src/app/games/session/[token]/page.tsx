@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, Palette, PawPrint, Puzzle, Sparkles, Users } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock, Footprints, Gamepad2, KeyRound, LockKeyhole, Mic, Palette, PawPrint, Puzzle, Sparkles, Users, Utensils } from "lucide-react";
 import { ActionHeroGame } from "@/app/games/action-hero/action-hero-game";
 import { EscapeRoomGame } from "@/app/games/escape-room/escape-room-game";
 import { PronunciationChallengeGame } from "@/app/games/pronunciation-challenge/pronunciation-challenge-game";
@@ -16,6 +16,7 @@ import { ReadingDetectiveGame } from "@/components/games/reading-detective/readi
 import { ProfileQuestGame } from "@/components/games/profile-quest/profile-quest-game";
 import { CareerQuestGame } from "@/components/games/career-quest/career-quest-game";
 import { HobbiesLevelUpGame } from "@/components/games/hobbies-level-up/hobbies-level-up-game";
+import { MealTimeGame } from "@/components/games/meal-time/meal-time-game";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -96,6 +97,7 @@ export default async function GameSessionPage({
   const isProfileQuest = activeGame === "profile-quest";
   const isCareerQuest = activeGame === "career-quest";
   const isHobbiesLevelUp = activeGame === "hobbies-level-up";
+  const isMealTime = activeGame === "meal-time";
   const shouldShowHub =
     gameSession?.gameType === "games-hub" &&
     !isEscapeRoom &&
@@ -111,9 +113,12 @@ export default async function GameSessionPage({
     !isTellingTime &&
     !isProfileQuest &&
     !isCareerQuest &&
-    !isHobbiesLevelUp;
+    !isHobbiesLevelUp &&
+    !isMealTime;
   const gameTitle = shouldShowHub
     ? "LEAD Class Games"
+    : isMealTime
+      ? "Meal Time Adventure"
     : isHobbiesLevelUp
       ? "Hobbies Level Up"
     : isEscapeRoom
@@ -143,6 +148,8 @@ export default async function GameSessionPage({
               : "Speech Competition Game";
   const gameDescription = shouldShowHub
     ? "Choose a class game. This private link is temporary and only works during the class game window."
+    : isMealTime
+    ? "Explore breakfast, lunch, and dinner, complete a Meal Chart, and test your recall."
     : isHobbiesLevelUp
     ? "Explore hobbies, give reasons, survey classmates, and complete an oral mission."
     : isEscapeRoom
@@ -170,7 +177,7 @@ export default async function GameSessionPage({
     : isCareerQuest
     ? "Explore Career City, perform eight jobs, solve situations, and speak about a future career."
     : "Practice your speech during class. This link is temporary and only works during the class game window.";
-  const GameIcon = shouldShowHub ? Gamepad2 : isHobbiesLevelUp ? Palette : isCareerQuest ? BriefcaseBusiness : isProfileQuest ? Users : isReadingDetective ? BookOpen : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
+  const GameIcon = shouldShowHub ? Gamepad2 : isMealTime ? Utensils : isHobbiesLevelUp ? Palette : isCareerQuest ? BriefcaseBusiness : isProfileQuest ? Users : isReadingDetective ? BookOpen : isTellingTime ? Clock : isActionHero ? Footprints : isPetRescueAdventure ? PawPrint : isTransportationAdventure ? Bus : isEscapeRoom ? KeyRound : isPronunciationChallenge ? Sparkles : isVocabularyMatch ? Puzzle : isSentenceBuilder ? Puzzle : Mic;
 
   if (!gameSession) {
     return (
@@ -225,6 +232,8 @@ export default async function GameSessionPage({
       <section className="container-shell grid gap-6 py-8">
         {shouldShowHub ? (
           <GameHub token={gameSession.token} />
+        ) : isMealTime ? (
+          <MealTimeGame />
         ) : isHobbiesLevelUp ? (
           <HobbiesLevelUpGame />
         ) : isEscapeRoom ? (
@@ -261,6 +270,7 @@ export default async function GameSessionPage({
 
 function GameHub({ token }: { token: string }) {
   const games = [
+    { title: "Meal Time Adventure", description: "Explore Meal Town, talk about meals, complete a chart, and test your memory.", href: `/games/session/${encodeURIComponent(token)}?game=meal-time`, icon: Utensils, accent: "border-orange-100 bg-orange-50 text-orange-700" },
     { title: "Hobbies Level Up", description: "Explore a 2D hobby park, give reasons, survey friends, and speak about your hobby.", href: `/games/session/${encodeURIComponent(token)}?game=hobbies-level-up`, icon: Palette, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700" },
     { title: "Career Quest", description: "Explore Career City, master eight jobs, and speak about a future career.", href: `/games/session/${encodeURIComponent(token)}?game=career-quest`, icon: BriefcaseBusiness, accent: "border-yellow-100 bg-yellow-50 text-amber-700" },
     {

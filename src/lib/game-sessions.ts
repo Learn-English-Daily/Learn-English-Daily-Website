@@ -13,7 +13,8 @@ export type GameType =
   | "telling-time"
   | "profile-quest"
   | "career-quest"
-  | "hobbies-level-up";
+  | "hobbies-level-up"
+  | "meal-time";
 
 export type GameSessionDocument = {
   token?: string;
