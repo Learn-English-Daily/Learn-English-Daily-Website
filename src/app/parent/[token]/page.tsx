@@ -28,6 +28,7 @@ type StudentDocument = {
   studentName?: string;
   courseJoined?: string;
   classType?: string;
+  activeBatchId?: string;
   parentAccessToken?: string;
 };
 
@@ -76,6 +77,16 @@ type LatestGroupClass = {
   learningHabits: number;
   automaticCommentEn: string;
   automaticCommentId: string;
+};
+
+type GroupClassProgress = {
+  totalClasses: number;
+  presentClasses: number;
+  excusedClasses: number;
+  absentClasses: number;
+  attendanceRate: number;
+  averageParticipation: number | null;
+  averagePerformance: number | null;
 };
 
 function formatDate(value: string) {
@@ -128,7 +139,17 @@ function getCurrentPhaseAttendance(records: WithId<AttendanceDocument>[]) {
   return records.filter((record) => record.meetingDate && record.meetingDate >= phaseStartDate);
 }
 
-async function getParentPortalData(token: string): Promise<{ student: Student; attendance: Attendance[]; latestGroupClass: LatestGroupClass | null } | null> {
+function roundedAverage(values: number[]) {
+  if (!values.length) return null;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+}
+
+async function getParentPortalData(token: string): Promise<{
+  student: Student;
+  attendance: Attendance[];
+  latestGroupClass: LatestGroupClass | null;
+  groupClassProgress: GroupClassProgress | null;
+} | null> {
   if (!token || token.length < 20) return null;
 
   const db = await getMongoDb();
@@ -145,13 +166,31 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
     .limit(500)
     .toArray()) as WithId<AttendanceDocument>[];
   const currentPhaseAttendanceDocs = getCurrentPhaseAttendance(attendanceDocs);
-  const latestGroupSession = studentDoc.classType === "Basic Group" ? await db
+  const groupSessions = studentDoc.classType === "Basic Group" ? await db
     .collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
-    .find({ status: "Completed", attendanceMarked: true, "attendance.studentId": studentDoc.studentId })
+    .find({
+      status: "Completed",
+      attendanceMarked: true,
+      "attendance.studentId": studentDoc.studentId,
+      ...(studentDoc.activeBatchId ? { batchId: studentDoc.activeBatchId } : {})
+    })
     .sort({ sessionDate: -1, attendanceMarkedAt: -1, meetingNumber: -1 })
-    .limit(1)
-    .next() : null;
+    .limit(500)
+    .toArray() : [];
+  const latestGroupSession = groupSessions[0] || null;
   const latestGroupEntry = latestGroupSession?.attendance?.find((entry) => entry.studentId === studentDoc.studentId);
+  const groupEntries = groupSessions.flatMap((session) =>
+    session.attendance?.filter((entry) => entry.studentId === studentDoc.studentId) || []
+  );
+  const presentClasses = groupEntries.filter((entry) => entry.attendance === "Present").length;
+  const excusedClasses = groupEntries.filter((entry) => entry.attendance === "Excused").length;
+  const absentClasses = groupEntries.filter((entry) => entry.attendance === "Absent").length;
+  const attendedEntries = groupEntries.filter((entry) => entry.attendance !== "Absent");
+  const participationScores = attendedEntries.map((entry) => entry.participationStars).filter((score) => score > 0);
+  const performanceScores = attendedEntries.flatMap((entry) => {
+    const ratings = [entry.communication, entry.englishSkills, entry.creativity, entry.learningHabits].filter((rating) => rating > 0);
+    return ratings.length ? [ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length] : [];
+  });
 
   return {
     student: {
@@ -167,6 +206,15 @@ async function getParentPortalData(token: string): Promise<{ student: Student; a
       notes: record.notes || "",
       teacherNames: record.teacherNames || []
     })),
+    groupClassProgress: groupEntries.length ? {
+      totalClasses: groupEntries.length,
+      presentClasses,
+      excusedClasses,
+      absentClasses,
+      attendanceRate: Math.round(((presentClasses + excusedClasses) / groupEntries.length) * 100),
+      averageParticipation: roundedAverage(participationScores),
+      averagePerformance: roundedAverage(performanceScores)
+    } : null,
     latestGroupClass: latestGroupSession && latestGroupEntry ? {
       batchName: latestGroupSession.batchName,
       program: latestGroupSession.program,
@@ -199,7 +247,7 @@ export default async function ParentAttendancePortalPage({
     notFound();
   }
 
-  const { student, attendance, latestGroupClass } = data;
+  const { student, attendance, latestGroupClass, groupClassProgress } = data;
   const isGroupStudent = student.classType === "Basic Group";
   const latestAttendance = attendance[0];
   const presentCount = countStatus(attendance, "Present");
@@ -356,6 +404,44 @@ export default async function ParentAttendancePortalPage({
 
           {latestGroupClass ? (
             <div className="mt-5 grid gap-5">
+              {groupClassProgress ? (
+                <section className="rounded-2xl border border-blue-100 bg-[linear-gradient(135deg,#eff6ff,#ffffff_58%,#fff7d6)] p-4 sm:p-5" aria-labelledby="overall-class-progress">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-lead-blue">Active batch</p>
+                      <h3 id="overall-class-progress" className="mt-1 font-heading text-xl font-extrabold text-lead-navy">Overall Class Progress</h3>
+                    </div>
+                    <p className="text-xs font-semibold text-lead-gray">Based on completed classes with marked attendance</p>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <ProgressKpi
+                      label="Classes Present"
+                      value={`${groupClassProgress.presentClasses} of ${groupClassProgress.totalClasses}`}
+                      detail={`${groupClassProgress.absentClasses} absent${groupClassProgress.excusedClasses ? ` / ${groupClassProgress.excusedClasses} excused` : ""}`}
+                      tone="emerald"
+                    />
+                    <ProgressKpi
+                      label="Attendance Rate"
+                      value={`${groupClassProgress.attendanceRate}%`}
+                      detail="Present and excused classes"
+                      tone="blue"
+                    />
+                    <ProgressKpi
+                      label="Avg. Participation"
+                      value={groupClassProgress.averageParticipation === null ? "Not rated" : `${groupClassProgress.averageParticipation}/5`}
+                      detail="Stars across attended classes"
+                      tone="amber"
+                    />
+                    <ProgressKpi
+                      label="Avg. Performance"
+                      value={groupClassProgress.averagePerformance === null ? "Not rated" : `${groupClassProgress.averagePerformance}/5`}
+                      detail="Four learning skill areas"
+                      tone="violet"
+                    />
+                  </div>
+                </section>
+              ) : null}
+
               <div className="rounded-lg bg-slate-50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -473,6 +559,23 @@ function ProgressStat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg bg-slate-50 p-4">
       <p className="font-heading text-2xl font-extrabold text-lead-blue">{value}</p>
       <p className="mt-1 text-sm font-bold text-lead-navy">{label}</p>
+    </div>
+  );
+}
+
+function ProgressKpi({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: "emerald" | "blue" | "amber" | "violet" }) {
+  const toneClass = {
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    blue: "border-blue-100 bg-blue-50 text-lead-blue",
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    violet: "border-violet-100 bg-violet-50 text-violet-700"
+  }[tone];
+
+  return (
+    <div className={`rounded-xl border p-4 ${toneClass}`}>
+      <p className="font-heading text-2xl font-extrabold">{value}</p>
+      <p className="mt-1 text-sm font-extrabold text-lead-navy">{label}</p>
+      <p className="mt-1 text-xs leading-5 text-lead-gray">{detail}</p>
     </div>
   );
 }
