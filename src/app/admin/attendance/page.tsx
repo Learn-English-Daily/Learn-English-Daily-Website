@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { redirect } from "next/navigation";
 import { BookOpenCheck, CalendarCheck, CalendarClock, CalendarRange, ChevronDown, Search, UserRoundCheck } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -96,6 +95,18 @@ type TodaySession = {
   status: ComputedClassSessionStatus;
 };
 
+type GroupAttendanceRecord = {
+  id: string;
+  batchName: string;
+  topic: string;
+  meetingNumber: number;
+  meetingDate: string;
+  teacherName: string;
+  status: "Present" | "Absent" | "Excused";
+  participationStars: number;
+  minutesLate: number;
+};
+
 function firstParam(value?: string | string[]) {
   return Array.isArray(value) ? value[0] || "" : value || "";
 }
@@ -131,7 +142,7 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function statusClassName(status: AttendanceStatus | ComputedClassSessionStatus) {
+function statusClassName(status: AttendanceStatus | ComputedClassSessionStatus | "Excused") {
   if (status === "Present" || status === "Completed") return "bg-emerald-50 text-emerald-700";
   if (status === "Absent" || status === "Needs Attendance") return "bg-rose-50 text-rose-700";
   if (status === "Late") return "bg-yellow-50 text-yellow-800";
@@ -348,6 +359,82 @@ async function getOperationsData(db: Awaited<ReturnType<typeof getMongoDb>>) {
   return { reminders, todaySessions, missingJournals, missingJournalCount, recentAttendance: recentDocs.map(mapAttendance) };
 }
 
+async function getGroupAttendanceData({
+  query,
+  studentId,
+  status,
+  teacherId,
+  month
+}: {
+  query: string;
+  studentId: string;
+  status: string;
+  teacherId: string;
+  month: string;
+}) {
+  const db = await getMongoDb();
+  const today = jakartaDateKey();
+  const search = query.trim();
+  const studentFilter: Filter<StudentDocument> = {
+    $and: [
+      getActiveStudentFilter(),
+      { classType: "Basic Group" },
+      ...(search ? [{ $or: ["studentId", "studentName", "parentName", "whatsapp", "courseJoined"].map((field) => ({ [field]: { $regex: escapeRegex(search), $options: "i" } })) }] : [])
+    ]
+  };
+  const selectedFilter: Filter<StudentDocument> = {
+    $and: [getActiveStudentFilter(), { classType: "Basic Group" }, { studentId }]
+  };
+  const [studentDocs, selectedDoc, sessionDocs, teachers] = await Promise.all([
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(studentFilter).sort({ studentId: 1, studentName: 1 }).limit(300).toArray() as Promise<WithId<StudentDocument>[]>,
+    studentId ? db.collection<StudentDocument>(getStudentRegistrationCollectionName()).findOne(selectedFilter) : null,
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: { $ne: "Cancelled" } }).sort({ sessionDate: -1, meetingNumber: -1 }).limit(1500).toArray(),
+    getAvailableTeachers(db)
+  ]);
+  const students = studentDocs.map((doc) => ({
+    id: doc._id.toString(),
+    studentId: doc.studentId || "",
+    studentName: doc.studentName || "Unknown",
+    parentName: doc.parentName || "",
+    courseJoined: doc.courseJoined || "",
+    classType: doc.classType || "",
+    classMode: doc.classMode || "Online"
+  } satisfies Student));
+  const selectedStudent = selectedDoc ? ({
+    id: selectedDoc._id.toString(),
+    studentId: selectedDoc.studentId || "",
+    studentName: selectedDoc.studentName || "Unknown",
+    parentName: selectedDoc.parentName || "",
+    courseJoined: selectedDoc.courseJoined || "",
+    classType: selectedDoc.classType || "",
+    classMode: selectedDoc.classMode || "Online"
+  } satisfies Student) : null;
+  const overdueSessions = sessionDocs.filter((doc) => doc.status === "Scheduled" && !doc.attendanceMarked && hasBatchClassEnded(doc));
+  const todaySessions = sessionDocs.filter((doc) => doc.sessionDate === today);
+  const completedSessions = sessionDocs.filter((doc) => doc.status === "Completed" || doc.attendanceMarked);
+  const completedToday = completedSessions.filter((doc) => doc.sessionDate === today).length;
+  const records: GroupAttendanceRecord[] = selectedStudent ? completedSessions.flatMap((session) => {
+    const entry = session.attendance?.find((item) => item.studentId === selectedStudent.studentId);
+    if (!entry) return [];
+    if (status && entry.attendance !== status) return [];
+    if (teacherId && session.teacherId !== teacherId) return [];
+    if (month && !session.sessionDate.startsWith(month)) return [];
+    return [{
+      id: `${session._id.toString()}-${entry.studentId}`,
+      batchName: session.batchName,
+      topic: session.topic || "",
+      meetingNumber: session.meetingNumber,
+      meetingDate: session.sessionDate,
+      teacherName: session.teacherName,
+      status: entry.attendance,
+      participationStars: entry.participationStars,
+      minutesLate: entry.minutesLate
+    }];
+  }) : [];
+
+  return { students, selectedStudent, teachers, overdueSessions, todaySessions, completedSessions, completedToday, records };
+}
+
 export default async function AdminAttendancePage({
   searchParams
 }: {
@@ -395,16 +482,19 @@ export default async function AdminAttendancePage({
     );
   }
 
-  if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
-
   const db = await getMongoDb();
-  const [students, selectedStudent, teachers, closedPeriods, operations, admin] = await Promise.all([
+  const admin = await getAuthenticatedAdmin();
+  if (isGroupStudentAdminSession(session)) {
+    const groupData = await getGroupAttendanceData({ query, studentId, status, teacherId, month });
+    return <GroupAttendanceAdminPage data={groupData} admin={admin} filters={{ query, studentId, status, teacherId, month }} />;
+  }
+
+  const [students, selectedStudent, teachers, closedPeriods, operations] = await Promise.all([
     getStudents(query),
     getSelectedStudent(studentId),
     getAvailableTeachers(db),
     getClosedBillingPeriodKeys(db),
-    getOperationsData(db),
-    getAuthenticatedAdmin()
+    getOperationsData(db)
   ]);
   const attendance = selectedStudent
     ? await getAttendance({ studentId, status, teacherId, month, showArchived, closedPeriods })
@@ -605,6 +695,125 @@ export default async function AdminAttendancePage({
       </section>
     </main>
   );
+}
+
+function GroupAttendanceAdminPage({
+  data,
+  admin,
+  filters
+}: {
+  data: Awaited<ReturnType<typeof getGroupAttendanceData>>;
+  admin: { name: string; username: string } | null;
+  filters: { query: string; studentId: string; status: string; teacherId: string; month: string };
+}) {
+  const recentCompleted = data.completedSessions.slice(0, 12);
+  return (
+    <main className="min-h-screen bg-lead-soft">
+      <AdminPageHeader
+        active="attendance"
+        title="Group attendance monitoring"
+        description="Read-only oversight of group-class attendance and student history. Teachers own attendance entry."
+        userName={admin?.name}
+        username={admin?.username}
+        logoutAction={logoutAdmin}
+      />
+
+      <section className="container-shell grid gap-6 py-8">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard icon={CalendarClock} label="Attendance Needed" value={data.overdueSessions.length} helper="Overdue group classes" tone="rose" />
+          <KpiCard icon={CalendarCheck} label="Today's Classes" value={data.todaySessions.length} helper={`${data.completedToday} attendance completed`} tone="blue" />
+          <KpiCard icon={UserRoundCheck} label="Completed Today" value={data.completedToday} helper="Group attendance submitted" tone="green" />
+          <KpiCard icon={BookOpenCheck} label="Completed Classes" value={data.completedSessions.length} helper="Recorded group classes" tone="amber" />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <OperationsList title="Attendance Needed" helper="Group classes past their end time without attendance." empty="No overdue group attendance." tone="rose">
+            {data.overdueSessions.map((session) => (
+              <CompactRow key={session._id.toString()} title={`${session.batchName} / Meeting ${session.meetingNumber}`} detail={`${formatDate(session.sessionDate)} / ${session.startTime} - ${session.endTime} WIB / ${session.teacherName || "Teacher not assigned"}`} badge="Needed" badgeClassName="bg-rose-50 text-rose-700" />
+            ))}
+          </OperationsList>
+          <OperationsList title="Today's Group Classes" helper="Live status for group classes scheduled today in WIB." empty="No group classes scheduled today." tone="blue">
+            {data.todaySessions.map((session) => {
+              const completed = session.status === "Completed" || Boolean(session.attendanceMarked);
+              const badge = completed ? "Completed" : hasBatchClassEnded(session) ? "Needs Attendance" : "Scheduled";
+              return <CompactRow key={session._id.toString()} title={`${session.batchName} / Meeting ${session.meetingNumber}`} detail={`${session.startTime} - ${session.endTime} WIB / ${session.teacherName || "Teacher not assigned"}`} badge={badge} badgeClassName={statusClassName(badge as ComputedClassSessionStatus)} />;
+            })}
+          </OperationsList>
+          <OperationsList title="Recent Group Attendance" helper="Latest teacher-submitted group-class records." empty="No group attendance records yet." tone="green">
+            {recentCompleted.map((session) => (
+              <CompactRow key={session._id.toString()} title={`${session.batchName} / Meeting ${session.meetingNumber}`} detail={`${formatDate(session.sessionDate)} / ${session.topic || "Topic not recorded"} / ${session.teacherName || "Teacher not assigned"}`} badge="Completed" badgeClassName="bg-emerald-50 text-emerald-700" />
+            ))}
+          </OperationsList>
+        </div>
+
+        <Card className="p-5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Group Student Attendance History</h2>
+              <p className="mt-1 text-sm text-lead-gray">Search Basic Group students and inspect teacher-submitted attendance without changing it.</p>
+            </div>
+            <span className="w-fit rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase text-lead-blue">Group students only</span>
+          </div>
+          <form action="/admin/attendance" className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <label className="relative md:col-span-2">
+              <span className="sr-only">Search group students</span>
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
+              <input name="q" defaultValue={filters.query} placeholder="Student ID, name, parent..." className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy" />
+            </label>
+            <input type="hidden" name="studentId" value={filters.studentId} />
+            <select name="status" defaultValue={filters.status} aria-label="Group attendance status" className="focus-ring h-12 rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy">
+              <option value="">All statuses</option>
+              {(["Present", "Absent", "Excused"] as const).map((option) => <option key={option}>{option}</option>)}
+            </select>
+            <select name="teacherId" defaultValue={filters.teacherId} aria-label="Teacher" className="focus-ring h-12 rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy">
+              <option value="">All teachers</option>
+              {data.teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
+            </select>
+            <input name="month" type="month" defaultValue={filters.month} aria-label="Attendance month" className="focus-ring h-12 rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy" />
+            <Button type="submit" size="lg"><Search className="h-4 w-4" />Apply Filters</Button>
+          </form>
+        </Card>
+
+        <div className="grid items-start gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+          <Card className="p-5 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto">
+            <h2 className="font-heading text-xl font-bold text-lead-navy">Group Students</h2>
+            <p className="mt-1 text-xs text-lead-gray">Only active Basic Group students are available here.</p>
+            <div className="mt-4 grid gap-3">
+              {data.students.map((student) => (
+                <a key={student.id} href={groupStudentHref(student.studentId, filters)} className={`focus-ring rounded-lg border p-4 transition hover:border-lead-blue hover:bg-blue-50 ${data.selectedStudent?.studentId === student.studentId ? "border-lead-blue bg-blue-50" : "border-slate-200 bg-white"}`}>
+                  <div className="flex flex-wrap items-center gap-2"><span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{student.studentId}</span><span className="font-heading font-bold text-lead-navy">{student.studentName}</span></div>
+                  <p className="mt-2 text-xs font-semibold text-lead-gray">{student.courseJoined} / {student.classMode}</p>
+                </a>
+              ))}
+              {!data.students.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No group students found.</p> : null}
+            </div>
+          </Card>
+
+          {data.selectedStudent ? (
+            <div className="grid gap-6">
+              <Card className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-3"><h2 className="font-heading text-2xl font-bold text-lead-navy">{data.selectedStudent.studentName}</h2><span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">{data.selectedStudent.studentId}</span></div><p className="mt-2 text-sm text-lead-gray">{data.selectedStudent.courseJoined} / Basic Group / {data.selectedStudent.classMode}</p></div><p className="text-sm font-bold text-lead-blue">{data.records.length} filtered record{data.records.length === 1 ? "" : "s"}</p></div></Card>
+              <Card className="p-5"><h2 className="font-heading text-xl font-bold text-lead-navy">Group attendance records</h2><div className="mt-5 grid gap-3">{data.records.map((record) => <GroupAttendanceRow key={record.id} record={record} />)}{!data.records.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No group attendance matches these filters.</p> : null}</div></Card>
+            </div>
+          ) : (
+            <Card className="p-8 text-center"><h2 className="font-heading text-2xl font-bold text-lead-navy">Choose a group student</h2><p className="mt-3 text-lead-gray">Select a student to inspect their group attendance history.</p></Card>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function GroupAttendanceRow({ record }: { record: GroupAttendanceRecord }) {
+  return <div className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-heading font-bold text-lead-navy">{record.batchName} / Meeting {record.meetingNumber}</h3><span className={`rounded-lg px-3 py-1 text-xs font-bold uppercase ${statusClassName(record.status)}`}>{record.status}</span></div><p className="mt-2 text-sm text-lead-gray">{formatDate(record.meetingDate)} / {record.teacherName || "Teacher not assigned"}</p><p className="mt-1 text-sm text-lead-gray"><span className="font-bold text-lead-navy">Topic:</span> {record.topic || "Not recorded"}</p></div><div className="text-sm font-semibold text-lead-gray sm:text-right"><p>{record.participationStars}/5 participation stars</p><p className="mt-1">{record.minutesLate} minutes late</p></div></div></div>;
+}
+
+function groupStudentHref(studentId: string, filters: { query: string; status: string; teacherId: string; month: string }) {
+  const params = new URLSearchParams({ studentId });
+  if (filters.query) params.set("q", filters.query);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.teacherId) params.set("teacherId", filters.teacherId);
+  if (filters.month) params.set("month", filters.month);
+  return `/admin/attendance?${params}`;
 }
 
 function KpiCard({ icon: Icon, label, value, helper, tone }: { icon: typeof CalendarCheck; label: string; value: number; helper: string; tone: "rose" | "blue" | "amber" | "green" }) {

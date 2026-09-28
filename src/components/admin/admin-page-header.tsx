@@ -44,7 +44,7 @@ export function AdminPageHeader({
   logoutAction: () => void | Promise<void>;
 }) {
   const access = getAdminAccessForUsername(username || "");
-  const visibleNavItems = adminNavItems.filter((item) => access === "full" || ["dashboard", "sessions", "students", "batches"].includes(item.key));
+  const visibleNavItems = adminNavItems.filter((item) => access === "full" || ["dashboard", "sessions", "attendance", "students", "batches"].includes(item.key));
 
   return (
     <header className="border-b border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
@@ -72,7 +72,7 @@ export function AdminPageHeader({
           </form>
         </div>
 
-        <nav className={`mt-6 grid gap-3 ${access === "full" ? "sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7" : "grid-cols-4 overflow-x-auto pb-2"}`} aria-label="Admin navigation">
+        <nav className={`mt-6 grid gap-3 ${access === "full" ? "sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7" : "grid-cols-5 overflow-x-auto pb-2"}`} aria-label="Admin navigation">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;
