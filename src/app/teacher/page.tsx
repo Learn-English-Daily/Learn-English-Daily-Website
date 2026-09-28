@@ -599,13 +599,13 @@ export default async function TeacherPortalPage({
   const data = await getTeacherPortalData(teacher.id, selectedAssessmentMonth, selectedAssessmentYear);
   const today = getTodayJakarta();
   const db = await getMongoDb();
-  const todaysGroupSessions = await db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
-    .find({ teacherId: teacher.id, sessionDate: today, status: "Scheduled", attendanceMarked: { $ne: true } })
-    .sort({ startTime: 1, meetingNumber: 1 }).toArray();
-  const groupAttendanceNeeded = todaysGroupSessions.filter((session) => hasBatchClassEnded(session)).length;
+  const pendingGroupSessions = await db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
+    .find({ teacherId: teacher.id, status: "Scheduled", attendanceMarked: { $ne: true } })
+    .sort({ sessionDate: 1, startTime: 1, meetingNumber: 1 }).toArray();
+  const todaysGroupSessions = pendingGroupSessions.filter((session) => session.sessionDate === today);
+  const groupAttendanceNeeded = pendingGroupSessions.filter((session) => hasBatchClassEnded(session)).length;
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
   const missedSessions = data.sessions.filter((session) => session.sessionDate < today);
-  const needsAttendance = todaysSessions.filter((session) => session.status === "Needs Attendance");
   const attendanceNeededSessions = data.sessions.filter((session) => session.status === "Needs Attendance");
   const selectedBatch = data.batches.find((batch) => batch.id === selectedAssessmentBatchId);
   const selectedStudent = selectedBatch?.students.find((student) => student.studentId === selectedAssessmentStudentId);
@@ -670,7 +670,7 @@ export default async function TeacherPortalPage({
       <section className="container-shell grid gap-6 py-8">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length + todaysGroupSessions.length} detail="Private and group classes today" />
-          <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={needsAttendance.length + groupAttendanceNeeded} detail="Today's classes waiting" tone="rose" />
+          <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={attendanceNeededSessions.length + groupAttendanceNeeded} detail="Private and group classes waiting" tone="rose" />
           <TeacherKpi icon={CalendarCheck} label="Missed" value={missedSessions.length} detail="Past unmarked classes" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Journal Missing" value={data.journalMissingCount} detail="Attendance records needing journal" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Recent Records" value={data.recentAttendance.length} detail="Your latest attendance entries" tone="blue" />
