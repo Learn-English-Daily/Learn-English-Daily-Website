@@ -65,6 +65,7 @@ type Attendance = {
 type LatestGroupClass = {
   batchName: string;
   program: string;
+  topic: string;
   teacherName: string;
   meetingNumber: number;
   sessionDate: string;
@@ -218,6 +219,7 @@ async function getParentPortalData(token: string): Promise<{
     latestGroupClass: latestGroupSession && latestGroupEntry ? {
       batchName: latestGroupSession.batchName,
       program: latestGroupSession.program,
+      topic: latestGroupSession.topic || "",
       teacherName: latestGroupSession.teacherName,
       meetingNumber: latestGroupSession.meetingNumber,
       sessionDate: latestGroupSession.sessionDate,
@@ -448,6 +450,7 @@ export default async function ParentAttendancePortalPage({
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-lead-gray">Meeting {latestGroupClass.meetingNumber} / {formatDate(latestGroupClass.sessionDate)}</p>
                     <h3 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">{latestGroupClass.batchName || student.courseJoined}</h3>
                     <p className="mt-1 text-sm text-lead-gray">{latestGroupClass.program || student.courseJoined} / Teacher: {latestGroupClass.teacherName || "Not assigned"}</p>
+                    <p className="mt-3 text-sm text-lead-gray"><span className="font-bold text-lead-navy">Class topic:</span> {latestGroupClass.topic || "Not recorded"}</p>
                   </div>
                   <span className="w-fit rounded-lg bg-emerald-50 px-4 py-2 text-sm font-extrabold uppercase text-emerald-700">
                     {latestGroupClass.attendance}

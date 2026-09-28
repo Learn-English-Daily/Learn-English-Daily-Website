@@ -98,6 +98,17 @@ export default async function TeacherGroupClassesPage() {
               <ActionFeedbackForm action={saveBatchClassAttendance} successMessage="Group attendance and class progress saved." className="p-5">
                 <input type="hidden" name="sessionId" value={session._id.toString()} />
                 <input type="hidden" name="rosterStudentIds" value={JSON.stringify(session.studentSnapshot.map((student) => student.studentId))} />
+                <label className="mb-5 grid gap-2 text-sm font-bold text-lead-navy">
+                  Class topic <span className="font-normal text-lead-gray">This will be shown in the parent portal.</span>
+                  <input
+                    required
+                    name="topic"
+                    defaultValue={session.topic || ""}
+                    maxLength={160}
+                    placeholder="Example: Daily routines and telling the time"
+                    className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy"
+                  />
+                </label>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1250px] text-left text-sm">
                     <thead className="text-xs uppercase tracking-[0.12em] text-lead-gray"><tr><th className="pb-3">Student</th><th className="pb-3">Attendance</th><th className="pb-3">Stars</th><th className="pb-3">Minutes Late</th><th className="pb-3">Communication</th><th className="pb-3">English Skills</th><th className="pb-3">Creativity</th><th className="pb-3">Learning Habits</th></tr></thead>
