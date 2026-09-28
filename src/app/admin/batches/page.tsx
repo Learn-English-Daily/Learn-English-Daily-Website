@@ -159,6 +159,7 @@ export default async function AdminBatchesPage() {
   const [batchPageData, admin] = await Promise.all([getBatchPageData(), getAuthenticatedAdmin()]);
   const { batches, teachers, students } = batchPageData;
   const activeBatches = batches.filter((batch) => batch.status === "active");
+  const archivedBatches = batches.filter((batch) => batch.status === "archived");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
 
   return (
@@ -211,8 +212,13 @@ export default async function AdminBatchesPage() {
           </Card>
         </div>
 
-        <div className="grid gap-5">
-            {batches.map((batch) => {
+        <div>
+          <div className="mb-4">
+            <h2 className="font-heading text-2xl font-extrabold text-lead-navy">Active Batches</h2>
+            <p className="mt-1 text-sm text-lead-gray">Only batches currently in use are shown here.</p>
+          </div>
+          <div className="grid gap-5">
+            {activeBatches.map((batch) => {
               const batchStudents = students.filter((student) => student.activeBatchId === batch.id);
 
               return (
@@ -301,7 +307,33 @@ export default async function AdminBatchesPage() {
                 </Card>
               );
             })}
+            {!activeBatches.length ? <Card className="p-8 text-center text-sm text-lead-gray">No active batches.</Card> : null}
+          </div>
         </div>
+
+        {archivedBatches.length ? (
+          <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+            <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 p-5 marker:content-none">
+              <div>
+                <h2 className="font-heading text-lg font-extrabold text-lead-navy">Archived Batches</h2>
+                <p className="mt-1 text-sm text-lead-gray">Hidden from active management · {archivedBatches.length} archived</p>
+              </div>
+              <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold uppercase text-slate-600 group-open:hidden">Show history</span>
+            </summary>
+            <div className="grid gap-3 border-t border-slate-200 bg-slate-50/70 p-5 sm:grid-cols-2 lg:grid-cols-3">
+              {archivedBatches.map((batch) => (
+                <div key={batch.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-heading font-extrabold text-lead-navy">{batch.batchName}</h3>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase text-slate-600">Archived</span>
+                  </div>
+                  <p className="mt-2 text-sm text-lead-gray">{batch.program} / {batch.teacherName || "Teacher not assigned"}</p>
+                  <p className="mt-1 text-xs text-lead-gray">Started {formatDate(batch.startDate)}</p>
+                </div>
+              ))}
+            </div>
+          </details>
+        ) : null}
       </section>
     </main>
   );
