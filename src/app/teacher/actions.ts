@@ -541,7 +541,9 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
 export async function saveBatchClassAttendance(formData: FormData) {
   const teacher = await assertTeacher();
   const sessionId = clean(formData.get("sessionId"));
+  const topic = clean(formData.get("topic"));
   if (!ObjectId.isValid(sessionId)) throw new Error("Invalid group class.");
+  if (!topic || topic.length > 160) throw new Error("Enter a class topic of 160 characters or fewer.");
 
   const db = await getMongoDb();
   const sessions = db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName());
@@ -584,7 +586,7 @@ export async function saveBatchClassAttendance(formData: FormData) {
   const now = new Date();
   await sessions.updateOne(
     { _id: session._id, status: "Scheduled" },
-    { $set: { studentSnapshot: roster, attendance, attendanceMarked: true, attendanceMarkedAt: now, attendanceMarkedBy: teacher.id, status: "Completed", updatedAt: now } }
+    { $set: { topic, studentSnapshot: roster, attendance, attendanceMarked: true, attendanceMarkedAt: now, attendanceMarkedBy: teacher.id, status: "Completed", updatedAt: now } }
   );
 
   revalidatePath("/teacher/group-classes");
