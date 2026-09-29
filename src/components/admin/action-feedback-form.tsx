@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { useActionState, useState, useTransition, type ComponentPropsWithoutRef, type ReactNode } from "react";
 
 type ActionState = {
   status: "idle" | "success" | "error";
@@ -16,15 +16,18 @@ type ActionFeedbackFormProps = Omit<ComponentPropsWithoutRef<"form">, "action" |
   action: (formData: FormData) => void | ActionFeedbackResult | Promise<void | ActionFeedbackResult>;
   successMessage: string;
   children: ReactNode;
+  preserveValuesAfterSubmit?: boolean;
 };
 
 export function ActionFeedbackForm({
   action,
   successMessage,
   children,
+  preserveValuesAfterSubmit = false,
   ...formProps
 }: ActionFeedbackFormProps) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
+  const { onSubmit, ...restFormProps } = formProps;
+  const [actionState, formAction, actionPending] = useActionState<ActionState, FormData>(
     async (_previousState, formData) => {
       try {
         const result = await action(formData);
@@ -38,9 +41,37 @@ export function ActionFeedbackForm({
     },
     { status: "idle" }
   );
+  const [preservedState, setPreservedState] = useState<ActionState>({ status: "idle" });
+  const [preservedPending, startTransition] = useTransition();
+  const state = preserveValuesAfterSubmit ? preservedState : actionState;
+  const pending = preserveValuesAfterSubmit ? preservedPending : actionPending;
+
+  async function submitPreservingValues(formData: FormData) {
+    try {
+      const result = await action(formData);
+      if (result && !result.success) {
+        setPreservedState({ status: "error", message: result.message });
+        return;
+      }
+      setPreservedState({ status: "success" });
+    } catch {
+      setPreservedState({ status: "error" });
+    }
+  }
 
   return (
-    <form action={formAction} {...formProps}>
+    <form
+      action={preserveValuesAfterSubmit ? undefined : formAction}
+      {...restFormProps}
+      onSubmit={(event) => {
+        onSubmit?.(event);
+        if (!preserveValuesAfterSubmit || event.defaultPrevented) return;
+
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        startTransition(() => submitPreservingValues(formData));
+      }}
+    >
       <fieldset disabled={pending} className="contents">
         {children}
       </fieldset>

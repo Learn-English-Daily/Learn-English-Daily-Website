@@ -669,7 +669,7 @@ export default async function FinancePaymentsPage({
                         </div>
                         {!showArchived ? (
                         <div className="lg:min-w-[360px]">
-                        <ActionFeedbackForm action={updateStudentPaymentStatus} successMessage="Payment updated successfully." className="grid gap-2 sm:grid-cols-2">
+                        <ActionFeedbackForm action={updateStudentPaymentStatus} successMessage="Payment updated successfully." preserveValuesAfterSubmit className="grid gap-2 sm:grid-cols-2">
                           <input type="hidden" name="id" value={payment.id} />
                           <select name="status" defaultValue={payment.status} className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-lead-navy">
                             {paymentStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
