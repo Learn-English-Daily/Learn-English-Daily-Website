@@ -242,7 +242,7 @@ export async function closeMonthlyBalance(formData: FormData) {
     source?: string;
     meetingNumber?: number;
     receiptUploadedToDrive?: boolean;
-  }>(getStudentPaymentsCollectionName()).find({}).limit(50000).toArray();
+  }>(getStudentPaymentsCollectionName()).find({ financeExcluded: { $ne: true } }).limit(50000).toArray();
   const students = await db.collection<{
     studentId?: string;
     studentName?: string;

@@ -37,6 +37,7 @@ type PaymentDocument = {
   baseAmountDue?: number;
   registrationFeeIncluded?: boolean;
   registrationFeeAmount?: number;
+  financeExcluded?: boolean;
 };
 
 type StudentDocument = {
@@ -83,7 +84,7 @@ async function getPaymentRequest(id: string): Promise<PaymentRequest | null> {
   const db = await getMongoDb();
   const payment = (await db
     .collection<PaymentDocument>(getStudentPaymentsCollectionName())
-    .findOne({ _id: new ObjectId(id) })) as WithId<PaymentDocument> | null;
+    .findOne({ _id: new ObjectId(id), financeExcluded: { $ne: true } })) as WithId<PaymentDocument> | null;
 
   if (!payment?.studentId) return null;
 

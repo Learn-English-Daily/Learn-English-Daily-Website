@@ -37,6 +37,7 @@ export async function refreshUnpaidStudentPaymentPricing(db: Db, student: Studen
     {
       studentId: student.studentId,
       status: { $ne: "Paid" },
+      financeExcluded: { $ne: true },
       source: { $nin: ["batch-assessment", "batch-monthly"] }
     },
     {
