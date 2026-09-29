@@ -68,7 +68,7 @@ async function getCumulativePaymentRequest(studentId: string): Promise<Cumulativ
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).findOne({ studentId }),
     db
       .collection<PaymentDocument>(getStudentPaymentsCollectionName())
-      .find({ studentId, status: "Unpaid" })
+      .find({ studentId, status: "Unpaid", financeExcluded: { $ne: true } })
       .sort({ meetingDate: 1, meetingNumber: 1 })
       .limit(200)
       .toArray() as Promise<WithId<PaymentDocument>[]>

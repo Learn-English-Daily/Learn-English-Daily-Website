@@ -72,6 +72,7 @@ type PaymentDocument = {
   classMode?: string;
   receiptUploadedToDrive?: boolean;
   createdAt?: Date;
+  financeExcluded?: boolean;
 };
 
 type LeadDocument = {
@@ -192,7 +193,7 @@ async function getDashboardData(period: Period) {
   const [students, attendance, payments, leads, reviews, classSessions] = await Promise.all([
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<AttendanceDocument>(getStudentAttendanceCollectionName()).find({}).sort({ meetingDate: -1 }).limit(20000).toArray(),
-    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({}).sort({ meetingDate: -1 }).limit(20000).toArray(),
+    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ financeExcluded: { $ne: true } }).sort({ meetingDate: -1 }).limit(20000).toArray(),
     db.collection<LeadDocument>(leadCollectionName).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<ReviewDocument>(getReviewCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({}).sort({ scheduledAt: -1 }).limit(5000).toArray()

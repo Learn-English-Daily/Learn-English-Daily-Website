@@ -6,7 +6,8 @@ import { ObjectId, type WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
-import { changeStudentStatus, updateStudentRegistration } from "@/app/admin/students/actions";
+import { changeStudentStatus, updateStudentRegistration, waiveUnpaidGroupMonthlyFee } from "@/app/admin/students/actions";
+import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
@@ -168,7 +169,7 @@ async function getLifecycleWarnings(studentId: string) {
   const db = await getMongoDb();
   const [futureSessions, unpaidPayments, reminders, missingJournals] = await Promise.all([
     db.collection(getClassSessionsCollectionName()).countDocuments({ studentId, status: { $ne: "Completed" } }),
-    db.collection(getStudentPaymentsCollectionName()).countDocuments({ studentId, status: "Unpaid" }),
+    db.collection(getStudentPaymentsCollectionName()).countDocuments({ studentId, status: "Unpaid", financeExcluded: { $ne: true } }),
     getAttendanceReminders(db),
     db.collection(getStudentAttendanceCollectionName()).countDocuments({
       studentId,
@@ -418,9 +419,23 @@ export default async function EditStudentRegistrationPage({
                 Reason / Note
                 <textarea name="statusNote" rows={3} placeholder="Example: Completed Fluent English course" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" />
               </label>
-              <p className="text-xs leading-5 text-lead-gray md:col-span-2">Changing away from Active closes unfinished scheduled classes but preserves attendance, journals, payments, receipts, Parent QR access, and Student ID.</p>
+              {registration.classType === "Basic Group" ? (
+                <label className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-lead-navy md:col-span-2">
+                  <input name="waiveGroupMonthlyFee" type="checkbox" className="mt-1 h-4 w-4 accent-lead-blue" />
+                  <span><strong>Waive this month&apos;s unpaid group fee when withdrawing</strong><span className="mt-1 block text-xs leading-5 text-lead-gray">Uses the effective date&apos;s month. Paid invoices are never changed, and the waived invoice is retained internally for audit.</span></span>
+                </label>
+              ) : null}
+              <p className="text-xs leading-5 text-lead-gray md:col-span-2">Changing away from Active closes unfinished scheduled classes but preserves attendance, journals, receipts, Parent QR access, and Student ID. Payments remain unchanged unless the withdrawal fee-waiver option is selected.</p>
               <Button type="submit" className="md:col-span-2 md:w-fit">Update Student Status</Button>
             </form>
+            {registration.classType === "Basic Group" && registration.studentStatus !== "Active" && lifecycleWarnings.unpaidPayments ? (
+              <ActionFeedbackForm action={waiveUnpaidGroupMonthlyFee} successMessage="The unpaid group fee was waived and removed from active Finance totals." className="mt-4 grid gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 md:grid-cols-2">
+                <input type="hidden" name="id" value={registration.id} />
+                <label className="grid gap-2 text-sm font-semibold text-lead-navy">Fee month<input name="billingMonth" type="month" required defaultValue={todayWib.slice(0, 7)} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" /></label>
+                <label className="grid gap-2 text-sm font-semibold text-lead-navy">Reason<input name="waiverReason" required defaultValue="Withdrawn without taking classes" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" /></label>
+                <Button type="submit" variant="secondary" className="md:col-span-2 md:w-fit">Waive Unpaid Group Fee</Button>
+              </ActionFeedbackForm>
+            ) : null}
             <div className="mt-4 grid gap-3">
               {registration.statusHistory.map((entry, index) => (
                 <div key={`${entry.changedAt}-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">

@@ -85,6 +85,7 @@ type PaymentDocument = {
   registrationFeeIncluded?: boolean;
   registrationFeeAmount?: number;
   createdAt?: Date;
+  financeExcluded?: boolean;
 };
 
 type Payment = {
@@ -292,7 +293,7 @@ async function getPayments(student: Student, showArchived = false, closedPeriodK
   const normalizedStudentName = normalizePaymentName(student.studentName);
   const docs = (await db
     .collection<PaymentDocument>(getStudentPaymentsCollectionName())
-    .find({ studentId: student.studentId })
+    .find({ studentId: student.studentId, financeExcluded: { $ne: true } })
     .sort({ meetingNumber: -1, meetingDate: -1 })
     .limit(200)
     .toArray()) as WithId<PaymentDocument>[];
@@ -331,7 +332,7 @@ async function getPayments(student: Student, showArchived = false, closedPeriodK
 async function getFinancePaymentOverview(closedPeriodKeys = new Set<string>()): Promise<FinancePaymentOverview> {
   const db = await getMongoDb();
   const [paymentDocs, studentDocs] = await Promise.all([
-    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({}).limit(50000).toArray() as Promise<WithId<PaymentDocument>[]>,
+    db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ financeExcluded: { $ne: true } }).limit(50000).toArray() as Promise<WithId<PaymentDocument>[]>,
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getCourseStudentFilter()).limit(50000).toArray() as Promise<WithId<StudentDocument>[]>
   ]);
   const studentsById = new Map(studentDocs.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));

@@ -99,6 +99,7 @@ type StudentPaymentDocument = {
   paidDate?: string;
   paymentMethod?: string;
   createdAt?: Date;
+  financeExcluded?: boolean;
 };
 
 type FinanceIncomeDocument = {
@@ -410,7 +411,7 @@ async function getFinanceData(searchParams: SearchParams) {
     students,
     teachers
   ] = await Promise.all([
-    db.collection<StudentPaymentDocument>(getStudentPaymentsCollectionName()).find({}).sort({ meetingDate: -1 }).limit(50000).toArray() as Promise<WithId<StudentPaymentDocument>[]>,
+    db.collection<StudentPaymentDocument>(getStudentPaymentsCollectionName()).find({ financeExcluded: { $ne: true } }).sort({ meetingDate: -1 }).limit(50000).toArray() as Promise<WithId<StudentPaymentDocument>[]>,
     db.collection<FinanceIncomeDocument>(getFinanceIncomeCollectionName()).find({}).sort({ paymentDate: -1 }).limit(50000).toArray() as Promise<WithId<FinanceIncomeDocument>[]>,
     db.collection<FinanceExpenseDocument>(getFinanceExpensesCollectionName()).find({}).sort({ expenseDate: -1 }).limit(50000).toArray() as Promise<WithId<FinanceExpenseDocument>[]>,
     db.collection<TeacherPaymentDocument>(getFinanceTeacherPaymentsCollectionName()).find({}).sort({ period: -1 }).limit(10000).toArray() as Promise<WithId<TeacherPaymentDocument>[]>,
