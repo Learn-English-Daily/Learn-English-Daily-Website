@@ -28,7 +28,6 @@ type StudentDocument = {
   studentName?: string;
   courseJoined?: string;
   classType?: string;
-  activeBatchId?: string;
   parentAccessToken?: string;
 };
 
@@ -172,8 +171,7 @@ async function getParentPortalData(token: string): Promise<{
     .find({
       status: "Completed",
       attendanceMarked: true,
-      "attendance.studentId": studentDoc.studentId,
-      ...(studentDoc.activeBatchId ? { batchId: studentDoc.activeBatchId } : {})
+      "attendance.studentId": studentDoc.studentId
     })
     .sort({ sessionDate: -1, attendanceMarkedAt: -1, meetingNumber: -1 })
     .limit(500)
