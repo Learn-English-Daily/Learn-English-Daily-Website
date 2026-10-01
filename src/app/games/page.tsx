@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "Playground Champions", description: "Explore a connected sports park, play action challenges, earn medals, unlock the arena, and give a champion interview.", status: "Available", icon: Trophy, accent: "border-yellow-100 bg-yellow-50 text-amber-700", available: true, href: "/games/playground-champions" },
   { title: "Lost & Found Adventure", description: "Walk around the LEAD Fun Fair, hunt for missing accessories, solve memory mysteries, and complete Show & Tell.", status: "Available", icon: Search, accent: "border-blue-100 bg-blue-50 text-lead-blue", available: true, href: "/games/lost-found-adventure" },
   { title: "Meal Time Adventure", description: "Enter your name, explore Meal Town, sort foods, complete a Meal Chart, and win a memory challenge.", status: "Available", icon: Utensils, accent: "border-orange-100 bg-orange-50 text-orange-700", available: true, href: "/games/meal-time" },
   { title: "Hobbies Level Up", description: "Enter your name, explore a 2D hobby park, give reasons, survey classmates, and complete an oral challenge.", status: "Available", icon: Palette, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/hobbies-level-up" },
