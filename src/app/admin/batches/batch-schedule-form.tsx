@@ -6,11 +6,12 @@ import { scheduleBatchClasses } from "@/app/admin/batches/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 
-export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMeetingNumbers = [] }: { batchId: string; batchName: string; days: string; time: string; scheduledMeetingNumbers?: number[] }) {
+export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMeetingNumbers = [] }: { batchId: string; batchName: string; days: string; time: string; scheduledMeetingNumbers?: Array<{ sessionDate: string; status: string }> }) {
   const [mode, setMode] = useState<"single" | "series">("single");
+  const [seriesMonth, setSeriesMonth] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit" }).format(new Date()));
   const isSeries = mode === "series";
-  const scheduledCount = new Set(scheduledMeetingNumbers.filter((meeting) => meeting >= 1 && meeting <= 12)).size;
-  const remainingCount = 12 - scheduledCount;
+  const scheduledCount = scheduledMeetingNumbers.filter((meeting) => meeting.sessionDate.startsWith(`${seriesMonth}-`) && meeting.status !== "Cancelled").length;
+  const remainingCount = Math.max(0, 12 - scheduledCount);
 
   return (
     <div>
@@ -33,7 +34,7 @@ export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMee
         <div className="flex gap-3">
           <CalendarDays className={`mt-0.5 h-5 w-5 shrink-0 ${isSeries ? "text-lead-blue" : "text-slate-500"}`} />
           {isSeries ? (
-            <div><p className="font-bold text-lead-navy">Schedules the {remainingCount} remaining {remainingCount === 1 ? "class" : "classes"}</p><p className="mt-1 text-sm leading-6 text-lead-gray">{scheduledCount ? `${scheduledCount} of 12 meetings already exist. ` : ""}The next meetings are created automatically using <strong>{days}</strong> at <strong>{time}</strong>.</p></div>
+            <div><p className="font-bold text-lead-navy">Schedules {remainingCount} more {remainingCount === 1 ? "class" : "classes"} in {seriesMonth}</p><p className="mt-1 text-sm leading-6 text-lead-gray">{scheduledCount ? `${scheduledCount} of 12 classes already exist in this month. ` : ""}Meeting numbers continue from the previous month using <strong>{days}</strong> at <strong>{time}</strong>.</p></div>
           ) : (
             <div><p className="font-bold text-lead-navy">Creates one selected meeting</p><p className="mt-1 text-sm leading-6 text-lead-gray">Use this for a single class, replacement class, or a meeting you want to schedule separately.</p></div>
           )}
@@ -43,6 +44,7 @@ export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMee
       <ActionFeedbackForm action={scheduleBatchClasses} successMessage={isSeries ? "Remaining group classes scheduled." : "Group class scheduled."} className="mt-4 grid gap-4 sm:grid-cols-2">
         <input type="hidden" name="batchId" value={batchId} />
         <input type="hidden" name="scheduleMode" value={mode} />
+        {isSeries ? <label className="grid gap-2 text-sm font-bold text-lead-navy sm:col-span-2">Schedule Month<input name="seriesMonth" type="month" required value={seriesMonth} onChange={(event) => setSeriesMonth(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100" /></label> : null}
         <label className="grid gap-2 text-sm font-bold text-lead-navy">Class Mode
           <select name="classMode" defaultValue="Offline" required className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100">
             <option value="Online">Online</option>

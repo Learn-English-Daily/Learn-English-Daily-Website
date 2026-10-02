@@ -404,6 +404,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
   const selectedBatchId = groupData.batches.some((batch) => batch.id === requestedBatchId) ? requestedBatchId || "" : groupData.batches[0]?.id || "";
   const selectedBatch = groupData.batches.find((batch) => batch.id === selectedBatchId);
   const selectedBatchSessions = groupData.sessions.filter((groupSession) => groupSession.batchId === selectedBatchId);
+  const visibleGroupSessions = groupData.sessions.filter((groupSession) => groupSession.status !== "Completed" && !groupSession.attendanceMarked);
   const needsAttendance = sessions.filter((session) => session.status === "Needs Attendance");
   const today = getIndonesiaDateInput();
   const todaysSessions = sessions.filter((session) => session.sessionDate === today);
@@ -626,16 +627,16 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                 </div>
               ) : null}
             </Card>
-            {selectedBatch ? <Card className="p-5"><BatchScheduleForm key={selectedBatch.id} batchId={selectedBatch.id} batchName={selectedBatch.batchName} days={selectedBatch.days} time={selectedBatch.time} scheduledMeetingNumbers={selectedBatchSessions.map((session) => session.meetingNumber)} /></Card> : null}
+            {selectedBatch ? <Card className="p-5"><BatchScheduleForm key={selectedBatch.id} batchId={selectedBatch.id} batchName={selectedBatch.batchName} days={selectedBatch.days} time={selectedBatch.time} scheduledMeetingNumbers={selectedBatchSessions.map((session) => ({ sessionDate: session.sessionDate, status: session.status }))} /></Card> : null}
             {!selectedBatch ? <Card className="p-6 text-sm text-lead-gray">Create an active batch and assign its students before scheduling group classes.</Card> : null}
           </div>
 
           <div><h2 className="font-heading text-2xl font-extrabold text-lead-navy">All Group Schedules</h2><p className="mt-2 text-sm text-lead-gray">View each batch below. Choose a batch above only when creating classes.</p></div>
           {Array.from(new Map([
-            ...groupData.sessions.map((session) => [session.batchId, { id: session.batchId, batchName: session.batchName }] as const),
+            ...visibleGroupSessions.map((session) => [session.batchId, { id: session.batchId, batchName: session.batchName }] as const),
             ...groupData.batches.map((batch) => [batch.id, batch] as const)
           ]).values()).sort((a, b) => a.batchName.localeCompare(b.batchName)).map((batch) => {
-            const batchSessions = groupData.sessions.filter((session) => session.batchId === batch.id).sort((a, b) => a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime));
+            const batchSessions = visibleGroupSessions.filter((session) => session.batchId === batch.id).sort((a, b) => a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime));
             return <Card key={batch.id} className="p-5">
             <div className="flex items-start justify-between gap-3"><h3 className="font-heading text-xl font-extrabold text-lead-navy">{batch.batchName} Schedule</h3><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-lead-blue">{batchSessions.length} classes</span></div>
             <div className="mt-5 max-h-[540px] space-y-3 overflow-y-auto pr-1">

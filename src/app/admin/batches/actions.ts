@@ -66,12 +66,6 @@ function getJakartaDateInput() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function nextDateInput(value: string) {
-  const date = new Date(`${value}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
-}
-
 async function assertAdmin() {
   const cookieStore = await cookies();
   const isAuthenticated = isValidAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
@@ -278,6 +272,7 @@ export async function scheduleBatchClasses(formData: FormData) {
   const admin = await assertAdmin();
   const batchId = clean(formData.get("batchId"));
   const scheduleMode = clean(formData.get("scheduleMode"));
+  const seriesMonth = clean(formData.get("seriesMonth"));
   const firstMeetingNumber = numberInRange(formData.get("firstMeetingNumber"), 1, 12, 1);
   const requestedFirstDate = clean(formData.get("firstDate"));
   const requestedStartTime = clean(formData.get("startTime"));
@@ -292,31 +287,27 @@ export async function scheduleBatchClasses(formData: FormData) {
   const batch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), status: "active" });
   if (!batch) throw new Error("Active batch not found.");
 
-  const existingMeetings = scheduleMode === "series"
-    ? await db.collection(getBatchClassSessionsCollectionName()).find({
-        batchId,
-        meetingNumber: { $gte: 1, $lte: 12 },
-        status: { $ne: "Cancelled" }
-      }).project({ meetingNumber: 1, sessionDate: 1 }).toArray()
-    : [];
-  const existingMeetingNumbers = new Set(existingMeetings.map((meeting) => Number(meeting.meetingNumber)));
+  if (scheduleMode === "series" && !/^\d{4}-\d{2}$/.test(seriesMonth)) throw new Error("Select a valid month for the 12-class series.");
+  const existingMeetings = await db.collection(getBatchClassSessionsCollectionName()).find({
+    batchId,
+    status: { $ne: "Cancelled" }
+  }).project({ meetingNumber: 1, sessionDate: 1 }).toArray();
+  const meetingsInMonth = scheduleMode === "series" ? existingMeetings.filter((meeting) => String(meeting.sessionDate || "").startsWith(`${seriesMonth}-`)) : [];
+  const nextMeetingNumber = existingMeetings.reduce((highest, meeting) => Math.max(highest, Number(meeting.meetingNumber) || 0), 0) + 1;
   const meetingNumbers = scheduleMode === "series"
-    ? Array.from({ length: 12 }, (_, index) => index + 1).filter((meetingNumber) => !existingMeetingNumbers.has(meetingNumber))
+    ? Array.from({ length: Math.max(0, 12 - meetingsInMonth.length) }, (_, index) => nextMeetingNumber + index)
     : [firstMeetingNumber];
   const count = meetingNumbers.length;
 
-  if (!count) throw new Error("All 12 meetings are already scheduled for this batch.");
+  if (!count) throw new Error(`All 12 classes are already scheduled for ${seriesMonth}.`);
 
   const savedTime = scheduleMode === "series" ? parseBatchTimeRange(String(batch.time || "")) : null;
   if (scheduleMode === "series" && !savedTime) {
     throw new Error("The batch time is invalid. Edit the batch and use a range such as 7:00 PM - 8:00 PM.");
   }
-  const latestExistingDate = existingMeetings.map((meeting) => String(meeting.sessionDate || "")).filter(Boolean).sort().at(-1);
-  const automaticFirstDate = [
-    String(batch.startDate || ""),
-    getJakartaDateInput(),
-    latestExistingDate ? nextDateInput(latestExistingDate) : ""
-  ].filter(Boolean).sort().at(-1) || getJakartaDateInput();
+  const monthStart = scheduleMode === "series" ? `${seriesMonth}-01` : "";
+  const today = getJakartaDateInput();
+  const automaticFirstDate = [String(batch.startDate || ""), monthStart, today.startsWith(`${seriesMonth}-`) ? today : ""].filter(Boolean).sort().at(-1) || monthStart;
   const firstDate = scheduleMode === "series" ? automaticFirstDate : requestedFirstDate;
   const startTime = scheduleMode === "series" ? savedTime!.startTime : requestedStartTime;
   const endTime = scheduleMode === "series" ? savedTime!.endTime : requestedEndTime;
@@ -326,8 +317,11 @@ export async function scheduleBatchClasses(formData: FormData) {
   }
 
   const weekdays = scheduleMode === "series" ? parseBatchWeekdays(String(batch.days || "")) : [new Date(`${firstDate}T00:00:00Z`).getUTCDay()];
-  const dates = generateBatchMeetingDates(firstDate, weekdays, count);
-  if (dates.length !== count) throw new Error("Could not generate meeting dates. Check the batch Days field.");
+  const existingDates = new Set(meetingsInMonth.map((meeting) => String(meeting.sessionDate || "")));
+  const dates = scheduleMode === "series"
+    ? generateBatchMeetingDates(firstDate, weekdays, 31).filter((date) => date.startsWith(`${seriesMonth}-`) && !existingDates.has(date)).slice(0, count)
+    : generateBatchMeetingDates(firstDate, weekdays, count);
+  if (dates.length !== count) throw new Error(`There are only ${dates.length} available ${String(batch.days || "class")} dates remaining in ${seriesMonth}. Choose another month or schedule individual classes.`);
 
   const conflict = await db.collection(getBatchClassSessionsCollectionName()).findOne({
     batchId,
