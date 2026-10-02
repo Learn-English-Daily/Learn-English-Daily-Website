@@ -6,12 +6,13 @@ import { scheduleBatchClasses } from "@/app/admin/batches/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 
-export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMeetingNumbers = [] }: { batchId: string; batchName: string; days: string; time: string; scheduledMeetingNumbers?: Array<{ sessionDate: string; status: string }> }) {
+export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMeetingNumbers = [] }: { batchId: string; batchName: string; days: string; time: string; scheduledMeetingNumbers?: Array<{ meetingNumber: number; sessionDate: string; status: string }> }) {
   const [mode, setMode] = useState<"single" | "series">("single");
   const [seriesMonth, setSeriesMonth] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit" }).format(new Date()));
   const isSeries = mode === "series";
   const scheduledCount = scheduledMeetingNumbers.filter((meeting) => meeting.sessionDate.startsWith(`${seriesMonth}-`) && meeting.status !== "Cancelled").length;
   const remainingCount = Math.max(0, 12 - scheduledCount);
+  const nextMeetingNumber = scheduledMeetingNumbers.reduce((highest, meeting) => Math.max(highest, meeting.meetingNumber), 0) + 1;
 
   return (
     <div>
@@ -52,7 +53,7 @@ export function BatchScheduleForm({ batchId, batchName, days, time, scheduledMee
           </select>
         </label>
         {isSeries ? <input type="hidden" name="firstMeetingNumber" value="1" /> : (
-          <label className="grid gap-2 text-sm font-bold text-lead-navy">Meeting Number<input name="firstMeetingNumber" type="number" min={1} max={12} defaultValue={1} required className="rounded-lg border border-slate-200 px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100" /></label>
+          <label className="grid gap-2 text-sm font-bold text-lead-navy">Meeting Number<input name="firstMeetingNumber" type="number" min={1} max={9999} defaultValue={nextMeetingNumber} required className="rounded-lg border border-slate-200 px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100" /></label>
         )}
         {!isSeries ? <>
           <label className="grid gap-2 text-sm font-bold text-lead-navy">Class Date<input name="firstDate" type="date" required className="rounded-lg border border-slate-200 px-3 py-2 font-medium outline-none focus:border-lead-blue focus:ring-4 focus:ring-blue-100" /></label>
