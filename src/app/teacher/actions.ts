@@ -590,6 +590,7 @@ export async function saveBatchClassAttendance(formData: FormData) {
   );
 
   revalidatePath("/teacher/group-classes");
+  revalidatePath("/admin/sessions");
   revalidatePath("/admin/batches");
   revalidatePath("/parent");
 }
