@@ -34,7 +34,18 @@ function numberInRange(value: FormDataEntryValue | null, min: number, max: numbe
 }
 
 function parseBatchTimeRange(value: string) {
-  const match = value.replace(/[–—]/g, "-").match(/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*-\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s+wib)?\s*$/i);
+  const normalized = value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/(\d)\.(\d)/g, "$1:$2")
+    .replace(/\./g, "")
+    .replace(/[–—−]/g, "-")
+    .replace(/\bto\b/g, "-")
+    .replace(/\bwib\b/g, "")
+    .replace(/[;,]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*-\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
   if (!match) return null;
 
   function toTime(hourValue: string, minuteValue: string | undefined, meridiem: string | undefined) {
