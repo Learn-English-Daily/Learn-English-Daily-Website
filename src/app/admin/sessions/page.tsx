@@ -627,7 +627,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                 </div>
               ) : null}
             </Card>
-            {selectedBatch ? <Card className="p-5"><BatchScheduleForm key={selectedBatch.id} batchId={selectedBatch.id} batchName={selectedBatch.batchName} days={selectedBatch.days} time={selectedBatch.time} scheduledMeetingNumbers={selectedBatchSessions.map((session) => ({ sessionDate: session.sessionDate, status: session.status }))} /></Card> : null}
+            {selectedBatch ? <Card className="p-5"><BatchScheduleForm key={selectedBatch.id} batchId={selectedBatch.id} batchName={selectedBatch.batchName} days={selectedBatch.days} time={selectedBatch.time} scheduledMeetingNumbers={selectedBatchSessions.map((session) => ({ meetingNumber: session.meetingNumber, sessionDate: session.sessionDate, status: session.status }))} /></Card> : null}
             {!selectedBatch ? <Card className="p-6 text-sm text-lead-gray">Create an active batch and assign its students before scheduling group classes.</Card> : null}
           </div>
 

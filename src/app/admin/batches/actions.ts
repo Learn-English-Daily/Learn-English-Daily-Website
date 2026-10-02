@@ -269,11 +269,12 @@ export async function removeStudentFromBatch(formData: FormData) {
 }
 
 export async function scheduleBatchClasses(formData: FormData) {
+  try {
   const admin = await assertAdmin();
   const batchId = clean(formData.get("batchId"));
   const scheduleMode = clean(formData.get("scheduleMode"));
   const seriesMonth = clean(formData.get("seriesMonth"));
-  const firstMeetingNumber = numberInRange(formData.get("firstMeetingNumber"), 1, 12, 1);
+  const firstMeetingNumber = numberInRange(formData.get("firstMeetingNumber"), 1, 9999, 1);
   const requestedFirstDate = clean(formData.get("firstDate"));
   const requestedStartTime = clean(formData.get("startTime"));
   const requestedEndTime = clean(formData.get("endTime"));
@@ -360,6 +361,17 @@ export async function scheduleBatchClasses(formData: FormData) {
   revalidatePath("/admin/batches");
   revalidatePath("/admin/sessions");
   revalidatePath("/teacher/group-classes");
+  return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const safePrefixes = ["Select ", "Active batch", "All 12", "The batch", "Enter ", "There are", "Meeting ", "Assign "];
+    if (safePrefixes.some((prefix) => message.startsWith(prefix))) return { success: false, message };
+    if (error && typeof error === "object" && "code" in error && error.code === 11000) {
+      return { success: false, message: "This class conflicts with an existing meeting number. Refresh the page and use the suggested next meeting number." };
+    }
+    console.error("Failed to schedule batch classes", error);
+    return { success: false, message: "The schedule could not be saved because of a server or database error. Please try again once, then contact support if it continues." };
+  }
 }
 
 export async function cancelBatchClass(formData: FormData) {
