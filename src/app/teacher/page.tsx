@@ -5,6 +5,7 @@ import type { Filter, WithId } from "mongodb";
 import { CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookPen, Search, Users } from "lucide-react";
 import { generateTeacherGamesLink, logoutTeacher, saveTeacherAttendance, saveTeacherMonthlyAssessment } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
+import { FlowerCelebration } from "@/app/teacher/flower-celebration";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
@@ -607,6 +608,7 @@ export default async function TeacherPortalPage({
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
   const missedSessions = data.sessions.filter((session) => session.sessionDate < today);
   const attendanceNeededSessions = data.sessions.filter((session) => session.status === "Needs Attendance");
+  const attendanceNeededCount = attendanceNeededSessions.length + groupAttendanceNeeded;
   const selectedBatch = data.batches.find((batch) => batch.id === selectedAssessmentBatchId);
   const selectedStudent = selectedBatch?.students.find((student) => student.studentId === selectedAssessmentStudentId);
   const selectedAssessment = data.assessments.find(
@@ -641,6 +643,7 @@ export default async function TeacherPortalPage({
 
   return (
     <main className="min-h-screen bg-lead-soft">
+      <FlowerCelebration teacherId={teacher.id} attendanceCount={attendanceNeededCount} journalCount={data.journalMissingCount} />
       <header className="border-b border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
         <div className="container-shell flex flex-col gap-4 py-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -670,7 +673,7 @@ export default async function TeacherPortalPage({
       <section className="container-shell grid gap-6 py-8">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length + todaysGroupSessions.length} detail="Private and group classes today" />
-          <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={attendanceNeededSessions.length + groupAttendanceNeeded} detail="Private and group classes waiting" tone="rose" />
+          <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={attendanceNeededCount} detail="Private and group classes waiting" tone="rose" />
           <TeacherKpi icon={CalendarCheck} label="Missed" value={missedSessions.length} detail="Past unmarked classes" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Journal Missing" value={data.journalMissingCount} detail="Attendance records needing journal" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Recent Records" value={data.recentAttendance.length} detail="Your latest attendance entries" tone="blue" />
