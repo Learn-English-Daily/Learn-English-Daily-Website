@@ -10,6 +10,7 @@ import { FinanceLoginForm } from "@/app/finance/login-form";
 import { updateStudentPaymentStatus, waiveGroupRegistrationFee } from "@/app/finance/payments/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { FinancePageHeader } from "@/components/finance/finance-page-header";
+import { FinanceClearCelebration } from "@/app/finance/payments/finance-clear-celebration";
 import { getClosedBillingPeriodKeys, getRecordBillingPeriod } from "@/lib/billing-periods";
 import { FINANCE_ID_COOKIE, FINANCE_SESSION_COOKIE, isValidFinanceSession } from "@/lib/finance-auth";
 import { getFinanceEmployeeById } from "@/lib/finance-employees";
@@ -455,6 +456,11 @@ export default async function FinancePaymentsPage({
 
   return (
     <main className="min-h-screen bg-lead-soft">
+      <FinanceClearCelebration
+        employeeId={financeEmployee.id}
+        unpaidCount={financeSummary.unpaidCount}
+        receiptPendingCount={financeSummary.receiptPendingCount}
+      />
       <FinancePageHeader
         title="Student payments"
         description="Review individual attendance payments and create flexible group payments from batch assessments."
