@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "LEAD Restaurant Rush", description: "Catch orders, serve busy tables, build polite requests, role-play both sides, and survive the Friday dinner rush.", status: "New", icon: Utensils, accent: "border-amber-100 bg-amber-50 text-amber-700", available: true, href: "/games/restaurant-rush" },
   { title: "LEAD Family Adventure", description: "Slice, run, fly, perform on Family TV, and hunt hidden family words across five replayable arcade challenges.", status: "New", icon: Users, accent: "border-yellow-100 bg-yellow-50 text-amber-700", available: true, href: "/games/family-adventure" },
   { title: "Playground Champions", description: "Explore a connected sports park, play action challenges, earn medals, unlock the arena, and give a champion interview.", status: "Available", icon: Trophy, accent: "border-yellow-100 bg-yellow-50 text-amber-700", available: true, href: "/games/playground-champions" },
   { title: "Lost & Found Adventure", description: "Walk around the LEAD Fun Fair, hunt for missing accessories, solve memory mysteries, and complete Show & Tell.", status: "Available", icon: Search, accent: "border-blue-100 bg-blue-50 text-lead-blue", available: true, href: "/games/lost-found-adventure" },

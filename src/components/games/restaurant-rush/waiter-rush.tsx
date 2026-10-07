@@ -1,0 +1,30 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { arcadeSound, speakArcade } from "../lead-arcade/audio";
+import type { ArcadeStageProps } from "../lead-arcade/types";
+import { requestFor, restaurantItems, shuffle, type RestaurantItem } from "./game-data";
+
+type TableOrder = { table: number; customer: string; items: RestaurantItem[]; patience: number };
+
+export function WaiterRush({ sound, onComplete }: ArcadeStageProps) {
+  const [round, setRound] = useState(0); const [orders, setOrders] = useState<TableOrder[]>([]); const [visible, setVisible] = useState(true); const [carry, setCarry] = useState<RestaurantItem[]>([]); const [score, setScore] = useState(0); const [combo, setCombo] = useState(0); const [best, setBest] = useState(0); const [correct, setCorrect] = useState(0); const [attempts, setAttempts] = useState(0); const [message, setMessage] = useState("Listen to the customers!");
+  const kitchen = useMemo(() => shuffle(restaurantItems.slice(0, round > 1 ? 10 : 6)), [round]);
+  useEffect(() => {
+    const count = Math.min(4, round + 1); const pool = shuffle(restaurantItems.slice(0, round > 1 ? 10 : 6));
+    const next = Array.from({ length: count }, (_, index) => ({ table: index + 1, customer: ["👧", "👦", "👩", "👨", "👵"][Math.floor(Math.random() * 5)], items: round >= 2 && index === count - 1 ? [pool[index], pool[index + count]] : [pool[index]], patience: 100 }));
+    setOrders(next); setVisible(true); setCarry([]); setMessage("Listen to the customers!");
+    next.forEach((order, index) => window.setTimeout(() => speakArcade(`Table ${order.table}. ${requestFor(order.items[0])}${order.items[1] ? ` Anything else? Yes, please. ${order.items[1].article} ${order.items[1].name}.` : ""}`, sound), index * 1600));
+    const hide = window.setTimeout(() => setVisible(false), count * 1600 + 1800); return () => window.clearTimeout(hide);
+  }, [round, sound]);
+  useEffect(() => { const timer = window.setInterval(() => setOrders((items) => items.length ? items.map((order) => ({ ...order, patience: Math.max(10, order.patience - 1) })) : items), 700); return () => window.clearInterval(timer); }, []);
+  function pick(item: RestaurantItem) { if (carry.length < 2 && !carry.some((value) => value.id === item.id)) { setCarry((value) => [...value, item]); setMessage(`Carrying ${[...carry, item].map((value) => value.name).join(" + ")}. Choose a table!`); arcadeSound("power", sound); } }
+  function serve(order: TableOrder) {
+    if (!carry.length) { setMessage("Collect food from the kitchen first!"); return; }
+    setAttempts((value) => value + 1); const wanted = order.items.map((item) => item.id).sort().join(); const held = carry.map((item) => item.id).sort().join();
+    if (wanted === held) { const nextCombo = combo + 1; setCombo(nextCombo); setBest((value) => Math.max(value, nextCombo)); setCorrect((value) => value + 1); setScore((value) => value + 200 * nextCombo + order.patience); setOrders((value) => value.filter((entry) => entry.table !== order.table)); setCarry([]); setMessage(Math.random() > .5 ? "Here you are!" : "Enjoy your meal!"); speakArcade(Math.random() > .5 ? "Here you are. Enjoy your meal!" : "Thank you!", sound); arcadeSound("correct", sound); }
+    else { setCombo(0); setCarry([]); setMessage("Not this table—check the order and try again."); arcadeSound("wrong", sound); setVisible(true); window.setTimeout(() => setVisible(false), 1500); }
+  }
+  useEffect(() => { if (orders.length) return; const timer = window.setTimeout(() => { if (round === 3) onComplete({ stars: correct >= 8 ? 3 : correct >= 6 ? 2 : 1, score, correct, attempts, bestCombo: best, practiced: ["Anything else?", "Here you are.", "Enjoy your meal!"] }); else setRound((value) => value + 1); }, 900); return () => window.clearTimeout(timer); }, [orders, round, onComplete, correct, score, attempts, best]);
+  return <section className="mx-auto max-w-6xl"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase text-yellow-300">Service wave {round + 1}/4</p><h2 className="font-heading text-3xl font-black">Remember. Collect. Serve.</h2></div><div className="text-right font-black">{score} pts · 🔥 x{combo}</div></div><div className="mt-4 rounded-2xl bg-yellow-400 px-4 py-3 text-center font-black text-slate-950">{message}</div><div className="mt-5 grid gap-5 lg:grid-cols-[1fr_300px]"><div className="grid gap-4 sm:grid-cols-2">{orders.map((order) => <button key={order.table} onClick={() => serve(order)} className="relative min-h-48 overflow-hidden rounded-[2rem] border-4 border-amber-200 bg-[linear-gradient(#fef3c7,#fff)] p-5 text-slate-900 shadow-xl"><div className="text-6xl">{order.customer}</div><p className="mt-2 font-heading text-2xl font-black">Table {order.table}</p><div className="mx-auto mt-2 h-2 max-w-44 overflow-hidden rounded-full bg-slate-200"><div className="h-full bg-emerald-500" style={{ width: `${order.patience}%` }} /></div>{visible ? <div className="mt-3 rounded-xl bg-blue-50 p-3 font-black text-blue-800">{order.items.map((item) => `${item.emoji} ${item.name}`).join(" + ")}</div> : <p className="mt-4 text-sm font-bold text-slate-500">Order hidden · remember it!</p>}</button>)}</div><aside className="rounded-[2rem] border-4 border-slate-300 bg-slate-100 p-4 text-slate-900"><p className="text-xs font-black uppercase tracking-widest text-blue-700">Kitchen counter</p><div className="mt-3 grid grid-cols-2 gap-2">{kitchen.map((item) => <button key={item.id} onClick={() => pick(item)} className="rounded-xl bg-white p-3 shadow hover:-translate-y-1"><span className="block text-4xl">{item.emoji}</span><span className="text-xs font-black uppercase">{item.name}</span></button>)}</div><div className="mt-4 rounded-xl bg-slate-900 p-3 text-center text-white"><p className="text-xs font-black uppercase text-yellow-300">Your tray</p><p className="mt-2 text-3xl">{carry.length ? carry.map((item) => item.emoji).join(" ") : "🍽️"}</p><button onClick={() => setCarry([])} className="mt-2 text-xs font-bold text-blue-200">Clear tray</button></div></aside></div></section>;
+}
