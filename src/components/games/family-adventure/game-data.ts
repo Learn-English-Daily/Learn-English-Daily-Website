@@ -28,7 +28,7 @@ export const sentenceChallenges = [
   { member: "grandmother" as FamilyId, sentence: "She is my grandmother.", words: ["She", "is", "my", "grandmother"] }
 ];
 
-export const stageNames = ["Family Slice", "Family Rush", "Sentence Flight", "Family TV", "Family Escape"];
+export const stageNames = ["Family Slice", "Family Rush", "Sentence Flight", "Family TV", "Family Word Hunt"];
 
 export function shuffle<T>(values: T[]) {
   return [...values].sort(() => Math.random() - 0.5);
