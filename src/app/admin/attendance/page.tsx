@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { BookOpenCheck, CalendarCheck, CalendarClock, CalendarRange, ChevronDown, Search, UserRoundCheck } from "lucide-react";
+import Link from "next/link";
+import { BookOpenCheck, BookOpenText, CalendarCheck, CalendarClock, CalendarRange, ChevronDown, Search, UserRoundCheck } from "lucide-react";
 import type { Filter, WithId } from "mongodb";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
@@ -535,7 +536,13 @@ export default async function AdminAttendancePage({
               />
             ))}
           </OperationsList>
-          <OperationsList title="Missing Journals" helper="Attendance exists, but the teacher journal is empty." empty="No missing journals." tone="amber">
+          <OperationsList
+            title="Missing Journals"
+            helper="Attendance exists, but the teacher journal is empty."
+            empty="No missing journals."
+            tone="amber"
+            action={<Button asChild size="sm" variant="secondary"><Link href="/admin/attendance/journals"><BookOpenText className="h-4 w-4" /> All Journals</Link></Button>}
+          >
             {operations.missingJournals.map((record) => (
               <CompactRow
                 key={record.id}
@@ -821,10 +828,10 @@ function KpiCard({ icon: Icon, label, value, helper, tone }: { icon: typeof Cale
   return <Card className="p-5"><div className={`grid h-11 w-11 place-items-center rounded-lg ${tones[tone]}`}><Icon className="h-5 w-5" /></div><p className="mt-4 font-heading text-3xl font-extrabold text-lead-navy">{value}</p><p className="mt-1 text-sm font-bold text-lead-navy">{label}</p><p className="mt-1 text-xs text-lead-gray">{helper}</p></Card>;
 }
 
-function OperationsList({ title, helper, empty, tone, children }: { title: string; helper: string; empty: string; tone: "rose" | "blue" | "amber" | "green"; children: React.ReactNode }) {
+function OperationsList({ title, helper, empty, tone, action, children }: { title: string; helper: string; empty: string; tone: "rose" | "blue" | "amber" | "green"; action?: React.ReactNode; children: React.ReactNode }) {
   const border = { rose: "border-rose-100", blue: "border-blue-100", amber: "border-yellow-100", green: "border-emerald-100" }[tone];
   const hasItems = Array.isArray(children) ? children.length > 0 : Boolean(children);
-  return <Card className={`overflow-hidden ${border}`}><div className="border-b border-slate-100 p-5"><h2 className="font-heading text-xl font-bold text-lead-navy">{title}</h2><p className="mt-1 text-xs leading-5 text-lead-gray">{helper}</p></div><div className="max-h-80 overflow-y-auto p-4"><div className="grid gap-3">{hasItems ? children : <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">{empty}</p>}</div></div></Card>;
+  return <Card className={`overflow-hidden ${border}`}><div className="flex items-start justify-between gap-3 border-b border-slate-100 p-5"><div><h2 className="font-heading text-xl font-bold text-lead-navy">{title}</h2><p className="mt-1 text-xs leading-5 text-lead-gray">{helper}</p></div>{action ? <div className="shrink-0">{action}</div> : null}</div><div className="max-h-80 overflow-y-auto p-4"><div className="grid gap-3">{hasItems ? children : <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">{empty}</p>}</div></div></Card>;
 }
 
 function ReminderRow({ record }: { record: AttendanceReminder }) {
