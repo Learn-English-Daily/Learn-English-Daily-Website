@@ -1,0 +1,21 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Volume2 } from "lucide-react";
+import { arcadeTone, speak } from "./game-audio";
+import { familyMembers, shuffle } from "./game-data";
+import type { StageProps } from "./types";
+
+const distractors = [{ word: "Ball", emoji: "⚽" }, { word: "Book", emoji: "📘" }, { word: "Apple", emoji: "🍎" }, { word: "Backpack", emoji: "🎒" }];
+
+export function FamilySlice({ sound, onComplete }: StageProps) {
+  const rounds = useMemo(() => shuffle([...familyMembers.slice(0, 6), ...familyMembers.slice(0, 6)]).slice(0, 10), []);
+  const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [combo, setCombo] = useState(0); const [best, setBest] = useState(0); const [attempts, setAttempts] = useState(0); const [correct, setCorrect] = useState(0); const [feedback, setFeedback] = useState("SLICE THE TARGET!");
+  const target = rounds[round];
+  const choices = useMemo(() => target ? shuffle([target, ...shuffle(familyMembers.filter((item) => item.id !== target.id)).slice(0, 2), distractors[round % distractors.length]]) : [], [round, target]);
+  const finish = useCallback((nextCorrect: number, nextAttempts: number, nextScore: number, nextBest: number) => { const accuracy = nextCorrect / Math.max(1, nextAttempts); onComplete({ stars: accuracy >= .85 ? 3 : accuracy >= .6 ? 2 : 1, score: nextScore, correct: nextCorrect, attempts: nextAttempts, bestCombo: nextBest }); }, [onComplete]);
+  function hit(choice: { word: string }) { const hitCorrect = choice.word === target.word; const nextAttempts = attempts + 1; setAttempts(nextAttempts); if (hitCorrect) { const nextCombo = combo + 1; const nextBest = Math.max(best, nextCombo); const nextCorrect = correct + 1; const nextScore = score + 100 * Math.max(1, nextCombo); setCombo(nextCombo); setBest(nextBest); setCorrect(nextCorrect); setScore(nextScore); setFeedback(nextCombo >= 3 ? `🔥 FAMILY COMBO x${nextCombo}` : "+100 NICE!"); arcadeTone("correct", sound); if (round === rounds.length - 1) window.setTimeout(() => finish(nextCorrect, nextAttempts, nextScore, nextBest), 450); else setRound((value) => value + 1); } else { setCombo(0); setFeedback("COMBO LOST — KEEP GOING!"); arcadeTone("wrong", sound); } }
+  useEffect(() => { if (!target) return; const timer = window.setTimeout(() => speak(target.word, sound), 250); return () => window.clearTimeout(timer); }, [target, sound]);
+  if (!target) return null;
+  return <section className="relative min-h-[590px] overflow-hidden rounded-3xl bg-[radial-gradient(circle_at_top,#1d4ed8,#07142e_65%)] p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-widest text-blue-200">Target {round + 1}/{rounds.length}</p><h2 className="font-heading text-3xl font-black text-yellow-300">{round >= 5 ? "🔊 Listen — no labels!" : target.word.toUpperCase()}</h2></div><button onClick={() => speak(target.word, sound)} className="focus-ring rounded-full bg-white/10 p-3" aria-label="Replay target"><Volume2 /></button></div><div className="mt-2 flex justify-between text-sm font-black"><span>Score {score.toLocaleString()}</span><span className="text-orange-300">Combo x{combo}</span></div><div className="relative mt-5 grid min-h-[430px] grid-cols-2 place-items-center gap-4 overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 sm:grid-cols-4">{choices.map((choice, index) => <button key={`${choice.word}-${round}`} onPointerDown={() => hit(choice)} className="focus-ring group relative grid h-36 w-full max-w-40 place-items-center rounded-full border-4 border-white/70 bg-white text-slate-900 shadow-[0_14px_35px_rgba(0,0,0,.35)] transition hover:scale-110 active:scale-75" style={{ animation: `slice-float ${1.5 + index * .18}s ease-in-out ${index * .08}s infinite alternate`, transform: `rotate(${index % 2 ? 5 : -5}deg)` }}><span className="text-6xl">{"emoji" in choice ? choice.emoji : "?"}</span>{round < 5 ? <span className="absolute -bottom-3 rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{choice.word.toUpperCase()}</span> : null}</button>)}</div><p className="mt-4 text-center font-heading text-xl font-black text-yellow-300">{feedback}</p><style jsx>{`@keyframes slice-float{from{translate:0 18px}to{translate:0 -18px}}`}</style></section>;
+}
