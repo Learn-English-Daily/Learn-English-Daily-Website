@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   AlertTriangle,
   CalendarCheck,
@@ -8,6 +9,7 @@ import {
   CircleDollarSign,
   Clock,
   GraduationCap,
+  Bot,
   RefreshCcw,
   Star,
   UserPlus,
@@ -18,6 +20,7 @@ import { logoutCeo } from "@/app/ceo/actions";
 import { CeoLoginForm } from "@/app/ceo/login-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { getBatchesCollectionName } from "@/lib/assessments";
 import { getStudentAttendanceCollectionName, type AttendanceStatus } from "@/lib/attendance";
 import { CEO_SESSION_COOKIE, isCeoConfigured, isValidCeoSession } from "@/lib/ceo-auth";
 import {
@@ -30,7 +33,8 @@ import { getMongoDb } from "@/lib/mongodb";
 import { getEffectivePaymentAmountDue } from "@/lib/payment-pricing";
 import { formatRupiah, getStudentPaymentsCollectionName, type PaymentStatus } from "@/lib/payments";
 import { getReviewCollectionName, type ReviewStatus } from "@/lib/reviews";
-import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
+import { getAvailableTeachers } from "@/lib/teachers";
 
 export const dynamic = "force-dynamic";
 
@@ -87,16 +91,6 @@ type ReviewDocument = {
 };
 
 type DateRange = { start: string | null; end: string | null; label: string };
-
-type TodaySession = {
-  id: string;
-  studentId: string;
-  studentName: string;
-  meetingNumber: number;
-  scheduledAt: string;
-  teacherNames: string[];
-  status: ComputedClassSessionStatus;
-};
 
 const periodOptions: Array<{ value: Period; label: string }> = [
   { value: "this_month", label: "This month" },
@@ -190,13 +184,16 @@ async function getDashboardData(period: Period) {
   const range = getDateRange(period);
   const leadCollectionName = process.env.MONGODB_COLLECTION || "leads";
 
-  const [students, attendance, payments, leads, reviews, classSessions] = await Promise.all([
+  const [students, attendance, payments, leads, reviews, classSessions, activeStudentCount, activeTeachers, activeBatchCount] = await Promise.all([
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<AttendanceDocument>(getStudentAttendanceCollectionName()).find({}).sort({ meetingDate: -1 }).limit(20000).toArray(),
     db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ financeExcluded: { $ne: true } }).sort({ meetingDate: -1 }).limit(20000).toArray(),
     db.collection<LeadDocument>(leadCollectionName).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<ReviewDocument>(getReviewCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
-    db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({}).sort({ scheduledAt: -1 }).limit(5000).toArray()
+    db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({}).sort({ scheduledAt: -1 }).limit(5000).toArray(),
+    db.collection(getStudentRegistrationCollectionName()).countDocuments(getActiveStudentFilter()),
+    getAvailableTeachers(db),
+    db.collection(getBatchesCollectionName()).countDocuments({ status: { $ne: "archived" } })
   ]);
   const studentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
   const attendanceKeys = new Set(attendance.map((record) => `${record.studentId || ""}:${record.meetingNumber || 0}`));
@@ -216,6 +213,12 @@ async function getDashboardData(period: Period) {
   const unpaidPayments = payments.filter(
     (payment) => payment.status === "Unpaid" && matchesRange(payment.meetingDate || payment.createdAt?.toISOString() || "")
   );
+  const allUnpaidPayments = payments.filter((payment) => payment.status === "Unpaid");
+  const currentOutstandingAmount = allUnpaidPayments.reduce(
+    (sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")),
+    0
+  );
+  const studentsWithOutstanding = new Set(allUnpaidPayments.map((payment) => payment.studentId || payment.studentName).filter(Boolean)).size;
   const outstandingAmount = unpaidPayments.reduce((sum, payment) => sum + getEffectivePaymentAmountDue(payment, studentsById.get(payment.studentId || "")), 0);
   const outstandingByStudent = new Map<
     string,
@@ -380,6 +383,13 @@ async function getDashboardData(period: Period) {
 
   return {
     range,
+    snapshot: {
+      activeStudents: activeStudentCount,
+      activeTeachers: activeTeachers.length,
+      activeBatches: activeBatchCount,
+      currentOutstandingAmount,
+      studentsWithOutstanding
+    },
     kpis: {
       registeredStudents: periodStudents.length,
       newStudents: periodStudents.length,
@@ -476,10 +486,13 @@ export default async function CeoDashboardPage({
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="secondary">
+              <Link href="/ceo/assistant"><Bot className="h-4 w-4" />AI Assistant</Link>
+            </Button>
+            <Button asChild variant="secondary">
               <a href={`/ceo?period=${period}`}><RefreshCcw className="h-4 w-4" />Refresh</a>
             </Button>
             <Button asChild variant="yellow">
-              <a href="/ceo/finance"><CircleDollarSign className="h-4 w-4" />Finance Center</a>
+              <Link href="/ceo/finance"><CircleDollarSign className="h-4 w-4" />Finance Center</Link>
             </Button>
             <form action={logoutCeo}><Button type="submit">Logout</Button></form>
           </div>
@@ -487,7 +500,22 @@ export default async function CeoDashboardPage({
       </header>
 
       <div className="container-shell grid gap-6 py-8">
+        <Card className="p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-lead-blue">Current snapshot</p>
+            <h2 className="mt-1 font-heading text-xl font-extrabold text-lead-navy">Academy right now</h2>
+            <p className="mt-1 text-sm text-lead-gray">These totals show the current operating position and do not change with the reporting-period filter.</p>
+          </div>
+          <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Kpi icon={Users} label="Active students" value={String(data.snapshot.activeStudents)} detail="Current enrolled students" color="text-blue-600" />
+            <Kpi icon={GraduationCap} label="Active teachers" value={String(data.snapshot.activeTeachers)} detail="Available teaching team" color="text-violet-600" />
+            <Kpi icon={CalendarCheck} label="Active groups" value={String(data.snapshot.activeBatches)} detail="Non-archived batches" color="text-emerald-600" />
+            <Kpi icon={WalletCards} label="Current outstanding" value={formatRupiah(data.snapshot.currentOutstandingAmount)} detail={`${plural(data.snapshot.studentsWithOutstanding, "student")} with unpaid fees`} color="text-yellow-700" />
+          </section>
+        </Card>
+
         <Card className="p-3">
+          <p className="px-2 pb-2 text-xs font-bold uppercase tracking-[0.14em] text-lead-gray">Reporting period</p>
           <div className="flex flex-wrap gap-2">
             {periodOptions.map((option) => (
               <Button key={option.value} asChild size="sm" variant={period === option.value ? "primary" : "secondary"}>
