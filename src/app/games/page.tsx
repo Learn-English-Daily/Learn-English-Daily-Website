@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, Palette, PawPrint, Puzzle, Search, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, Palette, PawPrint, Puzzle, Search, Shirt, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "LEAD Fashion Challenge", description: "Hunt clothes, build Scrabble words, solve outfit mysteries, design looks, and survive the memory runway.", status: "New", icon: Shirt, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/fashion-challenge" },
   { title: "LEAD Restaurant Rush", description: "Catch orders, serve busy tables, build polite requests, role-play both sides, and survive the Friday dinner rush.", status: "New", icon: Utensils, accent: "border-amber-100 bg-amber-50 text-amber-700", available: true, href: "/games/restaurant-rush" },
   { title: "LEAD Family Adventure", description: "Slice, run, fly, perform on Family TV, and hunt hidden family words across five replayable arcade challenges.", status: "New", icon: Users, accent: "border-yellow-100 bg-yellow-50 text-amber-700", available: true, href: "/games/family-adventure" },
   { title: "Playground Champions", description: "Explore a connected sports park, play action challenges, earn medals, unlock the arena, and give a champion interview.", status: "Available", icon: Trophy, accent: "border-yellow-100 bg-yellow-50 text-amber-700", available: true, href: "/games/playground-champions" },
