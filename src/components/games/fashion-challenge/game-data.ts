@@ -14,10 +14,10 @@ export const clothes = [
 export const scrabbleWords = ["shirt", "dress", "jacket", "jeans", "shoes"];
 
 export const detectiveRounds = [
-  { look: "👧 👗 👟", clue: "red dress + white shoes", answer: "She is wearing a red dress and white shoes.", choices: ["She is wearing a red dress and white shoes.", "She is wearing blue jeans and a hat.", "He is wearing a green jacket."] },
-  { look: "👦 🧥 👖", clue: "green jacket + blue jeans", answer: "He is wearing a green jacket and blue jeans.", choices: ["He is wearing a yellow shirt.", "He is wearing a green jacket and blue jeans.", "She is wearing a red scarf."] },
-  { look: "👧 👕 🧢", clue: "blue shirt + yellow hat", answer: "She is wearing a blue shirt and a yellow hat.", choices: ["She is wearing a blue shirt and a yellow hat.", "He is wearing white shoes.", "She is wearing a green dress."] },
-  { look: "👦 🧣 👟", clue: "red scarf + white shoes", answer: "He is wearing a red scarf and white shoes.", choices: ["He is wearing purple socks.", "She is wearing blue jeans.", "He is wearing a red scarf and white shoes."] }
+  { person: "girl" as const, look: [{ word: "dress", color: "red" }, { word: "shoes", color: "white" }], answer: "She is wearing a red dress and white shoes.", choices: ["She is wearing a red dress and white shoes.", "She is wearing blue jeans and a yellow hat.", "He is wearing a green jacket."] },
+  { person: "boy" as const, look: [{ word: "jacket", color: "green" }, { word: "jeans", color: "blue" }], answer: "He is wearing a green jacket and blue jeans.", choices: ["He is wearing a yellow shirt.", "He is wearing a green jacket and blue jeans.", "She is wearing a red scarf."] },
+  { person: "girl" as const, look: [{ word: "shirt", color: "blue" }, { word: "hat", color: "yellow" }], answer: "She is wearing a blue shirt and a yellow hat.", choices: ["She is wearing a blue shirt and a yellow hat.", "He is wearing white shoes.", "She is wearing a green dress."] },
+  { person: "boy" as const, look: [{ word: "scarf", color: "red" }, { word: "shoes", color: "white" }], answer: "He is wearing a red scarf and white shoes.", choices: ["He is wearing purple socks.", "She is wearing blue jeans.", "He is wearing a red scarf and white shoes."] }
 ];
 
 export const studioMissions = [
@@ -26,7 +26,7 @@ export const studioMissions = [
 ];
 
 export const runwayRounds = [
-  { look: "👕 🧢 👟", answer: "I'm wearing a blue shirt, a yellow hat, and white shoes.", choices: ["I'm wearing a blue shirt, a yellow hat, and white shoes.", "I'm wearing a red dress and a scarf.", "I'm wearing a jacket and jeans."] },
-  { look: "🧥 👖 🧣", answer: "I'm wearing a green jacket, blue jeans, and a red scarf.", choices: ["I'm wearing a yellow hat and shoes.", "I'm wearing a green jacket, blue jeans, and a red scarf.", "I'm wearing a blue dress and socks."] },
-  { look: "👗 🧦 👟", answer: "I'm wearing a red dress, purple socks, and white shoes.", choices: ["I'm wearing a red dress, purple socks, and white shoes.", "I'm wearing a shirt, jeans, and a hat.", "I'm wearing a green jacket and a scarf."] }
+  { look: [{ word: "shirt", color: "blue" }, { word: "hat", color: "yellow" }, { word: "shoes", color: "white" }], answer: "I'm wearing a blue shirt, a yellow hat, and white shoes.", choices: ["I'm wearing a blue shirt, a yellow hat, and white shoes.", "I'm wearing a red dress and a red scarf.", "I'm wearing a green jacket and blue jeans."] },
+  { look: [{ word: "jacket", color: "green" }, { word: "jeans", color: "blue" }, { word: "scarf", color: "red" }], answer: "I'm wearing a green jacket, blue jeans, and a red scarf.", choices: ["I'm wearing a yellow hat and white shoes.", "I'm wearing a green jacket, blue jeans, and a red scarf.", "I'm wearing a red dress and purple socks."] },
+  { look: [{ word: "dress", color: "red" }, { word: "socks", color: "purple" }, { word: "shoes", color: "white" }], answer: "I'm wearing a red dress, purple socks, and white shoes.", choices: ["I'm wearing a red dress, purple socks, and white shoes.", "I'm wearing a blue shirt, blue jeans, and a yellow hat.", "I'm wearing a green jacket and a red scarf."] }
 ];
