@@ -1,4 +1,4 @@
-export const stageNames = ["Price Scanner", "Basket Mission", "Compare Corner", "Talk to the Shopkeeper", "Checkout Rush"];
+export const stageNames = ["Price Scanner", "Basket Mission", "Toy Claw Shop", "Talk to the Shopkeeper", "Checkout Rush"];
 
 export type Product = { id: string; name: string; emoji: string; price: number; size: "small" | "large" };
 export const products: Product[] = [
@@ -17,11 +17,19 @@ export const basketLists = [
   { items: ["bread", "apple", "water"], budget: 5 },
   { items: ["milk", "banana", "cookie"], budget: 8 }
 ];
-export const comparisons = [
-  { left: products[2], right: products[3], question: "The juice costs $4, but I only have $2.", answer: "It's too expensive." },
-  { left: products[7], right: products[0], question: "I need a big bottle for my family.", answer: "The water is too small." },
-  { left: products[4], right: products[5], question: "I cannot carry the large bag of rice.", answer: "The rice is too heavy." },
-  { left: products[2], right: products[6], question: "I need fruit for five students.", answer: "The apple is too small." }
+export const toys = [
+  { id: "robot", name: "robot", emoji: "🤖", price: 5 },
+  { id: "teddy", name: "teddy bear", emoji: "🧸", price: 4 },
+  { id: "kite", name: "kite", emoji: "🪁", price: 3 },
+  { id: "ball", name: "ball", emoji: "⚽", price: 2 },
+  { id: "train", name: "toy train", emoji: "🚂", price: 6 },
+  { id: "puzzle", name: "puzzle", emoji: "🧩", price: 3 }
+];
+export const toyOrders = [
+  { request: "I want the robot. Can I have it, please?", id: "robot" },
+  { request: "Can I have the teddy bear, please?", id: "teddy" },
+  { request: "I want the kite, please.", id: "kite" },
+  { request: "Can I have the ball?", id: "ball" }
 ];
 export const checkoutOrders = [
   { request: "I want milk and bread, please.", ids: ["milk", "bread"], paid: 10 },
