@@ -117,14 +117,14 @@ const collisions: Rect[] = [
   { x: 1910, y: 710, width: 120, height: 45 }
 ];
 
-function initialState(): GameState {
+function initialState(playerName = "Action Hero"): GameState {
   return {
     started: false,
     level: 0,
     completed: [],
     verbs: [],
     stars: 0,
-    message: "Hi Bill! Are you ready for an action adventure?",
+    message: `Hi ${playerName}! Are you ready for an action adventure?`,
     phrase: "Speak English with Confidence",
     nearbyLabel: "",
     location: "Playground",
@@ -139,6 +139,8 @@ function initialState(): GameState {
 export function ActionHeroGame() {
   const gameRef = useRef<GameHandle>(null);
   const [snapshot, setSnapshot] = useState<Snapshot>(initialState());
+  const [nameInput, setNameInput] = useState("");
+  const [studentName, setStudentName] = useState("");
   const [started, setStarted] = useState(false);
   const [missionsOpen, setMissionsOpen] = useState(true);
   const [bookOpen, setBookOpen] = useState(false);
@@ -163,8 +165,14 @@ export function ActionHeroGame() {
   }
 
   function begin() {
+    const name = nameInput.trim().slice(0, 24);
+    if (!name) return;
+    setStudentName(name);
     setStarted(true);
-    window.setTimeout(() => gameRef.current?.interact(), 50);
+    window.setTimeout(() => {
+      gameRef.current?.reset();
+      gameRef.current?.interact();
+    }, 50);
   }
 
   if (snapshot.won) {
@@ -173,7 +181,7 @@ export function ActionHeroGame() {
         <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-yellow-400 text-4xl font-black text-lead-navy shadow-lg">AH</div>
         <p className="mt-6 text-sm font-black uppercase tracking-[0.2em] text-lead-blue">LEAD Fun Learning</p>
         <h2 className="mt-3 font-heading text-4xl font-extrabold text-lead-navy sm:text-5xl">Action Adventure Complete!</h2>
-        <p className="mt-3 text-lg text-lead-gray">Bill completed every mission and became an Action Hero.</p>
+        <p className="mt-3 text-lg text-lead-gray">{studentName} completed every mission and became an Action Hero.</p>
         <div className="mx-auto mt-7 flex max-w-3xl flex-wrap justify-center gap-2">
           {snapshot.verbs.map((verb) => <span key={verb} className="rounded-full bg-white px-4 py-2 text-sm font-bold uppercase text-lead-blue shadow-sm">{verb}</span>)}
         </div>
@@ -196,15 +204,17 @@ export function ActionHeroGame() {
       </div>
 
       <div className="relative overflow-hidden rounded-3xl border-4 border-slate-800 bg-slate-950 shadow-soft">
-        <ActionCanvas ref={gameRef} onSnapshot={setSnapshot} />
+        <ActionCanvas ref={gameRef} playerName={studentName || nameInput.trim() || "Action Hero"} onSnapshot={setSnapshot} />
         {!started ? (
           <div className="absolute inset-0 z-30 grid place-items-center bg-slate-950/80 p-5 backdrop-blur-sm">
             <div className="max-w-2xl text-center text-white">
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-lead-blue text-sm font-black ring-4 ring-yellow-300">LEAD</div>
               <p className="mt-5 text-sm font-bold uppercase tracking-[0.2em] text-yellow-300">Learn English Daily</p>
               <h2 className="mt-3 font-heading text-4xl font-extrabold sm:text-6xl">Action Hero</h2>
-              <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-blue-100">Control Bill, explore one connected world, and learn action verbs by actually performing every action.</p>
-              <Button onClick={begin} className="mt-7 bg-yellow-400 text-slate-950 hover:bg-yellow-300">Start Action Adventure</Button>
+              <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-blue-100">Become the hero, explore one connected world, and learn action verbs by actually performing every action.</p>
+              <label htmlFor="action-hero-name" className="mx-auto mt-6 block max-w-sm text-left text-sm font-black uppercase tracking-wider text-yellow-300">What&apos;s your name?</label>
+              <input id="action-hero-name" autoFocus maxLength={24} value={nameInput} onChange={(event) => setNameInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && nameInput.trim() && begin()} placeholder="Enter your name" className="focus-ring mx-auto mt-2 block h-14 w-full max-w-sm rounded-xl border-2 border-blue-200 bg-white px-4 text-lg font-bold text-lead-navy" />
+              <Button disabled={!nameInput.trim()} onClick={begin} className="mt-4 bg-yellow-400 text-slate-950 hover:bg-yellow-300">Start Action Adventure</Button>
               <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-300">Arrow keys / WASD to move - Shift to run - Space to interact</p>
             </div>
           </div>
@@ -236,9 +246,9 @@ export function ActionHeroGame() {
   );
 }
 
-const ActionCanvas = forwardRef<GameHandle, { onSnapshot: (snapshot: Snapshot) => void }>(function ActionCanvas({ onSnapshot }, ref) {
+const ActionCanvas = forwardRef<GameHandle, { playerName: string; onSnapshot: (snapshot: Snapshot) => void }>(function ActionCanvas({ playerName, onSnapshot }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef(initialState());
+  const stateRef = useRef(initialState(playerName));
   const keysRef = useRef(new Set<string>());
   const nearbyRef = useRef<Interaction | null>(null);
   const lastSnapshotRef = useRef(0);
@@ -284,62 +294,62 @@ const ActionCanvas = forwardRef<GameHandle, { onSnapshot: (snapshot: Snapshot) =
       return;
     }
 
-    if (item.id === "play-ball" && state.level === 0) { learn("play", "PLAY - Bill kicks the ball. I can play."); mark(item.id); return; }
+    if (item.id === "play-ball" && state.level === 0) { learn("play", `PLAY - ${playerName} kicks the ball. I can play.`); mark(item.id); return; }
     if (item.id === "bench" && state.level === 0) {
-      if (!state.completed.includes("sit")) { learn("sit", "SIT - Bill sits on the bench.", 1200); mark("sit"); }
-      else if (!state.completed.includes("stand")) { learn("stand", "STAND - Bill stands up."); mark("stand"); }
-      else say("Bill already sat and stood. Find the slide.");
-      if (state.completed.includes("play-ball") && state.completed.includes("slide") && state.completed.includes("stand")) levelComplete(1, "Playground cleared! Walk east to Bill's home.");
+      if (!state.completed.includes("sit")) { learn("sit", `SIT - ${playerName} sits on the bench.`, 1200); mark("sit"); }
+      else if (!state.completed.includes("stand")) { learn("stand", `STAND - ${playerName} stands up.`); mark("stand"); }
+      else say(`${playerName} already sat and stood. Find the slide.`);
+      if (state.completed.includes("play-ball") && state.completed.includes("slide") && state.completed.includes("stand")) levelComplete(1, `Playground cleared! Walk east to ${playerName}'s home.`);
       return;
     }
     if (item.id === "slide" && state.level === 0) {
-      learn("climb", "CLIMB - Bill climbs the slide and slides down.", 1500); mark(item.id);
-      if (state.completed.includes("play-ball") && state.completed.includes("stand")) levelComplete(1, "Playground cleared! Walk east to Bill's home.");
+      learn("climb", `CLIMB - ${playerName} climbs the slide and slides down.`, 1500); mark(item.id);
+      if (state.completed.includes("play-ball") && state.completed.includes("stand")) levelComplete(1, `Playground cleared! Walk east to ${playerName}'s home.`);
       return;
     }
 
     if (["bed", "apple", "water", "home-door"].includes(item.id) && state.level !== 1) { say(state.level < 1 ? "Finish the playground mission first." : "This home mission is already complete."); return; }
-    if (item.id === "bed") { learn("sleep", "SLEEP - Bill wakes up, then stands.", 1100); mark("bed"); window.setTimeout(() => learn("stand", "STAND - Bill is ready for the day."), 700); return; }
-    if (item.id === "apple") { learn("eat", "EAT - Bill eats an apple.", 1100); mark(item.id); return; }
-    if (item.id === "water") { learn("drink", "DRINK - Bill drinks water.", 1100); mark(item.id); return; }
+    if (item.id === "bed") { learn("sleep", `SLEEP - ${playerName} wakes up, then stands.`, 1100); mark("bed"); window.setTimeout(() => learn("stand", `STAND - ${playerName} is ready for the day.`), 700); return; }
+    if (item.id === "apple") { learn("eat", `EAT - ${playerName} eats an apple.`, 1100); mark(item.id); return; }
+    if (item.id === "water") { learn("drink", `DRINK - ${playerName} drinks water.`, 1100); mark(item.id); return; }
     if (item.id === "home-door") {
       if (!["bed", "apple", "water"].every((id) => state.completed.includes(id))) { say("Wake up, eat the apple, and drink water before leaving."); return; }
-      learn("open", "OPEN - Bill opens the door."); mark(item.id); levelComplete(2, "Home mission complete! Walk east to the library."); return;
+      learn("open", `OPEN - ${playerName} opens the door.`); mark(item.id); levelComplete(2, "Home mission complete! Walk east to the library."); return;
     }
 
     if (["book", "library-chair"].includes(item.id) && state.level !== 2) { say(state.level < 2 ? "Complete the home mission first." : "The library mission is complete."); return; }
-    if (item.id === "book") { mark("book"); state.stars += 1; say("Bill picked up a book. Now find the reading chair.", "I read a book."); return; }
+    if (item.id === "book") { mark("book"); state.stars += 1; say(`${playerName} picked up a book. Now find the reading chair.`, "I read a book."); return; }
     if (item.id === "library-chair") {
       if (!state.completed.includes("book")) { say("Find and pick up the book first."); return; }
-      learn("sit", "SIT - Bill sits in the reading chair.", 800);
-      window.setTimeout(() => learn("read", "READ - Bill opens the book. I can read.", 1500), 650);
+      learn("sit", `SIT - ${playerName} sits in the reading chair.`, 800);
+      window.setTimeout(() => learn("read", `READ - ${playerName} opens the book. I can read.`, 1500), 650);
       mark(item.id); levelComplete(3, "Library cleared! Follow the path southeast to Action Park."); return;
     }
 
     if (["run-tree", "jump-log", "hill", "dance"].includes(item.id) && state.level !== 3) { say(state.level < 3 ? "Complete the library mission first." : "Action Park is complete."); return; }
     if (item.id === "run-tree") {
       if (!state.running) { say("Hold SHIFT or the RUN button while moving to this tree.", "I can run fast."); return; }
-      learn("run", "RUN - Bill runs fast to the tree."); mark(item.id); return;
+      learn("run", `RUN - ${playerName} runs fast to the tree.`); mark(item.id); return;
     }
     if (item.id === "jump-log") {
       if (!state.completed.includes("run-tree")) { say("Run to the marked tree first."); return; }
-      learn("jump", "JUMP - Bill jumps over the log.", 900); state.player.x += state.player.direction === "left" ? -55 : 55; mark(item.id); return;
+      learn("jump", `JUMP - ${playerName} jumps over the log.`, 900); state.player.x += state.player.direction === "left" ? -55 : 55; mark(item.id); return;
     }
     if (item.id === "hill") {
       if (!state.completed.includes("jump-log")) { say("Jump over the log first."); return; }
-      learn("climb", "CLIMB - Bill climbs the hill.", 1400); mark(item.id); return;
+      learn("climb", `CLIMB - ${playerName} climbs the hill.`, 1400); mark(item.id); return;
     }
     if (item.id === "dance") {
       if (!state.completed.includes("hill")) { say("Climb the hill before going to the dance stage."); return; }
-      learn("dance", "DANCE - Bill performs his Action Hero dance!", 1800); mark(item.id); levelComplete(4, "Action Park cleared! Head west to the swimming pool."); return;
+      learn("dance", `DANCE - ${playerName} performs an Action Hero dance!`, 1800); mark(item.id); levelComplete(4, "Action Park cleared! Head west to the swimming pool."); return;
     }
 
     if (["pool", "pool-finish"].includes(item.id) && state.level !== 4) { say(state.level < 4 ? "Complete Action Park first." : "The pool mission is complete."); return; }
-    if (item.id === "pool") { learn("swim", "SWIM - Bill swims across the pool.", 2400); mark(item.id); return; }
+    if (item.id === "pool") { learn("swim", `SWIM - ${playerName} swims across the pool.`, 2400); mark(item.id); return; }
     if (item.id === "pool-finish") {
       if (!state.completed.includes("pool")) { say("Swim across the pool first."); return; }
       if (!state.running) { say("Hold SHIFT or RUN, then race to the finish flag.", "I can run fast."); return; }
-      learn("run", "RUN - Bill races through the pool finish."); mark(item.id); levelComplete(5, "All areas cleared! Go southwest to the final Action Course."); return;
+      learn("run", `RUN - ${playerName} races through the pool finish.`); mark(item.id); levelComplete(5, "All areas cleared! Go southwest to the final Action Course."); return;
     }
 
     if (item.id === "final-start" && state.level === 5) { state.finalIndex = 1; mark(item.id); say("Final course started! Run to checkpoint 1.", "I am ready."); return; }
@@ -352,7 +362,7 @@ const ActionCanvas = forwardRef<GameHandle, { onSnapshot: (snapshot: Snapshot) =
       learn(verb, `${verb.toUpperCase()} - Final checkpoint cleared!`, verb === "dance" || verb === "swim" ? 1500 : 900);
       mark(item.id); state.finalIndex += 1;
       if (item.id === "final-jump") state.player.x += 48;
-      if (item.id === "final-finish") { state.stars += 5; state.won = true; say("Fantastic job, Bill! You are a LEAD Action Hero.", "I am an Action Hero."); }
+      if (item.id === "final-finish") { state.stars += 5; state.won = true; say(`Fantastic job, ${playerName}! You are a LEAD Action Hero.`, "I am an Action Hero."); }
       return;
     }
 
@@ -367,7 +377,7 @@ const ActionCanvas = forwardRef<GameHandle, { onSnapshot: (snapshot: Snapshot) =
   }
 
   function reset() {
-    stateRef.current = initialState();
+    stateRef.current = initialState(playerName);
     keysRef.current.clear();
     nearbyRef.current = null;
     emit();

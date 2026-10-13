@@ -10,7 +10,7 @@ import { GAMES_SESSION_COOKIE, isGamesPasswordConfigured, isValidGamesSession } 
 
 export const metadata: Metadata = {
   title: "Action Hero | LEAD Games",
-  description: "Control Bill and learn action verbs through a real interactive LEAD adventure."
+  description: "Become the hero and learn action verbs through a real interactive LEAD adventure."
 };
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function ActionHeroPage() {
           <Button asChild variant="secondary" size="sm"><Link href="/games"><ArrowLeft className="h-4 w-4" />Back to Games</Link></Button>
           <p className="mt-5 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-lead-blue shadow-soft"><Footprints className="h-4 w-4" />LEAD Fun Learning</p>
           <h1 className="mt-4 font-heading text-4xl font-extrabold tracking-tight text-lead-navy sm:text-5xl">Action Hero</h1>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-lead-gray">Move, explore, and make Bill run, jump, read, eat, swim, dance, and climb through a connected action world.</p>
+          <p className="mt-3 max-w-2xl text-lg leading-8 text-lead-gray">Enter your name, become the hero, and run, jump, read, eat, swim, dance, and climb through a connected action world.</p>
         </div>
       </section>
       <section className="container-shell py-7"><ActionHeroGame /></section>
