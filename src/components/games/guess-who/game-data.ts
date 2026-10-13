@@ -1,6 +1,6 @@
 export type Person = { id: string; name: string; gender: "boy" | "girl"; hair: string; hairColor: string; eyes: string; feature: string; accessory: string; shirt: string };
 
-export const stageNames = ["Face Factory", "Who Am I?", "Pronoun Power", "Flash Look", "Guess Who?"];
+export const stageNames = ["Face Factory", "Who Am I?", "Pronoun Power", "Flash Look", "My Look Studio"];
 
 export const people: Person[] = [
   { id: "maya", name: "Maya", gender: "girl", hair: "long curly hair", hairColor: "black", eyes: "brown eyes", feature: "freckles", accessory: "purple glasses", shirt: "#a855f7" },

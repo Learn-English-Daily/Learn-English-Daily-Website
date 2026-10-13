@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
-  { title: "LEAD Guess Who?", description: "Build faces, identify mystery people, master pronouns, test visual memory, and solve the final Guess Who challenge.", status: "New", icon: ScanFace, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/guess-who" },
+  { title: "LEAD Guess Who?", description: "Build faces, identify mystery people, master pronouns, test visual memory, and present your own appearance.", status: "New", icon: ScanFace, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/guess-who" },
   { title: "LEAD Mini Market", description: "Ask prices, follow a shopping list, compare products, speak to the shopkeeper, and master a busy checkout.", status: "New", icon: ShoppingBasket, accent: "border-emerald-100 bg-emerald-50 text-emerald-700", available: true, href: "/games/mini-market" },
   { title: "LEAD Fashion Challenge", description: "Hunt clothes, build Scrabble words, solve outfit mysteries, design looks, and survive the memory runway.", status: "New", icon: Shirt, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/fashion-challenge" },
   { title: "LEAD Restaurant Rush", description: "Catch orders, serve busy tables, build polite requests, role-play both sides, and survive the Friday dinner rush.", status: "New", icon: Utensils, accent: "border-amber-100 bg-amber-50 text-amber-700", available: true, href: "/games/restaurant-rush" },
