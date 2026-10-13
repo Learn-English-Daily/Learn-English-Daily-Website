@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, Palette, PawPrint, Puzzle, Search, Shirt, ShoppingBasket, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, Footprints, KeyRound, Lock, MapPinned, Mic, Palette, PawPrint, Puzzle, ScanFace, Search, Shirt, ShoppingBasket, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "LEAD Guess Who?", description: "Build faces, identify mystery people, master pronouns, test visual memory, and solve the final Guess Who challenge.", status: "New", icon: ScanFace, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/guess-who" },
   { title: "LEAD Mini Market", description: "Ask prices, follow a shopping list, compare products, speak to the shopkeeper, and master a busy checkout.", status: "New", icon: ShoppingBasket, accent: "border-emerald-100 bg-emerald-50 text-emerald-700", available: true, href: "/games/mini-market" },
   { title: "LEAD Fashion Challenge", description: "Hunt clothes, build Scrabble words, solve outfit mysteries, design looks, and survive the memory runway.", status: "New", icon: Shirt, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/fashion-challenge" },
   { title: "LEAD Restaurant Rush", description: "Catch orders, serve busy tables, build polite requests, role-play both sides, and survive the Friday dinner rush.", status: "New", icon: Utensils, accent: "border-amber-100 bg-amber-50 text-amber-700", available: true, href: "/games/restaurant-rush" },
@@ -73,7 +74,7 @@ const games: GameCard[] = [
   },
   {
     title: "Action Hero",
-    description: "Control Bill in a real 2D world and learn action verbs by running, jumping, reading, swimming, dancing, and climbing.",
+    description: "Enter your name, become the hero, and learn action verbs by running, jumping, reading, swimming, dancing, and climbing.",
     status: "Available",
     icon: Footprints,
     accent: "border-blue-100 bg-blue-50 text-lead-blue",
