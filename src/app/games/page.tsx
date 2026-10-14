@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
-  { title: "LEAD Weather Reporter", description: "Read weather scenes, race for the right gear, change activity plans, remember forecasts, and present a live report.", status: "New", icon: CloudSun, accent: "border-cyan-100 bg-cyan-50 text-cyan-700", available: true, href: "/games/weather-reporter" },
+  { title: "LEAD Weather Reporter", description: "Pop weather bubbles, dress a character, navigate storm maps, match forecast cards, and operate a live TV studio.", status: "New", icon: CloudSun, accent: "border-cyan-100 bg-cyan-50 text-cyan-700", available: true, href: "/games/weather-reporter" },
   { title: "LEAD Guess Who?", description: "Build faces, identify mystery people, master pronouns, test visual memory, and present your own appearance.", status: "New", icon: ScanFace, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/guess-who" },
   { title: "LEAD Mini Market", description: "Ask prices, follow a shopping list, compare products, speak to the shopkeeper, and master a busy checkout.", status: "New", icon: ShoppingBasket, accent: "border-emerald-100 bg-emerald-50 text-emerald-700", available: true, href: "/games/mini-market" },
   { title: "LEAD Fashion Challenge", description: "Hunt clothes, build Scrabble words, solve outfit mysteries, design looks, and survive the memory runway.", status: "New", icon: Shirt, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/fashion-challenge" },

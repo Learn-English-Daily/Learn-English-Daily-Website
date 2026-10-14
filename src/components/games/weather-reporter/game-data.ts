@@ -1,4 +1,4 @@
-export const stageNames = ["Weather Radar", "Gear Dash", "Plan the Day", "Memory Map", "Live Report"];
+export const stageNames = ["Weather Pop", "Dress-Up Relay", "Weather Adventure", "Forecast Flip", "TV Studio"];
 
 export type Weather = { id: string; label: string; emoji: string; sky: string; sentence: string };
 export const weather: Weather[] = [
