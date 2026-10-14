@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { CalendarDays, CheckCircle2, Clock3, LogOut, Users } from "lucide-react";
+import { BookOpen, CalendarDays, CheckCircle2, Clock3, LogOut, Users } from "lucide-react";
 import { logoutTeacher, saveBatchClassAttendance } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
@@ -128,7 +128,7 @@ export default async function TeacherGroupClassesPage() {
 
         <div id="group-schedules" className="grid scroll-mt-6 gap-5 lg:grid-cols-2">
           <SessionList title="Upcoming Schedule" sessions={future} empty="No upcoming group classes." />
-          <SessionList title="Completed Classes" sessions={completed} empty="No group classes completed yet." />
+          <SessionList title="Completed Classes" sessions={completed} empty="No group classes completed yet." showTopic />
         </div>
       </section>
     </main>
@@ -140,6 +140,6 @@ function Metric({ label, value, icon: Icon, tone }: { label: string; value: numb
   return <Card className="flex items-center gap-4 p-4"><div className={`grid h-11 w-11 place-items-center rounded-xl ${colors}`}><Icon className="h-5 w-5" /></div><div><p className="font-heading text-2xl font-extrabold text-lead-navy">{value}</p><p className="text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">{label}</p></div></Card>;
 }
 
-function SessionList({ title, sessions, empty }: { title: string; sessions: Array<BatchClassSessionDocument & { _id: { toString(): string } }>; empty: string }) {
-  return <Card className="p-5"><h2 className="font-heading text-xl font-extrabold text-lead-navy">{title}</h2><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{sessions.map((session) => <div key={session._id.toString()} className="rounded-xl bg-slate-50 p-3"><p className="font-bold text-lead-navy">{session.batchName} / Meeting {session.meetingNumber}</p><p className="mt-1 flex items-center gap-1 text-xs text-lead-gray"><Clock3 className="h-3.5 w-3.5" /> {displayDate(session.sessionDate)} / {session.startTime} - {session.endTime} WIB / {session.classMode || "Offline"}</p></div>)}{!sessions.length ? <p className="text-sm text-lead-gray">{empty}</p> : null}</div></Card>;
+function SessionList({ title, sessions, empty, showTopic = false }: { title: string; sessions: Array<BatchClassSessionDocument & { _id: { toString(): string } }>; empty: string; showTopic?: boolean }) {
+  return <Card className="p-5"><h2 className="font-heading text-xl font-extrabold text-lead-navy">{title}</h2><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{sessions.map((session) => <div key={session._id.toString()} className="rounded-xl bg-slate-50 p-3"><p className="font-bold text-lead-navy">{session.batchName} / Meeting {session.meetingNumber}</p><p className="mt-1 flex items-center gap-1 text-xs text-lead-gray"><Clock3 className="h-3.5 w-3.5" /> {displayDate(session.sessionDate)} / {session.startTime} - {session.endTime} WIB / {session.classMode || "Offline"}</p>{showTopic ? <div className="mt-2 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2"><BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-lead-blue" /><p className="text-sm text-lead-navy"><span className="font-bold">Topic:</span> {session.topic?.trim() || "No topic recorded"}</p></div> : null}</div>)}{!sessions.length ? <p className="text-sm text-lead-gray">{empty}</p> : null}</div></Card>;
 }
