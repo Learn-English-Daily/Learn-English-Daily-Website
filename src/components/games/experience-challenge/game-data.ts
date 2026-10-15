@@ -1,0 +1,2 @@
+export const stageNames=["Verb Ninja","Sentence Express","Experience Quest","Time Portal","Interview Show"];
+export const verbs=[{base:"go",participle:"gone"},{base:"see",participle:"seen"},{base:"eat",participle:"eaten"},{base:"ride",participle:"ridden"},{base:"win",participle:"won"},{base:"write",participle:"written"},{base:"make",participle:"made"},{base:"meet",participle:"met"},{base:"try",participle:"tried"},{base:"finish",participle:"finished"}];
