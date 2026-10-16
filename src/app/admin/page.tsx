@@ -31,6 +31,7 @@ import {
 import { getMongoDb } from "@/lib/mongodb";
 import { getReviewCollectionName } from "@/lib/reviews";
 import { getBatchesCollectionName } from "@/lib/assessments";
+import { getStudentAttendanceCollectionName } from "@/lib/attendance";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName, getTrialStudentFilter } from "@/lib/student-registration";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,14 @@ type ReviewDocument = {
   name?: string;
   rating?: number;
   createdAt?: Date;
+};
+
+type AttendanceDocument = {
+  studentId?: string;
+  studentName?: string;
+  meetingNumber?: number;
+  meetingDate?: string;
+  teacherNames?: string[];
 };
 
 type DashboardData = {
@@ -96,6 +105,8 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
 
   const [
     sessionDocs,
+    completedPrivateTodayDocs,
+    privateTodayAttendanceDocs,
     groupSessionDocs,
     newInquiries,
     pendingReviews,
@@ -110,6 +121,17 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
       .sort({ scheduledAt: 1 })
       .limit(200)
       .toArray() as Promise<WithId<ClassSessionDocument>[]>,
+    groupOnly ? Promise.resolve([] as WithId<ClassSessionDocument>[]) : db
+      .collection<ClassSessionDocument>(getClassSessionsCollectionName())
+      .find({ sessionDate: today, status: "Completed" })
+      .sort({ scheduledAt: 1 })
+      .toArray() as Promise<WithId<ClassSessionDocument>[]>,
+    groupOnly ? Promise.resolve([] as WithId<AttendanceDocument>[]) : db
+      .collection<AttendanceDocument>(getStudentAttendanceCollectionName())
+      .find({ meetingDate: today })
+      .sort({ meetingNumber: 1 })
+      .limit(200)
+      .toArray() as Promise<WithId<AttendanceDocument>[]>,
     db
       .collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
       .find({ status: { $ne: "Cancelled" } })
@@ -124,7 +146,7 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
     groupOnly ? Promise.resolve(null) : db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next()
   ]);
 
-  const privateTodaySessions = sessionDocs
+  const privateTodaySessions = [...sessionDocs, ...completedPrivateTodayDocs]
     .filter((doc) => doc.sessionDate === today)
     .map((doc) => ({
       id: doc._id.toString(),
@@ -150,9 +172,24 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
       status: doc.status === "Completed" || doc.attendanceMarked ? "Completed" : hasBatchClassEnded(doc) ? "Needs Attendance" : "Scheduled"
     }));
 
-  const todaySessions = [...privateTodaySessions, ...groupTodaySessions]
-    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
-    .slice(0, 5);
+  const scheduledPrivateKeys = new Set(
+    [...sessionDocs, ...completedPrivateTodayDocs]
+      .filter((doc) => doc.sessionDate === today)
+      .map((doc) => `${doc.studentId || ""}:${doc.meetingNumber || 0}`)
+  );
+  const completedPrivateAttendance = privateTodayAttendanceDocs
+    .filter((doc) => !scheduledPrivateKeys.has(`${doc.studentId || ""}:${doc.meetingNumber || 0}`))
+    .map((doc) => ({
+      id: `attendance-${doc._id.toString()}`,
+      studentName: doc.studentName || "Unknown",
+      meetingNumber: doc.meetingNumber || 0,
+      scheduledAt: doc.meetingDate ? `${doc.meetingDate}T00:00:00+07:00` : "",
+      teacherNames: doc.teacherNames || [],
+      status: "Completed"
+    }));
+
+  const todaySessions = [...privateTodaySessions, ...completedPrivateAttendance, ...groupTodaySessions]
+    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
 
   const privateNeedsAttendance = sessionDocs.filter(
     (doc) =>
