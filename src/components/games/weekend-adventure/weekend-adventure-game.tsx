@@ -11,7 +11,7 @@ const intros=[
   {emoji:"🏃🪵🦅",title:"WEEKEND OBSTACLE RUN",purpose:"Survive a tougher weekend course, protect three hearts, and collect every activity memory.",controls:"Move with arrows, jump over logs, duck under birds, and use checkpoints wisely"},
   {emoji:"🫧💥",title:"PAST-TENSE BUBBLE POP",purpose:"Past-tense verbs are floating away. Pop the right moving bubbles and build a combo.",controls:"Read the action and pop its past form before the bubbles escape"},
   {emoji:"🔤🏆",title:"WEEKEND SCRABBLE",purpose:"Turn scrambled letter tiles into five useful Simple Past weekend words.",controls:"Tap the Scrabble tiles in order; a wrong tile tumbles the word"},
-  {emoji:"🃏⏱️",title:"STORY CARD RACE",purpose:"Catch four animated story cards and build a weekend from morning to evening.",controls:"Catch cards in time order; a wrong card restarts the timeline"},
+  {emoji:"🃏⏱️",title:"STORY CARD CHAMPIONSHIP",purpose:"Survive three escalating story races: Saturday Sprint, Two-Day Dash, and a hidden-clue Mystery Story.",controls:"Catch 14 cards in logical order, protect your hearts, and rebuild a mission after mistakes"},
   {emoji:"⭕❌",title:"WEEKEND TIC-TAC-TOE STUDIO",purpose:"Build your story, challenge clever Wisey at Tic-Tac-Toe, then unlock the live speaking studio.",controls:"Create a story, win or force a draw, spin a follow-up, and perform aloud"}
 ];
 function clean(value:string){return value.trim().replace(/\s+/g," ").slice(0,24).replace(/(^|\s)\S/g,x=>x.toUpperCase())}
