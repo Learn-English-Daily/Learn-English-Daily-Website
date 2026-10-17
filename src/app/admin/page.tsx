@@ -123,7 +123,7 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
       .toArray() as Promise<WithId<ClassSessionDocument>[]>,
     groupOnly ? Promise.resolve([] as WithId<ClassSessionDocument>[]) : db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
-      .find({ sessionDate: today, status: "Completed" })
+      .find({ sessionDate: today, status: "Completed", studentLifecycleClosed: { $ne: true } })
       .sort({ scheduledAt: 1 })
       .toArray() as Promise<WithId<ClassSessionDocument>[]>,
     groupOnly ? Promise.resolve([] as WithId<AttendanceDocument>[]) : db
@@ -147,7 +147,7 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
   ]);
 
   const privateTodaySessions = [...sessionDocs, ...completedPrivateTodayDocs]
-    .filter((doc) => doc.sessionDate === today)
+    .filter((doc) => doc.sessionDate === today && !doc.studentLifecycleClosed)
     .map((doc) => ({
       id: doc._id.toString(),
       studentName: doc.studentName || "Unknown",

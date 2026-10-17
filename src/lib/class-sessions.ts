@@ -24,6 +24,10 @@ export type ClassSessionDocument = {
   meetingSequenceId?: string;
   status?: ClassSessionStatus;
   attendanceId?: string;
+  studentLifecycleClosed?: boolean;
+  studentLifecycleStatus?: string;
+  studentLifecycleClosedAt?: Date;
+  studentLifecycleClosedBy?: string;
   originalSessionDate?: string;
   originalStartTime?: string;
   originalEndTime?: string;
