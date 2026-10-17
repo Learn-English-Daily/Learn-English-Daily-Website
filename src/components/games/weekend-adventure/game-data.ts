@@ -1,4 +1,4 @@
-export const stageNames=["Weekend Run","Bubble Pop","Weekend Scrabble","Story Card Race","Story Studio"];
+export const stageNames=["Weekend Run","Bubble Pop","Weekend Scrabble","Story Card Race","Tic-Tac-Toe Studio"];
 export const activities=[
   {emoji:"🌳",base:"go",past:"went",place:"to the park"},
   {emoji:"⚽",base:"play",past:"played",place:"football"},
