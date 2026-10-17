@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, CloudSun, Footprints, KeyRound, Lock, MapPinned, Medal, Mic, Palette, PawPrint, Puzzle, ScanFace, Search, Shirt, ShoppingBasket, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, CloudSun, Footprints, KeyRound, Lock, MapPinned, Medal, Mic, Palette, PartyPopper, PawPrint, Puzzle, ScanFace, Search, Shirt, ShoppingBasket, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "LEAD My Weekend Adventure", description: "Run through a 2D weekend, pop past-tense bubbles, build Scrabble words, race story cards, and perform your own weekend story.", status: "New", icon: PartyPopper, accent: "border-orange-100 bg-orange-50 text-orange-700", available: true, href: "/games/weekend-adventure" },
   { title: "LEAD Have You Ever?", description: "Slice verbs, build sentence trains, explore experience maps, escape time portals, and perform a live interview.", status: "New", icon: Medal, accent: "border-indigo-100 bg-indigo-50 text-indigo-700", available: true, href: "/games/experience-challenge" },
   { title: "LEAD Weather Reporter", description: "Pop weather bubbles, dress a character, navigate storm maps, match forecast cards, and operate a live TV studio.", status: "New", icon: CloudSun, accent: "border-cyan-100 bg-cyan-50 text-cyan-700", available: true, href: "/games/weather-reporter" },
   { title: "LEAD Guess Who?", description: "Build faces, identify mystery people, master pronouns, test visual memory, and present your own appearance.", status: "New", icon: ScanFace, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/guess-who" },
