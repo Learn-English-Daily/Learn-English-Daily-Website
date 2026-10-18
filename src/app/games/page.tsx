@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "LEAD Direction City", description: "Explore a city map, ask townspeople, memorize routes, build signposts, program deliveries, and rescue tourists by giving directions.", status: "New", icon: MapPinned, accent: "border-sky-100 bg-sky-50 text-sky-700", available: true, href: "/games/direction-city" },
   { title: "LEAD My Weekend Adventure", description: "Run through a 2D weekend, pop past-tense bubbles, build Scrabble words, race story cards, and perform your own weekend story.", status: "New", icon: PartyPopper, accent: "border-orange-100 bg-orange-50 text-orange-700", available: true, href: "/games/weekend-adventure" },
   { title: "LEAD Have You Ever?", description: "Slice verbs, build sentence trains, explore experience maps, escape time portals, and perform a live interview.", status: "New", icon: Medal, accent: "border-indigo-100 bg-indigo-50 text-indigo-700", available: true, href: "/games/experience-challenge" },
   { title: "LEAD Weather Reporter", description: "Pop weather bubbles, dress a character, navigate storm maps, match forecast cards, and operate a live TV studio.", status: "New", icon: CloudSun, accent: "border-cyan-100 bg-cyan-50 text-cyan-700", available: true, href: "/games/weather-reporter" },
