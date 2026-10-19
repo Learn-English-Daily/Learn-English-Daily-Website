@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
-  { title: "LEAD My Favorite Thing", description: "Explore a 2D room, race a sorting conveyor, unlock memory pairs, design a favorite object, and perform a personalized Show & Tell.", status: "New", icon: Gift, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/favorite-thing" },
+  { title: "LEAD My Favorite Thing", description: "Blast object bubbles, race a shifting conveyor, connect sentence matches, train listening, and complete a microphone-scored Show & Tell.", status: "New", icon: Gift, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/favorite-thing" },
   { title: "LEAD Direction City", description: "Explore a city map, ask townspeople, memorize routes, build signposts, program deliveries, and rescue tourists by giving directions.", status: "New", icon: MapPinned, accent: "border-sky-100 bg-sky-50 text-sky-700", available: true, href: "/games/direction-city" },
   { title: "LEAD My Weekend Adventure", description: "Run through a 2D weekend, pop past-tense bubbles, build Scrabble words, race story cards, and perform your own weekend story.", status: "New", icon: PartyPopper, accent: "border-orange-100 bg-orange-50 text-orange-700", available: true, href: "/games/weekend-adventure" },
   { title: "LEAD Have You Ever?", description: "Slice verbs, build sentence trains, explore experience maps, escape time portals, and perform a live interview.", status: "New", icon: Medal, accent: "border-indigo-100 bg-indigo-50 text-indigo-700", available: true, href: "/games/experience-challenge" },
