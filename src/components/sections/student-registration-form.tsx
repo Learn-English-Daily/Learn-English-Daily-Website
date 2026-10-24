@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/content";
-import { classModeOptions, classTypeOptions, courseJoinedOptions, englishLevelOptions, learningGoalOptions } from "@/lib/student-registration";
+import { classModeOptions, classTypeOptions, courseJoinedOptions, englishLevelOptions, getCourseJoinedLabel, learningGoalOptions } from "@/lib/student-registration";
 import { getTodayInJakarta } from "@/lib/student-age";
 
 const copy = {
@@ -147,7 +147,7 @@ export function StudentRegistrationForm({ locale }: { locale: Locale }) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <SelectField name="courseJoined" label={text.fields.courseJoined} options={courseJoinedOptions} choose={text.choose} requiredText={text.required} />
+        <SelectField name="courseJoined" label={text.fields.courseJoined} options={courseJoinedOptions} optionLabel={(option) => getCourseJoinedLabel(option, locale)} choose={text.choose} requiredText={text.required} />
         <SelectField name="classType" label={text.fields.classType} options={classTypeOptions} choose={text.choose} requiredText={text.required} />
         <SelectField name="classMode" label={text.fields.classMode} options={classModeOptions} choose={text.choose} requiredText={text.required} />
         <SelectField name="englishLevel" label={text.fields.englishLevel} options={englishLevelOptions} choose={text.choose} requiredText={text.required} />
@@ -210,12 +210,14 @@ function SelectField({
   name,
   label,
   options,
+  optionLabel,
   choose,
   requiredText
 }: {
   name: string;
   label: string;
   options: readonly string[];
+  optionLabel?: (option: string) => string;
   choose: string;
   requiredText: string;
 }) {
@@ -235,7 +237,7 @@ function SelectField({
         </option>
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {optionLabel ? optionLabel(option) : option}
           </option>
         ))}
       </select>

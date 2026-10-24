@@ -1,4 +1,4 @@
-export const courseJoinedOptions = ["Foundation English", "Confident English", "Fluent English", "Trial Class"] as const;
+export const courseJoinedOptions = ["Foundation English", "Confident English", "Fluent English", "Academic English", "Trial Class"] as const;
 export const classTypeOptions = ["Basic Group", "Standard/Buddy", "Premium 1-to-1"] as const;
 export const classModeOptions = ["Online", "Offline"] as const;
 export const englishLevelOptions = ["Beginner", "Elementary", "Intermediate", "Not sure"] as const;
@@ -11,6 +11,11 @@ export type ClassMode = (typeof classModeOptions)[number];
 export type EnglishLevel = (typeof englishLevelOptions)[number];
 export type LearningGoal = (typeof learningGoalOptions)[number];
 export type StudentStatus = (typeof studentStatusOptions)[number];
+
+export function getCourseJoinedLabel(courseJoined: string, locale: "en" | "id") {
+  if (courseJoined === "Academic English" && locale === "id") return "Bahasa Inggris Akademik";
+  return courseJoined;
+}
 
 export type StudentStatusHistoryEntry = {
   fromStatus: StudentStatus;

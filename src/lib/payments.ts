@@ -19,6 +19,9 @@ const perMeetingPrices: Record<string, Record<string, number>> = {
     "Basic Group": 17000,
     "Standard/Buddy": 55000,
     "Premium 1-to-1": 90000
+  },
+  "Academic English": {
+    "Premium 1-to-1": 100000
   }
 };
 
