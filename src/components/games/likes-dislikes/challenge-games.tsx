@@ -114,49 +114,81 @@ export function PreferenceFall({ sound, onComplete, onProfile }: { sound: boolea
   );
 }
 
-const mazeWalls = new Set([6, 8, 16, 18]);
-const prizeCells = [0, 4, 12, 24];
-// Keep the ghosts threatening without sealing the player into the starting corner.
-// Every prize remains reachable through at least one safe route.
-const dangerCells = [2, 7, 17, 22];
+const MAZE_WIDTH = 9;
+const MAZE_SIZE = 63;
+const SNAKE_START = 54;
+const MAZE_EXIT = 8;
+const KEY_CELL = 40;
+const mazeWalls = new Set([10, 11, 12, 14, 15, 16, 28, 29, 30, 32, 33, 34, 46, 47, 48, 50, 51, 52]);
+const prizeCells = [0, 26, 58, 62];
+const dangerCells = [4, 18, 38, 56];
 
 export function PreferenceMaze({ profile, sound, onComplete }: ArcadeStageProps & { profile: PreferenceProfile }) {
   const likes = profile.liked.length ? profile.liked : ["reading"];
   const dislikes = profile.disliked.length ? profile.disliked : ["spicy food"];
   const prizes = useMemo(() => prizeCells.map((cell, index) => ({ cell, name: likes[index % likes.length] })), [likes]);
   const dangers = useMemo(() => dangerCells.map((cell, index) => ({ cell, name: dislikes[index % dislikes.length] })), [dislikes]);
-  const [position, setPosition] = useState(20);
+  const [snake, setSnake] = useState<number[]>([SNAKE_START]);
   const [collected, setCollected] = useState<number[]>([]);
+  const [hitDangers, setHitDangers] = useState<number[]>([]);
   const [lives, setLives] = useState(3);
   const [moves, setMoves] = useState(0);
+  const [hasKey, setHasKey] = useState(false);
+  const [message, setMessage] = useState("Collect every LIKE, find the key, then reach the exit!");
+  const position = snake[0];
 
   const move = useCallback((dx: number, dy: number) => {
-    const row = Math.floor(position / 5);
-    const column = position % 5;
+    const row = Math.floor(position / MAZE_WIDTH);
+    const column = position % MAZE_WIDTH;
     const nextRow = row + dy;
     const nextColumn = column + dx;
-    if (nextRow < 0 || nextRow > 4 || nextColumn < 0 || nextColumn > 4) return arcadeSound("wrong", sound);
-    const next = nextRow * 5 + nextColumn;
-    if (mazeWalls.has(next)) return arcadeSound("wrong", sound);
+    if (nextRow < 0 || nextRow > 6 || nextColumn < 0 || nextColumn >= MAZE_WIDTH) return arcadeSound("wrong", sound);
+    const next = nextRow * MAZE_WIDTH + nextColumn;
+    if (mazeWalls.has(next)) {
+      setMessage("Wall! Find another route.");
+      return arcadeSound("wrong", sound);
+    }
     setMoves((value) => value + 1);
-    const danger = dangers.find((entry) => entry.cell === next);
+    const prize = prizes.find((entry) => entry.cell === next && !collected.includes(entry.cell));
+    const danger = dangers.find((entry) => entry.cell === next && !hitDangers.includes(entry.cell));
+    const movingBody = prize ? snake : snake.slice(0, -1);
+    if (movingBody.includes(next)) {
+      setMessage("You bumped into your own tail!");
+      setLives((value) => Math.max(0, value - 1));
+      setSnake([SNAKE_START]);
+      return arcadeSound("wrong", sound);
+    }
     if (danger) {
       arcadeSound("wrong", sound);
       speakArcade(`I don't like ${danger.name}.`, sound);
+      setMessage(`Ouch! I don't like ${danger.name}. Back to the start!`);
+      setHitDangers((value) => [...value, danger.cell]);
       setLives((value) => Math.max(0, value - 1));
-      setPosition(20);
+      setSnake([SNAKE_START]);
       return;
     }
-    setPosition(next);
-    const prize = prizes.find((entry) => entry.cell === next);
-    if (prize && !collected.includes(next)) {
+    setSnake([next, ...movingBody]);
+    if (prize) {
       const nextCollected = [...collected, next];
       setCollected(nextCollected);
       arcadeSound("correct", sound);
       speakArcade(`I like ${prize.name}.`, sound);
-      if (nextCollected.length === prizes.length) window.setTimeout(() => finish(prizes.length, prizes.length + (3 - lives), prizes.length, onComplete, Math.max(0, 400 - moves * 5)), 600);
+      setMessage(`Yum! I like ${prize.name}. Your snake grew!`);
+    } else if (next === KEY_CELL && !hasKey) {
+      setHasKey(true);
+      setMessage("Golden key found! Now collect any remaining likes.");
+      arcadeSound("power", sound);
+    } else if (next === MAZE_EXIT) {
+      if (collected.length === prizes.length && hasKey) {
+        setMessage("Exit unlocked—maze complete!");
+        arcadeSound("complete", sound);
+        window.setTimeout(() => finish(prizes.length, prizes.length + (3 - lives), snake.length, onComplete, Math.max(0, 700 - moves * 5)), 600);
+      } else {
+        setMessage(`Exit locked: ${prizes.length - collected.length} likes remaining${hasKey ? "" : " and the key is missing"}.`);
+        arcadeSound("wrong", sound);
+      }
     }
-  }, [collected, dangers, lives, moves, onComplete, position, prizes, sound]);
+  }, [collected, dangers, hasKey, hitDangers, lives, moves, onComplete, position, prizes, snake, sound]);
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -168,27 +200,29 @@ export function PreferenceMaze({ profile, sound, onComplete }: ArcadeStageProps 
   }, [move]);
 
   return (
-    <Frame title="Preference Maze Chase">
-      <div className="grid gap-5 rounded-3xl bg-slate-950 p-5 lg:grid-cols-[1fr_220px]">
+    <Frame title="Preference Snake Maze">
+      <div className="grid gap-5 rounded-3xl bg-slate-950 p-5 lg:grid-cols-[1fr_230px]">
         <div>
-          <div className="mb-3 flex justify-between font-black text-yellow-300"><span>Collect your likes ⭐</span><span>{"❤️".repeat(lives)}{"🖤".repeat(3 - lives)}</span></div>
-          <div className="mx-auto grid max-w-[520px] grid-cols-5 gap-2 rounded-3xl border-8 border-blue-700 bg-blue-950 p-3">
-            {Array.from({ length: 25 }, (_, cell) => {
+          <div className="mb-3 flex flex-wrap justify-between gap-2 font-black text-yellow-300"><span>LIKES {collected.length}/{prizes.length} · KEY {hasKey ? "🔑" : "❌"}</span><span>{"❤️".repeat(lives)}{"🖤".repeat(3 - lives)}</span></div>
+          <div className="mx-auto grid max-w-[720px] grid-cols-9 gap-1 rounded-3xl border-8 border-blue-700 bg-blue-950 p-2">
+            {Array.from({ length: MAZE_SIZE }, (_, cell) => {
               const prize = prizes.find((entry) => entry.cell === cell);
               const danger = dangers.find((entry) => entry.cell === cell);
-              return <div key={cell} className={`grid aspect-square place-items-center rounded-xl text-3xl ${mazeWalls.has(cell) ? "bg-blue-600 shadow-[inset_0_0_0_4px_#60a5fa]" : "bg-slate-900"}`}>{position === cell ? "🟡" : prize && !collected.includes(cell) ? iconFor(prize.name) : danger ? "👻" : <span className="text-xs text-blue-400">•</span>}</div>;
+              const bodyIndex = snake.indexOf(cell);
+              return <div key={cell} className={`grid aspect-square min-w-0 place-items-center rounded-md text-xl sm:text-3xl ${mazeWalls.has(cell) ? "bg-blue-600 shadow-[inset_0_0_0_2px_#60a5fa]" : "bg-slate-900"}`}>{bodyIndex === 0 ? "🐍" : bodyIndex > 0 ? "🟢" : prize && !collected.includes(cell) ? iconFor(prize.name) : danger && !hitDangers.includes(cell) ? `💢${iconFor(danger.name)}` : cell === KEY_CELL && !hasKey ? "🔑" : cell === MAZE_EXIT ? (collected.length === prizes.length && hasKey ? "🚪" : "🔒") : <span className="text-xs text-blue-400">•</span>}</div>;
             })}
           </div>
-          <p className="mt-3 text-center text-sm font-bold">🟡 You · 👻 Things you dislike · Blue blocks are walls</p>
+          <p className="mt-3 text-center font-black text-yellow-200">{message}</p>
+          <p className="mt-1 text-center text-xs font-bold text-blue-200">🐍 Snake · 🟢 Tail · 💢 Dislike hazard · 🔑 Key · 🔒 Exit · Blue blocks are walls</p>
         </div>
         <div className="flex flex-col justify-center rounded-2xl bg-white/10 p-4 text-center">
-          <p className="font-black">PRIZES {collected.length}/{prizes.length}</p>
+          <p className="font-black">SNAKE LENGTH {snake.length}</p>
           <div className="mx-auto mt-4 grid w-40 grid-cols-3 gap-2">
             <span /><Button onClick={() => move(0, -1)}><ArrowUp /></Button><span />
             <Button onClick={() => move(-1, 0)}><ArrowLeft /></Button><Button disabled className="opacity-100">🟡</Button><Button onClick={() => move(1, 0)}><ArrowRight /></Button>
             <span /><Button onClick={() => move(0, 1)}><ArrowDown /></Button><span />
           </div>
-          <p className="mt-4 text-xs font-bold text-blue-200">Use keyboard arrows or the maze controls. Avoid the ghosts!</p>
+          <p className="mt-4 text-xs font-bold text-blue-200">Collect all four likes to grow. Avoid dislikes and your own tail, find the key, then escape.</p>
         </div>
       </div>
     </Frame>
