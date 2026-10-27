@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, CloudSun, Footprints, Gift, KeyRound, Lock, MapPinned, Medal, Mic, Palette, PartyPopper, PawPrint, Puzzle, ScanFace, Search, Shirt, ShoppingBasket, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, CloudSun, Footprints, Gift, Heart, KeyRound, Lock, MapPinned, Medal, Mic, Palette, PartyPopper, PawPrint, Puzzle, ScanFace, Search, Shirt, ShoppingBasket, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "LEAD Likes & Dislikes", description: "Play preference pinball, catch your likes, stack reason towers, win Would You Rather tug-of-war, and speak live opinions.", status: "New", icon: Heart, accent: "border-orange-100 bg-orange-50 text-orange-700", available: true, href: "/games/likes-dislikes" },
   { title: "LEAD My Favorite Thing", description: "Blast object bubbles, race a shifting conveyor, connect sentence matches, train listening, and complete a microphone-scored Show & Tell.", status: "New", icon: Gift, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/favorite-thing" },
   { title: "LEAD Direction City", description: "Explore a city map, ask townspeople, memorize routes, build signposts, program deliveries, and rescue tourists by giving directions.", status: "New", icon: MapPinned, accent: "border-sky-100 bg-sky-50 text-sky-700", available: true, href: "/games/direction-city" },
   { title: "LEAD My Weekend Adventure", description: "Run through a 2D weekend, pop past-tense bubbles, build Scrabble words, race story cards, and perform your own weekend story.", status: "New", icon: PartyPopper, accent: "border-orange-100 bg-orange-50 text-orange-700", available: true, href: "/games/weekend-adventure" },
