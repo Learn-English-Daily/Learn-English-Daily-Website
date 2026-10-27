@@ -330,6 +330,15 @@ const preferenceReasons: Record<string, string> = {
   "watch a movie": "because it is entertaining",
 };
 
+const nonPreferenceReasons: Record<string, string> = {
+  "play football": "because it makes me tired",
+  "play video games": "because I prefer outdoor games",
+  "eat pizza": "because it is too oily",
+  "eat ice cream": "because it is too cold",
+  "read a book": "because it can feel difficult",
+  "watch a movie": "because it takes too long",
+};
+
 export function RatherTugArena({ sound, onComplete, onPreferred }: { sound: boolean; onComplete: ArcadeStageProps["onComplete"]; onPreferred: (value: string[]) => void }) {
   const [round, setRound] = useState(0);
   const [choice, setChoice] = useState<"a" | "b" | null>(null);
@@ -408,17 +417,21 @@ export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sou
   const [phase, setPhase] = useState<"choose" | "flight">("choose");
   const [lane, setLane] = useState(0);
   const [choice, setChoice] = useState<"a" | "b" | null>(null);
+  const [sentenceMode, setSentenceMode] = useState<"prefer" | "not-prefer">("prefer");
   const [step, setStep] = useState(0);
   const [shields, setShields] = useState(3);
   const [picks, setPicks] = useState<string[]>([]);
   const [message, setMessage] = useState("Steer under the planet you prefer, then launch!");
   const task = rather[round];
   const selectedActivity = choice ? task[choice] : "";
-  const selectedReason = preferenceReasons[selectedActivity] || "because it is interesting";
-  const sentence = choice ? ["I prefer to", selectedActivity, selectedReason] : [];
+  const otherActivity = choice ? task[choice === "a" ? "b" : "a"] : "";
+  const activity = sentenceMode === "prefer" ? selectedActivity : otherActivity;
+  const selectedReason = sentenceMode === "prefer" ? preferenceReasons[activity] || "because it is interesting" : nonPreferenceReasons[activity] || "because it is not for me";
+  const sentence = choice ? [sentenceMode === "prefer" ? "I prefer to" : "I don't prefer to", activity, selectedReason] : [];
   const correctLane = (round + step * 2) % 3;
-  const otherReasons = Object.values(preferenceReasons).filter((reason) => reason !== selectedReason);
-  const decoys = step === 0 ? ["I don't like", "I never"] : step === 1 ? [task.a, task.b].filter((value) => value !== selectedActivity).concat("something else") : [otherReasons[(round * 2) % otherReasons.length], otherReasons[(round * 2 + 1) % otherReasons.length]];
+  const reasonPool = sentenceMode === "prefer" ? Object.values(preferenceReasons) : Object.values(nonPreferenceReasons);
+  const otherReasons = reasonPool.filter((reason) => reason !== selectedReason);
+  const decoys = step === 0 ? ["I don't like", "I never"] : step === 1 ? [task.a, task.b].filter((value) => value !== activity).concat("something else") : [otherReasons[(round * 2) % otherReasons.length], otherReasons[(round * 2 + 1) % otherReasons.length]];
   const gates = [0, 1, 2].map((gateLane) => gateLane === correctLane ? sentence[step] : decoys.shift() || "wrong way");
 
   const action = useCallback(() => {
@@ -426,6 +439,7 @@ export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sou
       const selected = lane === 0 ? "a" : "b";
       setChoice(selected);
       setPhase("flight");
+      setSentenceMode("prefer");
       setLane(1);
       setStep(0);
       setMessage(`Mission selected: ${task[selected]}. Collect the sentence fuel in order!`);
@@ -447,11 +461,20 @@ export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sou
       setMessage(`Fuel ${nextStep}/3 loaded. Find the next correct phrase!`);
       return;
     }
-    const selected = task[choice!];
-    const nextPicks = [...picks, selected];
+    if (sentenceMode === "prefer") {
+      speakArcade(`I prefer to ${selectedActivity} ${preferenceReasons[selectedActivity]}.`, sound);
+      setMessage("Great! Now build what you do not prefer.");
+      window.setTimeout(() => {
+        setSentenceMode("not-prefer");
+        setStep(0);
+        setLane(1);
+      }, 800);
+      return;
+    }
+    const nextPicks = [...picks, selectedActivity];
     setPicks(nextPicks);
-    speakArcade(`I prefer to ${selected} ${preferenceReasons[selected]}.`, sound);
-    setMessage("Sentence powered! Flying to the next galaxy…");
+    speakArcade(`I don't prefer to ${otherActivity} ${nonPreferenceReasons[otherActivity]}.`, sound);
+    setMessage("Both sentences powered! Flying to the next galaxy…");
     window.setTimeout(() => {
       if (round === rather.length - 1) {
         onPreferred(nextPicks);
@@ -460,12 +483,13 @@ export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sou
         setRound((value) => value + 1);
         setPhase("choose");
         setChoice(null);
+        setSentenceMode("prefer");
         setLane(0);
         setStep(0);
         setMessage("Choose your next preference planet!");
       }
     }, 900);
-  }, [choice, correctLane, lane, onComplete, onPreferred, phase, picks, round, sentence.length, shields, sound, step, task]);
+  }, [choice, correctLane, lane, onComplete, onPreferred, otherActivity, phase, picks, round, selectedActivity, sentence.length, sentenceMode, shields, sound, step, task]);
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -488,7 +512,7 @@ export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sou
             <div className="absolute bottom-5 w-1/2 text-center text-7xl transition-all duration-300" style={{ left: `${lane * 50}%` }}>🚀</div>
           </div>
         </> : <>
-          <h3 className="mt-3 font-heading text-2xl font-black">Build: “{sentence.slice(0, step).join(" ") || "…"}”</h3>
+          <h3 className="mt-3 font-heading text-2xl font-black">{sentenceMode === "prefer" ? "PREFERENCE FLIGHT" : "NOT-PREFERRED FLIGHT"}: “{sentence.slice(0, step).join(" ") || "…"}”</h3>
           <div className="relative mt-5 grid h-80 grid-cols-3 overflow-hidden rounded-3xl border-4 border-white/20 bg-[linear-gradient(#111827,#1e1b4b)]">
             {[0, 1, 2].map((gateLane) => <div key={gateLane} className="relative border-r-2 border-dashed border-white/10 last:border-0"><div className="absolute inset-x-2 top-8 grid min-h-24 place-items-center rounded-2xl border-4 border-violet-300 bg-violet-950 px-2 text-sm font-black shadow-[0_0_20px_rgba(196,181,253,.25)]">☄️<br />{gates[gateLane]}</div></div>)}
             <div className="absolute bottom-5 w-1/3 text-center text-7xl transition-all duration-300" style={{ left: `${lane * 33.333}%` }}>🚀</div>
