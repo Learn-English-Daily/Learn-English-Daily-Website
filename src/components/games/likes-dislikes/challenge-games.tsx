@@ -195,11 +195,26 @@ export function PreferenceMaze({ profile, sound, onComplete }: ArcadeStageProps 
   );
 }
 
-const reasons = ["because it is fun", "because it helps me relax", "because I can enjoy it with friends", "because it teaches me something new"];
+const likeReasons: Record<string, string> = {
+  pizza: "because it is delicious",
+  football: "because it is exciting",
+  reading: "because it helps me relax",
+  "rainy days": "because they feel peaceful",
+  cats: "because they are cute",
+  dancing: "because it is fun",
+  "spicy food": "because it is tasty",
+  "video games": "because they are exciting",
+};
 
 export function CraneTower({ profile, sound, onComplete }: ArcadeStageProps & { profile: PreferenceProfile }) {
-  const item = profile.liked[0] || "reading";
-  const target = useMemo(() => ["I like", item, reasons[0], "very much"], [item]);
+  const likedItem = profile.liked[0] || "reading";
+  const dislikedItem = profile.disliked[0] || "spicy food";
+  const sentences = useMemo(() => [
+    ["I like", likedItem, "very much", likeReasons[likedItem] || "because it is enjoyable"],
+    ["I don't like", dislikedItem, "because", "it is not for me"],
+  ], [dislikedItem, likedItem]);
+  const [round, setRound] = useState(0);
+  const target = sentences[round];
   const pool = useMemo(() => [target[2], target[0], target[3], target[1]], [target]);
   const [crane, setCrane] = useState(0);
   const [stack, setStack] = useState<string[]>([]);
@@ -220,10 +235,17 @@ export function CraneTower({ profile, sound, onComplete }: ArcadeStageProps & { 
     setStack(next);
     arcadeSound("correct", sound);
     if (next.length === target.length) {
-      speakArcade(next.join(" "), sound);
-      window.setTimeout(() => finish(4, attempts + 1, 4, onComplete, 300), 700);
+      speakArcade(`${next.join(" ")}.`, sound);
+      window.setTimeout(() => {
+        if (round === sentences.length - 1) finish(8, attempts + 1, 8, onComplete, 400);
+        else {
+          setRound((value) => value + 1);
+          setStack([]);
+          setCrane(0);
+        }
+      }, 850);
     }
-  }, [attempts, crane, onComplete, pool, sound, stack, target]);
+  }, [attempts, crane, onComplete, pool, round, sentences.length, sound, stack, target]);
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -238,7 +260,7 @@ export function CraneTower({ profile, sound, onComplete }: ArcadeStageProps & { 
   return (
     <Frame title="Reason Crane Tower">
       <div className="rounded-3xl bg-gradient-to-b from-sky-300 to-emerald-300 p-5 text-slate-950">
-        <div className="flex justify-between font-black"><span>🏗️ Move the crane, then drop the next phrase</span><span>{stack.length}/4 BLOCKS</span></div>
+        <div className="flex justify-between font-black"><span>🏗️ {round === 0 ? "Build a LIKE sentence" : "Now build a DON'T LIKE sentence"}</span><span>SENTENCE {round + 1}/2 · {stack.length}/4 BLOCKS</span></div>
         <div className="relative mt-4 h-[450px] overflow-hidden rounded-3xl border-4 border-white bg-sky-200">
           <div className="absolute inset-x-0 top-8 h-4 bg-slate-700" />
           <div className="absolute top-8 z-20 w-1/4 text-center transition-all duration-300" style={{ left: `${crane * 25}%` }}><div className="mx-auto h-36 w-1 bg-slate-700" /><span className="text-5xl">🪝</span></div>
