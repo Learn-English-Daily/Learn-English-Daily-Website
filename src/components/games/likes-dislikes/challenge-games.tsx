@@ -390,3 +390,100 @@ export function RatherTugArena({ sound, onComplete, onPreferred }: { sound: bool
     </Frame>
   );
 }
+
+export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sound: boolean; onComplete: ArcadeStageProps["onComplete"]; onPreferred: (value: string[]) => void }) {
+  const [round, setRound] = useState(0);
+  const [phase, setPhase] = useState<"choose" | "flight">("choose");
+  const [lane, setLane] = useState(0);
+  const [choice, setChoice] = useState<"a" | "b" | null>(null);
+  const [step, setStep] = useState(0);
+  const [shields, setShields] = useState(3);
+  const [picks, setPicks] = useState<string[]>([]);
+  const [message, setMessage] = useState("Steer under the planet you prefer, then launch!");
+  const task = rather[round];
+  const sentence = choice ? ["I prefer to", task[choice], "because it is fun"] : [];
+  const correctLane = (round + step * 2) % 3;
+  const decoys = step === 0 ? ["I don't like", "I never"] : step === 1 ? [task.a, task.b].filter((value) => !sentence.includes(value)).concat("something else") : ["but it is boring", "because it is difficult"];
+  const gates = [0, 1, 2].map((gateLane) => gateLane === correctLane ? sentence[step] : decoys.shift() || "wrong way");
+
+  const action = useCallback(() => {
+    if (phase === "choose") {
+      const selected = lane === 0 ? "a" : "b";
+      setChoice(selected);
+      setPhase("flight");
+      setLane(1);
+      setStep(0);
+      setMessage(`Mission selected: ${task[selected]}. Collect the sentence fuel in order!`);
+      arcadeSound("power", sound);
+      return;
+    }
+    if (lane !== correctLane) {
+      setShields((value) => Math.max(0, value - 1));
+      setStep(0);
+      setLane(1);
+      setMessage("Decoy gate! Sentence fuel reset—start the phrase again.");
+      arcadeSound("wrong", sound);
+      return;
+    }
+    const nextStep = step + 1;
+    arcadeSound("correct", sound);
+    if (nextStep < sentence.length) {
+      setStep(nextStep);
+      setMessage(`Fuel ${nextStep}/3 loaded. Find the next correct phrase!`);
+      return;
+    }
+    const selected = task[choice!];
+    const nextPicks = [...picks, selected];
+    setPicks(nextPicks);
+    speakArcade(`I prefer to ${selected} because it is fun.`, sound);
+    setMessage("Sentence powered! Flying to the next galaxy…");
+    window.setTimeout(() => {
+      if (round === rather.length - 1) {
+        onPreferred(nextPicks);
+        finish(9, 9 + (3 - shields), 9, onComplete, 500);
+      } else {
+        setRound((value) => value + 1);
+        setPhase("choose");
+        setChoice(null);
+        setLane(0);
+        setStep(0);
+        setMessage("Choose your next preference planet!");
+      }
+    }, 900);
+  }, [choice, correctLane, lane, onComplete, onPreferred, phase, picks, round, sentence.length, shields, sound, step, task]);
+
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") setLane((value) => Math.max(0, value - 1));
+      if (event.key === "ArrowRight") setLane((value) => Math.min(phase === "choose" ? 1 : 2, value + 1));
+      if (event.key === " " || event.key === "ArrowUp") { event.preventDefault(); action(); }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [action, phase]);
+
+  return (
+    <Frame title="Preference Space Mission">
+      <div className="overflow-hidden rounded-[2.5rem] border-8 border-violet-400 bg-[radial-gradient(circle_at_50%_10%,#312e81,#0f172a_65%)] p-5 text-center">
+        <div className="flex flex-wrap justify-between gap-2 font-black text-yellow-300"><span>GALAXY {round + 1}/3</span><span>{"🛡️".repeat(shields)}{"💥".repeat(3 - shields)}</span></div>
+        {phase === "choose" ? <>
+          <h3 className="mt-3 font-heading text-2xl font-black">Which planet would you rather visit?</h3>
+          <div className="relative mt-5 grid h-80 grid-cols-2 overflow-hidden rounded-3xl border-4 border-white/20 bg-[linear-gradient(transparent_70%,#172554_70%)]">
+            {(["a", "b"] as const).map((side) => <div key={side} className="grid place-items-center border-r-2 border-dashed border-white/10 last:border-0"><div><span className="block animate-bounce text-8xl">{side === "a" ? task.ai : task.bi}</span><b className="mt-3 block rounded-full bg-white/10 px-4 py-2 text-lg">{task[side]}</b></div></div>)}
+            <div className="absolute bottom-5 w-1/2 text-center text-7xl transition-all duration-300" style={{ left: `${lane * 50}%` }}>🚀</div>
+          </div>
+        </> : <>
+          <h3 className="mt-3 font-heading text-2xl font-black">Build: “{sentence.slice(0, step).join(" ") || "…"}”</h3>
+          <div className="relative mt-5 grid h-80 grid-cols-3 overflow-hidden rounded-3xl border-4 border-white/20 bg-[linear-gradient(#111827,#1e1b4b)]">
+            {[0, 1, 2].map((gateLane) => <div key={gateLane} className="relative border-r-2 border-dashed border-white/10 last:border-0"><div className={`absolute inset-x-2 top-8 grid min-h-24 place-items-center rounded-2xl border-4 px-2 text-sm font-black ${gateLane === correctLane ? "border-cyan-300 bg-cyan-950" : "border-rose-400 bg-rose-950"}`}>☄️<br />{gates[gateLane]}</div></div>)}
+            <div className="absolute bottom-5 w-1/3 text-center text-7xl transition-all duration-300" style={{ left: `${lane * 33.333}%` }}>🚀</div>
+            <div className="absolute inset-x-0 top-[58%] border-t-4 border-dashed border-yellow-300/50" />
+          </div>
+        </>}
+        <div className="mt-4 grid grid-cols-3 gap-3"><Button onClick={() => setLane((value) => Math.max(0, value - 1))}><ArrowLeft /> STEER</Button><Button onClick={action} className="bg-yellow-300 text-slate-950"><ArrowUp /> {phase === "choose" ? "LAUNCH" : "BOOST"}</Button><Button onClick={() => setLane((value) => Math.min(phase === "choose" ? 1 : 2, value + 1))}>STEER <ArrowRight /></Button></div>
+        <p className="mt-3 font-black text-blue-100">{message}</p>
+        <p className="mt-1 text-xs font-bold text-violet-200">Keyboard: ← → to steer, Space/↑ to launch or fly through a gate.</p>
+      </div>
+    </Frame>
+  );
+}
