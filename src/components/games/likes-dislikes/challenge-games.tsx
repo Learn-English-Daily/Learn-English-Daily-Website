@@ -116,7 +116,9 @@ export function PreferenceFall({ sound, onComplete, onProfile }: { sound: boolea
 
 const mazeWalls = new Set([6, 8, 16, 18]);
 const prizeCells = [0, 4, 12, 24];
-const dangerCells = [2, 10, 14, 22];
+// Keep the ghosts threatening without sealing the player into the starting corner.
+// Every prize remains reachable through at least one safe route.
+const dangerCells = [2, 7, 17, 22];
 
 export function PreferenceMaze({ profile, sound, onComplete }: ArcadeStageProps & { profile: PreferenceProfile }) {
   const likes = profile.liked.length ? profile.liked : ["reading"];
