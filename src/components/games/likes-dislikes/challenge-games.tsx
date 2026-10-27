@@ -45,6 +45,7 @@ export function PreferenceFall({ sound, onComplete, onProfile }: { sound: boolea
   const [lane, setLane] = useState(1);
   const [fall, setFall] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [jumping, setJumping] = useState(false);
   const [liked, setLiked] = useState<string[]>([]);
   const [disliked, setDisliked] = useState<string[]>([]);
   const item = things[index];
@@ -79,6 +80,8 @@ export function PreferenceFall({ sound, onComplete, onProfile }: { sound: boolea
 
   const jump = useCallback(() => {
     if (paused) return;
+    setJumping(true);
+    window.setTimeout(() => setJumping(false), 420);
     if (lane === itemLane && fall >= 2) resolve(true);
     else arcadeSound("wrong", sound);
   }, [fall, itemLane, lane, paused, resolve, sound]);
@@ -100,7 +103,7 @@ export function PreferenceFall({ sound, onComplete, onProfile }: { sound: boolea
         <div className="relative mt-5 h-[430px] overflow-hidden rounded-3xl border-4 border-white/30 bg-[linear-gradient(#1e3a8a_0_68%,#16a34a_68%_76%,#713f12_76%)]">
           {[1, 2].map((line) => <div key={line} className="absolute inset-y-0 border-l-4 border-dashed border-white/20" style={{ left: `${line * 33.333}%` }} />)}
           <div className="absolute z-10 text-7xl transition-all duration-500" style={{ left: `calc(${itemLane * 33.333}% + 11%)`, top: `${5 + fall * 14}%` }}>{item.icon}</div>
-          <div className="absolute bottom-5 z-20 -translate-x-1/2 text-7xl transition-all" style={{ left: `${lane * 33.333 + 16.666}%` }}>🧒</div>
+          <div className="absolute z-20 -translate-x-1/2 text-7xl transition-all duration-300" style={{ left: `${lane * 33.333 + 16.666}%`, bottom: jumping ? "120px" : "20px", transform: `translateX(-50%) ${jumping ? "rotate(-8deg) scale(1.08)" : "rotate(0deg) scale(1)"}` }}>🧒</div>
           <div className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-slate-950/70 px-4 py-1 font-black">{paused ? `🔊 ${item.name}` : fall >= 2 ? "JUMP NOW!" : "MOVE UNDER THE ITEM"}</div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3">
@@ -318,6 +321,15 @@ const rather = [
   { a: "read a book", ai: "📚", b: "watch a movie", bi: "🎬" },
 ];
 
+const preferenceReasons: Record<string, string> = {
+  "play football": "because I enjoy team games",
+  "play video games": "because they are exciting",
+  "eat pizza": "because it is delicious",
+  "eat ice cream": "because it is sweet",
+  "read a book": "because it helps me learn",
+  "watch a movie": "because it is entertaining",
+};
+
 export function RatherTugArena({ sound, onComplete, onPreferred }: { sound: boolean; onComplete: ArcadeStageProps["onComplete"]; onPreferred: (value: string[]) => void }) {
   const [round, setRound] = useState(0);
   const [choice, setChoice] = useState<"a" | "b" | null>(null);
@@ -401,9 +413,12 @@ export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sou
   const [picks, setPicks] = useState<string[]>([]);
   const [message, setMessage] = useState("Steer under the planet you prefer, then launch!");
   const task = rather[round];
-  const sentence = choice ? ["I prefer to", task[choice], "because it is fun"] : [];
+  const selectedActivity = choice ? task[choice] : "";
+  const selectedReason = preferenceReasons[selectedActivity] || "because it is interesting";
+  const sentence = choice ? ["I prefer to", selectedActivity, selectedReason] : [];
   const correctLane = (round + step * 2) % 3;
-  const decoys = step === 0 ? ["I don't like", "I never"] : step === 1 ? [task.a, task.b].filter((value) => !sentence.includes(value)).concat("something else") : ["but it is boring", "because it is difficult"];
+  const otherReasons = Object.values(preferenceReasons).filter((reason) => reason !== selectedReason);
+  const decoys = step === 0 ? ["I don't like", "I never"] : step === 1 ? [task.a, task.b].filter((value) => value !== selectedActivity).concat("something else") : [otherReasons[(round * 2) % otherReasons.length], otherReasons[(round * 2 + 1) % otherReasons.length]];
   const gates = [0, 1, 2].map((gateLane) => gateLane === correctLane ? sentence[step] : decoys.shift() || "wrong way");
 
   const action = useCallback(() => {
@@ -435,7 +450,7 @@ export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sou
     const selected = task[choice!];
     const nextPicks = [...picks, selected];
     setPicks(nextPicks);
-    speakArcade(`I prefer to ${selected} because it is fun.`, sound);
+    speakArcade(`I prefer to ${selected} ${preferenceReasons[selected]}.`, sound);
     setMessage("Sentence powered! Flying to the next galaxy…");
     window.setTimeout(() => {
       if (round === rather.length - 1) {
@@ -475,7 +490,7 @@ export function PreferenceSpaceMission({ sound, onComplete, onPreferred }: { sou
         </> : <>
           <h3 className="mt-3 font-heading text-2xl font-black">Build: “{sentence.slice(0, step).join(" ") || "…"}”</h3>
           <div className="relative mt-5 grid h-80 grid-cols-3 overflow-hidden rounded-3xl border-4 border-white/20 bg-[linear-gradient(#111827,#1e1b4b)]">
-            {[0, 1, 2].map((gateLane) => <div key={gateLane} className="relative border-r-2 border-dashed border-white/10 last:border-0"><div className={`absolute inset-x-2 top-8 grid min-h-24 place-items-center rounded-2xl border-4 px-2 text-sm font-black ${gateLane === correctLane ? "border-cyan-300 bg-cyan-950" : "border-rose-400 bg-rose-950"}`}>☄️<br />{gates[gateLane]}</div></div>)}
+            {[0, 1, 2].map((gateLane) => <div key={gateLane} className="relative border-r-2 border-dashed border-white/10 last:border-0"><div className="absolute inset-x-2 top-8 grid min-h-24 place-items-center rounded-2xl border-4 border-violet-300 bg-violet-950 px-2 text-sm font-black shadow-[0_0_20px_rgba(196,181,253,.25)]">☄️<br />{gates[gateLane]}</div></div>)}
             <div className="absolute bottom-5 w-1/3 text-center text-7xl transition-all duration-300" style={{ left: `${lane * 33.333}%` }}>🚀</div>
             <div className="absolute inset-x-0 top-[58%] border-t-4 border-dashed border-yellow-300/50" />
           </div>
