@@ -9,6 +9,8 @@ import { AdminLoginForm } from "@/app/admin/login-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
+import { getStudentAttendanceCollectionName } from "@/lib/attendance";
+import { getJakartaMonthKey } from "@/lib/batch-course-progress";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentAgeLabel } from "@/lib/student-age";
 import {
@@ -73,6 +75,40 @@ type StudentRegistration = {
   source: string;
   createdAt: string;
   studentStatus: string;
+};
+
+type PrivateAttendanceDocument = {
+  studentId?: string;
+  meetingNumber?: number;
+  meetingDate?: string;
+  status?: string;
+  updatedAt?: Date;
+  createdAt?: Date;
+};
+
+type PrivateCourseProgress = {
+  targetClasses: number;
+  classesTaken: number;
+  classesRemaining: number;
+  progressPercent: number;
+  currentMonthLabel: string;
+  currentMonthTaken: number;
+  currentMonthHeld: number;
+  months: Array<{
+    monthKey: string;
+    monthLabel: string;
+    held: number;
+    taken: number;
+    absent: number;
+    attendancePercent: number | null;
+  }>;
+};
+
+const PRIVATE_COURSE_TARGETS: Record<string, number> = {
+  "Fluent English": 96,
+  "Foundation English": 48,
+  "Confident English": 72,
+  "Academic English": 48
 };
 
 type RegistrationViewMode = "active" | "trial" | "archived";
@@ -159,6 +195,83 @@ async function getActiveBasicGroupStudentCount() {
   });
 }
 
+function monthLabel(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  if (!year || !month) return monthKey;
+  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "Asia/Jakarta" })
+    .format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function currentCourseAttendance(records: PrivateAttendanceDocument[]) {
+  const latestMeetingOne = records.find((record) => record.meetingNumber === 1 && record.meetingDate);
+  if (!latestMeetingOne?.meetingDate) return records;
+  return records.filter((record) => record.meetingDate && record.meetingDate >= latestMeetingOne.meetingDate!);
+}
+
+async function getPrivateCourseProgress(students: StudentRegistration[]) {
+  const studentIds = students.map((student) => student.studentId).filter(Boolean);
+  if (!studentIds.length) return new Map<string, PrivateCourseProgress>();
+
+  const db = await getMongoDb();
+  const attendance = await db.collection<PrivateAttendanceDocument>(getStudentAttendanceCollectionName())
+    .find({ studentId: { $in: studentIds } })
+    .sort({ meetingDate: -1, updatedAt: -1, createdAt: -1, meetingNumber: -1 })
+    .toArray();
+  const byStudent = new Map<string, PrivateAttendanceDocument[]>();
+  for (const record of attendance) {
+    if (!record.studentId) continue;
+    const records = byStudent.get(record.studentId) || [];
+    records.push(record);
+    byStudent.set(record.studentId, records);
+  }
+
+  const currentMonthKey = getJakartaMonthKey();
+  return new Map(students.flatMap((student) => {
+    const targetClasses = PRIVATE_COURSE_TARGETS[student.courseJoined];
+    if (!student.studentId || !targetClasses) return [];
+    const records = currentCourseAttendance(byStudent.get(student.studentId) || []);
+    const monthly = new Map<string, { held: number; taken: number; absent: number }>();
+
+    for (const record of records) {
+      const monthKey = record.meetingDate?.slice(0, 7) || "";
+      if (!/^\d{4}-\d{2}$/.test(monthKey) || record.status === "Cancelled") continue;
+      const row = monthly.get(monthKey) || { held: 0, taken: 0, absent: 0 };
+      if (record.status === "Present" || record.status === "Late") {
+        row.held += 1;
+        row.taken += 1;
+      } else if (record.status === "Absent") {
+        row.held += 1;
+        row.absent += 1;
+      } else {
+        continue;
+      }
+      monthly.set(monthKey, row);
+    }
+
+    const months = [...monthly.entries()]
+      .sort(([left], [right]) => right.localeCompare(left))
+      .map(([monthKey, row]) => ({
+        monthKey,
+        monthLabel: monthLabel(monthKey),
+        ...row,
+        attendancePercent: row.held ? Math.round((row.taken / row.held) * 100) : null
+      }));
+    const classesTaken = months.reduce((sum, month) => sum + month.taken, 0);
+    const currentMonth = months.find((month) => month.monthKey === currentMonthKey);
+
+    return [[student.studentId, {
+      targetClasses,
+      classesTaken,
+      classesRemaining: Math.max(0, targetClasses - classesTaken),
+      progressPercent: Math.min(100, Math.round((classesTaken / targetClasses) * 100)),
+      currentMonthLabel: monthLabel(currentMonthKey),
+      currentMonthTaken: currentMonth?.taken || 0,
+      currentMonthHeld: currentMonth?.held || 0,
+      months
+    } satisfies PrivateCourseProgress] as const];
+  }));
+}
+
 function formatDate(value: string) {
   if (!value) return "Unknown";
   return new Intl.DateTimeFormat("en", {
@@ -218,6 +331,7 @@ export default async function AdminStudentsPage({
     groupOnly && mode === "active" ? getActiveBasicGroupStudentCount() : Promise.resolve(0),
     getAuthenticatedAdmin()
   ]);
+  const privateCourseProgress = splitActiveStudents ? await getPrivateCourseProgress(registrations) : new Map<string, PrivateCourseProgress>();
   const isTrialView = mode === "trial";
   const isArchivedView = mode === "archived";
   const pagePath = isTrialView ? "/admin/students?view=trial" : isArchivedView ? "/admin/students?view=archived" : "/admin/students";
@@ -306,7 +420,7 @@ export default async function AdminStudentsPage({
 
         {registrations.length ? (
           <div className="grid gap-4">
-            {registrations.map((registration) => <RegistrationCard key={registration.id} registration={registration} isTrialView={isTrialView} groupOnly={groupOnly} />)}
+            {registrations.map((registration) => <RegistrationCard key={registration.id} registration={registration} isTrialView={isTrialView} groupOnly={groupOnly} courseProgress={privateCourseProgress.get(registration.studentId)} />)}
           </div>
         ) : (
           <Card className="p-8 text-center">
@@ -321,7 +435,7 @@ export default async function AdminStudentsPage({
   );
 }
 
-function RegistrationCard({ registration, isTrialView, groupOnly }: { registration: StudentRegistration; isTrialView: boolean; groupOnly: boolean }) {
+function RegistrationCard({ registration, isTrialView, groupOnly, courseProgress }: { registration: StudentRegistration; isTrialView: boolean; groupOnly: boolean; courseProgress?: PrivateCourseProgress }) {
   return (
     <Card className="p-5">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -398,6 +512,7 @@ function RegistrationCard({ registration, isTrialView, groupOnly }: { registrati
                     ))}
                   </div>
                 </div>
+                {courseProgress ? <PrivateCourseProgressCard progress={courseProgress} courseName={registration.courseJoined} /> : null}
                 <div className="mt-5 grid gap-3 text-sm text-lead-gray md:grid-cols-2 lg:grid-cols-4">
                   <p><span className="font-bold text-lead-navy">Date of Birth:</span> {registration.dateOfBirth || "Not recorded"}</p>
                   <p><span className="font-bold text-lead-navy">Age:</span> {getStudentAgeLabel(registration.dateOfBirth, registration.age)}</p>
@@ -411,4 +526,51 @@ function RegistrationCard({ registration, isTrialView, groupOnly }: { registrati
                 </div>
     </Card>
   );
+}
+
+function PrivateCourseProgressCard({ progress, courseName }: { progress: PrivateCourseProgress; courseName: string }) {
+  return (
+    <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-lead-blue">{courseName} progress</p>
+          <p className="mt-1 text-sm text-lead-gray">Present and Late classes count toward course completion.</p>
+        </div>
+        <p className="font-heading text-2xl font-extrabold text-lead-navy">{progress.progressPercent}%</p>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <PrivateProgressMetric label="Classes taken" value={`${progress.classesTaken}/${progress.targetClasses}`} />
+        <PrivateProgressMetric label="Classes remaining" value={String(progress.classesRemaining)} />
+        <PrivateProgressMetric label={`${progress.currentMonthLabel} attendance`} value={`${progress.currentMonthTaken}/${progress.currentMonthHeld}`} />
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white" aria-label={`${progress.progressPercent}% of course classes taken`}>
+        <div className="h-full rounded-full bg-lead-blue" style={{ width: `${progress.progressPercent}%` }} />
+      </div>
+      <details className="group mt-4 rounded-xl border border-blue-100 bg-white p-3">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-lead-blue [&::-webkit-details-marker]:hidden">
+          View month-by-month history
+          <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+        </summary>
+        <div className="mt-3 overflow-x-auto border-t border-blue-100 pt-3">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="text-xs uppercase tracking-[0.08em] text-lead-gray">
+              <tr><th className="pb-2">Month</th><th className="pb-2">Held</th><th className="pb-2">Present/Late</th><th className="pb-2">Absent</th><th className="pb-2">Attendance</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {progress.months.map((month) => (
+                <tr key={month.monthKey}>
+                  <td className="py-2 font-semibold text-lead-navy">{month.monthLabel}</td><td className="py-2">{month.held}</td><td className="py-2">{month.taken}</td><td className="py-2">{month.absent}</td><td className="py-2">{month.attendancePercent === null ? "-" : `${month.attendancePercent}%`}</td>
+                </tr>
+              ))}
+              {!progress.months.length ? <tr><td colSpan={5} className="py-3 text-lead-gray">No attendance has been recorded for this course yet.</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function PrivateProgressMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg bg-white p-3"><p className="text-xs font-bold uppercase tracking-[0.08em] text-lead-gray">{label}</p><p className="mt-1 font-heading text-xl font-extrabold text-lead-navy">{value}</p></div>;
 }
