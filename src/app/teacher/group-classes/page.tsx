@@ -1,16 +1,17 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { BookOpen, CalendarDays, CheckCircle2, Clock3, LogOut, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, CheckCircle2, Clock3, LogOut, Users } from "lucide-react";
 import { logoutTeacher, saveBatchClassAttendance } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { assessmentAttendanceStatuses } from "@/lib/assessments";
+import { assessmentAttendanceStatuses, getBatchesCollectionName } from "@/lib/assessments";
 import { getBatchClassSessionsCollectionName, hasBatchClassEnded, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 import { getBatchAttendanceRoster } from "@/lib/batch-attendance-roster";
+import { buildBatchCourseProgress, getJakartaMonthKey, GROUP_COURSE_CLASS_TARGET } from "@/lib/batch-course-progress";
 import { getMongoDb } from "@/lib/mongodb";
 import { isValidTeacherSession, TEACHER_ID_COOKIE, TEACHER_SESSION_COOKIE } from "@/lib/teacher-auth";
 import { getEmployeeTeacherById } from "@/lib/teachers";
@@ -49,15 +50,23 @@ export default async function TeacherGroupClassesPage() {
   }
 
   const db = await getMongoDb();
-  const sessions = await db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
-    .find({ teacherId: teacher.id, status: { $ne: "Cancelled" } })
-    .sort({ sessionDate: -1, meetingNumber: -1 })
-    .limit(100)
-    .toArray();
+  const [sessions, assignedBatches] = await Promise.all([
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
+      .find({ teacherId: teacher.id, status: { $ne: "Cancelled" } })
+      .sort({ sessionDate: -1, meetingNumber: -1 })
+      .limit(500)
+      .toArray(),
+    db.collection<{ batchName?: string; teacherId?: string; status?: string }>(getBatchesCollectionName())
+      .find({ teacherId: teacher.id, status: { $ne: "archived" } })
+      .project({ batchName: 1 })
+      .sort({ batchName: 1 })
+      .toArray()
+  ]);
   const now = new Date();
   const open = sessions.filter((session) => session.status === "Scheduled" && hasBatchClassEnded(session, now)).reverse();
   const future = sessions.filter((session) => session.status === "Scheduled" && !hasBatchClassEnded(session, now)).reverse();
   const completed = sessions.filter((session) => session.status === "Completed").slice(0, 12);
+  const currentMonthKey = getJakartaMonthKey();
   const rosters = new Map(await Promise.all([...new Set(open.map((session) => session.batchId))].map(async (batchId) =>
     [batchId, await getBatchAttendanceRoster(db, batchId)] as const
   )));
@@ -84,6 +93,35 @@ export default async function TeacherGroupClassesPage() {
           <Metric label="Attendance needed" value={open.length} icon={Users} tone="amber" />
           <Metric label="Upcoming classes" value={future.length} icon={CalendarDays} tone="blue" />
           <Metric label="Recently completed" value={completed.length} icon={CheckCircle2} tone="green" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          {assignedBatches.map((batch) => {
+            const batchId = batch._id.toString();
+            const progress = buildBatchCourseProgress(sessions.filter((session) => session.batchId === batchId));
+            const currentMonth = progress.months.find((month) => month.monthKey === currentMonthKey);
+            return (
+              <Card key={batchId} className="overflow-hidden">
+                <div className="flex items-start justify-between gap-4 border-b border-blue-100 bg-blue-50 p-5">
+                  <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-lead-blue">Six-month course progress</p><h2 className="mt-1 font-heading text-xl font-extrabold text-lead-navy">{batch.batchName || "Group batch"}</h2></div>
+                  <div className="grid h-11 w-11 place-items-center rounded-xl bg-white text-lead-blue"><BarChart3 className="h-5 w-5" /></div>
+                </div>
+                <div className="p-5">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <ProgressMetric label="Completed" value={`${progress.completedClasses}/${GROUP_COURSE_CLASS_TARGET}`} />
+                    <ProgressMetric label="Remaining" value={String(progress.remainingClasses)} />
+                    <ProgressMetric label="This month" value={String(currentMonth?.completedClasses || 0)} />
+                  </div>
+                  <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-lead-blue" style={{ width: `${progress.progressPercent}%` }} /></div>
+                  <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs font-semibold text-lead-gray"><span>{progress.progressPercent}% of 72 classes complete</span><span>{currentMonth?.studentsAttended || 0} students attended this month</span></div>
+                  <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <summary className="cursor-pointer text-sm font-bold text-lead-blue">Monthly history</summary>
+                    <div className="mt-3 space-y-2">{progress.months.map((month) => <div key={month.monthKey} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="font-semibold text-lead-navy">{month.monthLabel}</span><span className="text-lead-gray">{month.completedClasses} classes · {month.studentsAttended} students</span></div>)}{!progress.months.length ? <p className="text-sm text-lead-gray">No completed classes yet.</p> : null}</div>
+                  </details>
+                </div>
+              </Card>
+            );
+          })}
         </div>
 
         <div className="grid gap-5">
@@ -138,6 +176,10 @@ export default async function TeacherGroupClassesPage() {
 function Metric({ label, value, icon: Icon, tone }: { label: string; value: number; icon: typeof Users; tone: "amber" | "blue" | "green" }) {
   const colors = tone === "amber" ? "bg-amber-50 text-amber-700" : tone === "green" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-lead-blue";
   return <Card className="flex items-center gap-4 p-4"><div className={`grid h-11 w-11 place-items-center rounded-xl ${colors}`}><Icon className="h-5 w-5" /></div><div><p className="font-heading text-2xl font-extrabold text-lead-navy">{value}</p><p className="text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">{label}</p></div></Card>;
+}
+
+function ProgressMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-slate-50 p-3"><p className="font-heading text-xl font-extrabold text-lead-navy">{value}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-lead-gray">{label}</p></div>;
 }
 
 function SessionList({ title, sessions, empty, showTopic = false }: { title: string; sessions: Array<BatchClassSessionDocument & { _id: { toString(): string } }>; empty: string; showTopic?: boolean }) {

@@ -21,6 +21,8 @@ import {
   assessmentPrograms,
   getBatchesCollectionName
 } from "@/lib/assessments";
+import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
+import { buildBatchCourseProgress, buildStudentGroupClassCounts, getJakartaMonthKey, GROUP_COURSE_CLASS_TARGET } from "@/lib/batch-course-progress";
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getAvailableTeachers, type TeacherOption } from "@/lib/teachers";
@@ -93,11 +95,17 @@ function getBasicGroupStudentFilter() {
 async function getBatchPageData() {
   const db = await getMongoDb();
 
-  const [batchDocs, teacherDocs, studentDocs] = await Promise.all([
+  const [batchDocs, teacherDocs, studentDocs, sessionDocs] = await Promise.all([
     db.collection<BatchDocument>(getBatchesCollectionName()).find({}).sort({ status: 1, startDate: -1 }).limit(100).toArray() as Promise<WithId<BatchDocument>[]>,
     getAvailableTeachers(db),
-    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getBasicGroupStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getBasicGroupStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>,
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: "Completed" }).sort({ sessionDate: -1 }).limit(5000).toArray()
   ]);
+
+  const batchProgress = new Map(batchDocs.map((batch) => {
+    const id = batch._id.toString();
+    return [id, buildBatchCourseProgress(sessionDocs.filter((session) => session.batchId === id))] as const;
+  }));
 
   return {
     batches: batchDocs.map((batch) => ({
@@ -122,7 +130,10 @@ async function getBatchPageData() {
       classType: student.classType || "",
       classMode: student.classMode || "Online",
       activeBatchId: student.activeBatchId || ""
-    }))
+    })),
+    batchProgress,
+    studentClassCounts: buildStudentGroupClassCounts(sessionDocs),
+    currentMonthKey: getJakartaMonthKey()
   };
 }
 
@@ -157,7 +168,7 @@ export default async function AdminBatchesPage() {
   }
 
   const [batchPageData, admin] = await Promise.all([getBatchPageData(), getAuthenticatedAdmin()]);
-  const { batches, teachers, students } = batchPageData;
+  const { batches, teachers, students, batchProgress, studentClassCounts, currentMonthKey } = batchPageData;
   const activeBatches = batches.filter((batch) => batch.status === "active");
   const archivedBatches = batches.filter((batch) => batch.status === "archived");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
@@ -220,6 +231,8 @@ export default async function AdminBatchesPage() {
           <div className="grid gap-5">
             {activeBatches.map((batch) => {
               const batchStudents = students.filter((student) => student.activeBatchId === batch.id);
+              const progress = batchProgress.get(batch.id) || buildBatchCourseProgress([]);
+              const currentMonth = progress.months.find((month) => month.monthKey === currentMonthKey);
 
               return (
                 <Card key={batch.id} className="overflow-hidden">
@@ -258,9 +271,27 @@ export default async function AdminBatchesPage() {
                         ) : null}
                       </details>
                     </div>
-                    <div className="mt-5 grid gap-3 sm:max-w-xs">
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <Metric label="Students" value={`${batchStudents.length}/${batch.maximumStudents}`} />
+                      <Metric label="Course classes completed" value={`${progress.completedClasses}/${GROUP_COURSE_CLASS_TARGET}`} />
+                      <Metric label="Classes remaining" value={String(progress.remainingClasses)} />
+                      <Metric label={`${currentMonth?.monthLabel || "This month"} attendance`} value={`${currentMonth?.completedClasses || 0} classes / ${currentMonth?.studentsAttended || 0} students`} />
                     </div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100" aria-label={`${progress.progressPercent}% of course classes completed`}>
+                      <div className="h-full rounded-full bg-lead-blue" style={{ width: `${progress.progressPercent}%` }} />
+                    </div>
+                    <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                      <summary className="cursor-pointer text-sm font-bold text-lead-blue">View month-by-month class history</summary>
+                      <div className="mt-3 overflow-x-auto">
+                        <table className="w-full min-w-[460px] text-left text-sm">
+                          <thead className="text-xs uppercase tracking-[0.1em] text-lead-gray"><tr><th className="pb-2">Month</th><th className="pb-2">Classes completed</th><th className="pb-2">Students attended</th></tr></thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {progress.months.map((month) => <tr key={month.monthKey}><td className="py-2 font-semibold text-lead-navy">{month.monthLabel}</td><td className="py-2">{month.completedClasses}</td><td className="py-2">{month.studentsAttended}</td></tr>)}
+                            {!progress.months.length ? <tr><td colSpan={3} className="py-3 text-lead-gray">No completed group classes recorded yet.</td></tr> : null}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
                   </div>
 
                   <div className="border-b border-slate-100 bg-white p-5">
@@ -273,6 +304,7 @@ export default async function AdminBatchesPage() {
                           <th className="px-5 py-3">Student ID</th>
                           <th className="px-5 py-3">Name</th>
                           <th className="px-5 py-3">Email</th>
+                          <th className="px-5 py-3">Classes taken</th>
                           <th className="px-5 py-3">Action</th>
                         </tr>
                       </thead>
@@ -287,6 +319,7 @@ export default async function AdminBatchesPage() {
                               <td className="px-5 py-4">
                                 {student.email ? <a href={`mailto:${student.email}`} className="font-semibold text-lead-blue hover:text-blue-700 hover:underline">{student.email}</a> : <span className="text-lead-gray">Not set</span>}
                               </td>
+                              <td className="px-5 py-4"><span className="rounded-full bg-blue-50 px-3 py-1.5 font-bold text-lead-blue">{studentClassCounts.get(student.studentId) || 0}/{GROUP_COURSE_CLASS_TARGET}</span><p className="mt-1 text-xs text-lead-gray">Present classes across group transfers</p></td>
                               <td className="px-5 py-4">
                                 <ActionFeedbackForm action={removeStudentFromBatch} successMessage="Student removed.">
                                   <input type="hidden" name="batchId" value={batch.id} />
@@ -298,7 +331,7 @@ export default async function AdminBatchesPage() {
                         ))}
                         {!batchStudents.length ? (
                           <tr>
-                            <td colSpan={4} className="px-5 py-6 text-center text-sm text-lead-gray">No students assigned yet.</td>
+                            <td colSpan={5} className="px-5 py-6 text-center text-sm text-lead-gray">No students assigned yet.</td>
                           </tr>
                         ) : null}
                       </tbody>
