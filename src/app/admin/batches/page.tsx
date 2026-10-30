@@ -22,7 +22,7 @@ import {
   getBatchesCollectionName
 } from "@/lib/assessments";
 import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
-import { buildBatchCourseProgress, buildStudentGroupClassCounts, getJakartaMonthKey, GROUP_COURSE_CLASS_TARGET } from "@/lib/batch-course-progress";
+import { buildBatchCourseProgress, buildStudentGroupClassProgress, getJakartaMonthKey, GROUP_COURSE_CLASS_TARGET } from "@/lib/batch-course-progress";
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getAvailableTeachers, type TeacherOption } from "@/lib/teachers";
@@ -132,7 +132,7 @@ async function getBatchPageData() {
       activeBatchId: student.activeBatchId || ""
     })),
     batchProgress,
-    studentClassCounts: buildStudentGroupClassCounts(sessionDocs),
+    studentClassProgress: buildStudentGroupClassProgress(sessionDocs),
     currentMonthKey: getJakartaMonthKey()
   };
 }
@@ -168,7 +168,7 @@ export default async function AdminBatchesPage() {
   }
 
   const [batchPageData, admin] = await Promise.all([getBatchPageData(), getAuthenticatedAdmin()]);
-  const { batches, teachers, students, batchProgress, studentClassCounts, currentMonthKey } = batchPageData;
+  const { batches, teachers, students, batchProgress, studentClassProgress, currentMonthKey } = batchPageData;
   const activeBatches = batches.filter((batch) => batch.status === "active");
   const archivedBatches = batches.filter((batch) => batch.status === "archived");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
@@ -309,8 +309,10 @@ export default async function AdminBatchesPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {batchStudents.map((student) => (
-                            <tr key={student.studentId} className="bg-white">
+                        {batchStudents.map((student) => {
+                          const classProgress = studentClassProgress.get(student.studentId) || { totalClasses: 0, months: [] };
+                          return (
+                            <tr key={student.studentId} className="bg-white align-top">
                               <td className="px-5 py-4 font-bold text-lead-navy">{student.studentId}</td>
                               <td className="px-5 py-4">
                                 <p className="font-semibold text-lead-navy">{student.studentName}</p>
@@ -319,7 +321,19 @@ export default async function AdminBatchesPage() {
                               <td className="px-5 py-4">
                                 {student.email ? <a href={`mailto:${student.email}`} className="font-semibold text-lead-blue hover:text-blue-700 hover:underline">{student.email}</a> : <span className="text-lead-gray">Not set</span>}
                               </td>
-                              <td className="px-5 py-4"><span className="rounded-full bg-blue-50 px-3 py-1.5 font-bold text-lead-blue">{studentClassCounts.get(student.studentId) || 0}/{GROUP_COURSE_CLASS_TARGET}</span><p className="mt-1 text-xs text-lead-gray">Present classes across group transfers</p></td>
+                              <td className="px-5 py-4">
+                                <details className="group w-56 rounded-xl border border-blue-100 bg-blue-50/50 p-2.5">
+                                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 marker:content-none">
+                                    <span className="rounded-full bg-blue-100 px-3 py-1 font-bold text-lead-blue">{classProgress.totalClasses}/{GROUP_COURSE_CLASS_TARGET}</span>
+                                    <span className="text-[10px] font-bold uppercase text-lead-blue group-open:hidden">View months</span>
+                                  </summary>
+                                  <div className="mt-3 space-y-1.5 border-t border-blue-100 pt-2">
+                                    {classProgress.months.map((month) => <div key={month.monthKey} className="flex items-center justify-between gap-3 rounded-lg bg-white px-2.5 py-2 text-xs"><span className="font-semibold text-lead-navy">{month.monthLabel}</span><span className="font-bold text-lead-blue">{month.classesTaken} classes</span></div>)}
+                                    {!classProgress.months.length ? <p className="px-1 py-2 text-xs text-lead-gray">No Present classes recorded yet.</p> : null}
+                                    <p className="px-1 pt-1 text-[10px] leading-4 text-lead-gray">Total includes Present classes across group transfers.</p>
+                                  </div>
+                                </details>
+                              </td>
                               <td className="px-5 py-4">
                                 <ActionFeedbackForm action={removeStudentFromBatch} successMessage="Student removed.">
                                   <input type="hidden" name="batchId" value={batch.id} />
@@ -328,7 +342,8 @@ export default async function AdminBatchesPage() {
                                 </ActionFeedbackForm>
                               </td>
                             </tr>
-                        ))}
+                          );
+                        })}
                         {!batchStudents.length ? (
                           <tr>
                             <td colSpan={5} className="px-5 py-6 text-center text-sm text-lead-gray">No students assigned yet.</td>

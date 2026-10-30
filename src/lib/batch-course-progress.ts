@@ -62,14 +62,32 @@ export function buildBatchCourseProgress(sessions: BatchClassSessionDocument[]):
   };
 }
 
-export function buildStudentGroupClassCounts(sessions: BatchClassSessionDocument[]) {
-  const counts = new Map<string, number>();
+export type StudentGroupClassProgress = {
+  totalClasses: number;
+  months: Array<{ monthKey: string; monthLabel: string; classesTaken: number }>;
+};
+
+export function buildStudentGroupClassProgress(sessions: BatchClassSessionDocument[]) {
+  const monthlyCounts = new Map<string, Map<string, number>>();
   for (const session of sessions) {
     if (session.status !== "Completed") continue;
+    const monthKey = session.sessionDate.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(monthKey)) continue;
     for (const attendance of session.attendance || []) {
       if (attendance.attendance !== "Present") continue;
-      counts.set(attendance.studentId, (counts.get(attendance.studentId) || 0) + 1);
+      const studentMonths = monthlyCounts.get(attendance.studentId) || new Map<string, number>();
+      studentMonths.set(monthKey, (studentMonths.get(monthKey) || 0) + 1);
+      monthlyCounts.set(attendance.studentId, studentMonths);
     }
   }
-  return counts;
+
+  return new Map([...monthlyCounts.entries()].map(([studentId, months]) => {
+    const monthRows = [...months.entries()]
+      .sort(([left], [right]) => right.localeCompare(left))
+      .map(([monthKey, classesTaken]) => ({ monthKey, monthLabel: monthLabel(monthKey), classesTaken }));
+    return [studentId, {
+      totalClasses: monthRows.reduce((sum, month) => sum + month.classesTaken, 0),
+      months: monthRows
+    }] as const;
+  }));
 }
