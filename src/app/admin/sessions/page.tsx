@@ -141,7 +141,7 @@ async function getStudents(): Promise<Student[]> {
   const db = await getMongoDb();
   const docs = (await db
     .collection<StudentDocument>(getStudentRegistrationCollectionName())
-    .find({ $and: [getActiveStudentFilter(), { classType: { $ne: "Basic Group" } }] })
+    .find({ $and: [getActiveStudentFilter(), { classType: "Premium 1-to-1" }] })
     .sort({ createdAt: -1 })
     .limit(200)
     .toArray()) as WithId<StudentDocument>[];
@@ -165,11 +165,12 @@ async function getStudents(): Promise<Student[]> {
   }));
 }
 
-async function getGroupSchedulingData() {
+async function getGroupSchedulingData(groupOnly: boolean) {
   const db = await getMongoDb();
+  const accessFilter = groupOnly ? { $or: [{ batchType: "Basic Group" as const }, { batchType: { $exists: false } }] } : {};
   const [batchDocs, sessionDocs] = await Promise.all([
-    db.collection(getBatchesCollectionName()).find({ status: "active" }).sort({ batchName: 1 }).limit(100).toArray(),
-    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: { $ne: "Cancelled" } }).sort({ sessionDate: -1, meetingNumber: -1 }).limit(500).toArray()
+    db.collection(getBatchesCollectionName()).find({ status: "active", ...accessFilter }).sort({ batchName: 1 }).limit(100).toArray(),
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: { $ne: "Cancelled" }, ...accessFilter }).sort({ sessionDate: -1, meetingNumber: -1 }).limit(500).toArray()
   ]);
 
   return {
@@ -400,7 +401,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
   const [students, teachers, sessions] = schedulingType === "private"
     ? await Promise.all([getStudents(), getTeachers(), getSessions()])
     : [[], [], []] as [Student[], Teacher[], ClassSession[]];
-  const groupData = schedulingType === "group" ? await getGroupSchedulingData() : { batches: [], sessions: [] };
+  const groupData = schedulingType === "group" ? await getGroupSchedulingData(groupOnly) : { batches: [], sessions: [] };
   const selectedBatchId = groupData.batches.some((batch) => batch.id === requestedBatchId) ? requestedBatchId || "" : groupData.batches[0]?.id || "";
   const selectedBatch = groupData.batches.find((batch) => batch.id === selectedBatchId);
   const selectedBatchSessions = groupData.sessions.filter((groupSession) => groupSession.batchId === selectedBatchId);

@@ -17,12 +17,13 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
+import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import {
   assessmentPrograms,
   getBatchesCollectionName
 } from "@/lib/assessments";
-import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
-import { buildBatchCourseProgress, buildStudentGroupClassProgress, getJakartaMonthKey, GROUP_COURSE_CLASS_TARGET } from "@/lib/batch-course-progress";
+import { getBatchClassSessionsCollectionName, getBatchType, type BatchClassSessionDocument, type BatchType } from "@/lib/batch-class-sessions";
+import { buildBatchCourseProgress, buildStudentGroupClassProgress, getCourseClassTarget, getJakartaMonthKey } from "@/lib/batch-course-progress";
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getAvailableTeachers, type TeacherOption } from "@/lib/teachers";
@@ -32,6 +33,7 @@ export const dynamic = "force-dynamic";
 type BatchDocument = {
   batchName?: string;
   program?: string;
+  batchType?: BatchType;
   teacherId?: string;
   teacherName?: string;
   startDate?: string;
@@ -56,6 +58,7 @@ type Batch = {
   id: string;
   batchName: string;
   program: string;
+  batchType: BatchType;
   teacherId: string;
   teacherName: string;
   startDate: string;
@@ -92,19 +95,21 @@ function getBasicGroupStudentFilter() {
   };
 }
 
-async function getBatchPageData() {
+async function getBatchPageData(groupOnly: boolean) {
   const db = await getMongoDb();
+  const batchFilter = groupOnly ? { $or: [{ batchType: "Basic Group" as const }, { batchType: { $exists: false } }] } : {};
+  const studentClassTypes = groupOnly ? ["Basic Group"] : ["Basic Group", "Standard/Buddy"];
 
   const [batchDocs, teacherDocs, studentDocs, sessionDocs] = await Promise.all([
-    db.collection<BatchDocument>(getBatchesCollectionName()).find({}).sort({ status: 1, startDate: -1 }).limit(100).toArray() as Promise<WithId<BatchDocument>[]>,
+    db.collection<BatchDocument>(getBatchesCollectionName()).find(batchFilter).sort({ status: 1, startDate: -1 }).limit(100).toArray() as Promise<WithId<BatchDocument>[]>,
     getAvailableTeachers(db),
-    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(getBasicGroupStudentFilter()).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>,
-    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: "Completed" }).sort({ sessionDate: -1 }).limit(5000).toArray()
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({ $and: [getActiveStudentFilter(), { classType: { $in: studentClassTypes } }] }).sort({ studentName: 1 }).limit(1000).toArray() as Promise<WithId<StudentDocument>[]>,
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: "Completed", ...(groupOnly ? { $or: [{ batchType: "Basic Group" }, { batchType: { $exists: false } }] } : {}) }).sort({ sessionDate: -1 }).limit(5000).toArray()
   ]);
 
   const batchProgress = new Map(batchDocs.map((batch) => {
     const id = batch._id.toString();
-    return [id, buildBatchCourseProgress(sessionDocs.filter((session) => session.batchId === id))] as const;
+    return [id, buildBatchCourseProgress(sessionDocs.filter((session) => session.batchId === id), getCourseClassTarget(batch.program || ""))] as const;
   }));
 
   return {
@@ -112,6 +117,7 @@ async function getBatchPageData() {
       id: batch._id.toString(),
       batchName: batch.batchName || "Untitled batch",
       program: batch.program || "",
+      batchType: getBatchType(batch.batchType),
       teacherId: batch.teacherId || "",
       teacherName: batch.teacherName || "",
       startDate: batch.startDate || "",
@@ -167,11 +173,13 @@ export default async function AdminBatchesPage() {
     );
   }
 
-  const [batchPageData, admin] = await Promise.all([getBatchPageData(), getAuthenticatedAdmin()]);
+  const groupOnly = isGroupStudentAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "");
+  const [batchPageData, admin] = await Promise.all([getBatchPageData(groupOnly), getAuthenticatedAdmin()]);
   const { batches, teachers, students, batchProgress, studentClassProgress, currentMonthKey } = batchPageData;
   const activeBatches = batches.filter((batch) => batch.status === "active");
   const archivedBatches = batches.filter((batch) => batch.status === "archived");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
+  const availablePrograms = groupOnly ? assessmentPrograms.filter((program) => program !== "Academic English") : assessmentPrograms;
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -190,12 +198,13 @@ export default async function AdminBatchesPage() {
             <SectionTitle icon={Plus} title="Create Batch" description="One batch can hold active course students only. Trial students stay separate." />
             <ActionFeedbackForm action={createBatch} successMessage="Batch created successfully." className="mt-5 grid gap-4 md:grid-cols-2">
               <Field label="Batch Name" name="batchName" placeholder="Foundation A" required />
-              <SelectField label="Program" name="program" options={assessmentPrograms} required />
+              <SelectField label="Program" name="program" options={availablePrograms} required />
+              {!groupOnly ? <SelectField label="Batch Type" name="batchType" options={["Basic Group", "Standard/Buddy"]} required /> : <input type="hidden" name="batchType" value="Basic Group" />}
               <SelectField label="Teacher" name="teacherId" options={teachers.map((teacher) => ({ label: teacher.name, value: teacher.id }))} required />
               <Field label="Start Date" name="startDate" type="date" required />
               <Field label="Days" name="days" placeholder="Mon, Wed, Fri" required />
               <Field label="Time" name="time" placeholder="7:00 PM - 8:00 PM" required />
-              <Field label="Maximum Students" name="maximumStudents" type="number" min={1} max={100} defaultValue={12} required />
+              <Field label="Maximum Students (Buddy is always 2)" name="maximumStudents" type="number" min={1} max={100} defaultValue={12} required />
               <div className="flex items-end">
                 <Button type="submit" className="w-full">Create Batch</Button>
               </div>
@@ -205,12 +214,12 @@ export default async function AdminBatchesPage() {
           <Card className="p-5">
             <SectionTitle icon={UserPlus} title="Assign Student" description="Each student belongs to one active batch." />
             <ActionFeedbackForm action={assignStudentToBatch} successMessage="Student assigned to batch." className="mt-5 grid gap-4">
-              <SelectField label="Batch" name="batchId" options={activeBatches.map((batch) => ({ label: batch.batchName, value: batch.id }))} required />
+              <SelectField label="Batch" name="batchId" options={activeBatches.map((batch) => ({ label: `${batch.batchName} (${batch.batchType})`, value: batch.id }))} required />
               <SelectField
                 label="Student"
                 name="studentId"
                 options={unassignedStudents.map((student) => ({
-                  label: `${student.studentId} - ${student.studentName}`,
+                  label: `${student.studentId} - ${student.studentName} (${student.classType})`,
                   value: student.studentId
                 }))}
                 required
@@ -231,7 +240,8 @@ export default async function AdminBatchesPage() {
           <div className="grid gap-5">
             {activeBatches.map((batch) => {
               const batchStudents = students.filter((student) => student.activeBatchId === batch.id);
-              const progress = batchProgress.get(batch.id) || buildBatchCourseProgress([]);
+              const courseTarget = getCourseClassTarget(batch.program);
+              const progress = batchProgress.get(batch.id) || buildBatchCourseProgress([], courseTarget);
               const currentMonth = progress.months.find((month) => month.monthKey === currentMonthKey);
 
               return (
@@ -244,6 +254,7 @@ export default async function AdminBatchesPage() {
                           <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${batch.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                             {batch.status}
                           </span>
+                          <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold uppercase text-violet-700">{batch.batchType}</span>
                         </div>
                         <p className="mt-2 text-sm text-lead-gray">
                           {batch.program} / {batch.teacherName} / {batch.days} / {batch.time}
@@ -254,8 +265,9 @@ export default async function AdminBatchesPage() {
                         <summary className="cursor-pointer text-sm font-bold text-lead-blue">Edit batch</summary>
                         <ActionFeedbackForm action={updateBatch} successMessage="Batch updated." className="mt-4 grid gap-3 sm:grid-cols-2">
                           <input type="hidden" name="id" value={batch.id} />
+                          <input type="hidden" name="batchType" value={batch.batchType} />
                           <Field label="Batch Name" name="batchName" defaultValue={batch.batchName} required />
-                          <SelectField label="Program" name="program" options={assessmentPrograms} defaultValue={batch.program} required />
+                          <SelectField label="Program" name="program" options={availablePrograms} defaultValue={batch.program} required />
                           <SelectField label="Teacher" name="teacherId" options={teachers.map((teacher) => ({ label: teacher.name, value: teacher.id }))} defaultValue={batch.teacherId} required />
                           <Field label="Start Date" name="startDate" type="date" defaultValue={batch.startDate} required />
                           <Field label="Days" name="days" defaultValue={batch.days} required />
@@ -273,7 +285,7 @@ export default async function AdminBatchesPage() {
                     </div>
                     <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <Metric label="Students" value={`${batchStudents.length}/${batch.maximumStudents}`} />
-                      <Metric label="Course classes completed" value={`${progress.completedClasses}/${GROUP_COURSE_CLASS_TARGET}`} />
+                      <Metric label="Course classes completed" value={`${progress.completedClasses}/${courseTarget}`} />
                       <Metric label="Classes remaining" value={String(progress.remainingClasses)} />
                       <Metric label={`${currentMonth?.monthLabel || "This month"} attendance`} value={`${currentMonth?.completedClasses || 0} classes / ${currentMonth?.studentsAttended || 0} students`} />
                     </div>
@@ -324,7 +336,7 @@ export default async function AdminBatchesPage() {
                               <td className="px-5 py-4">
                                 <details className="group w-56 rounded-xl border border-blue-100 bg-blue-50/50 p-2.5">
                                   <summary className="flex cursor-pointer list-none items-center justify-between gap-2 marker:content-none">
-                                    <span className="rounded-full bg-blue-100 px-3 py-1 font-bold text-lead-blue">{classProgress.totalClasses}/{GROUP_COURSE_CLASS_TARGET}</span>
+                                    <span className="rounded-full bg-blue-100 px-3 py-1 font-bold text-lead-blue">{classProgress.totalClasses}/{courseTarget}</span>
                                     <span className="text-[10px] font-bold uppercase text-lead-blue group-open:hidden">View months</span>
                                   </summary>
                                   <div className="mt-3 space-y-1.5 border-t border-blue-100 pt-2">

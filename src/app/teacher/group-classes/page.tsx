@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { assessmentAttendanceStatuses, getBatchesCollectionName } from "@/lib/assessments";
 import { getBatchClassSessionsCollectionName, hasBatchClassEnded, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 import { getBatchAttendanceRoster } from "@/lib/batch-attendance-roster";
-import { buildBatchCourseProgress, getJakartaMonthKey, GROUP_COURSE_CLASS_TARGET } from "@/lib/batch-course-progress";
+import { buildBatchCourseProgress, getCourseClassTarget, getJakartaMonthKey } from "@/lib/batch-course-progress";
 import { getMongoDb } from "@/lib/mongodb";
 import { isValidTeacherSession, TEACHER_ID_COOKIE, TEACHER_SESSION_COOKIE } from "@/lib/teacher-auth";
 import { getEmployeeTeacherById } from "@/lib/teachers";
@@ -56,9 +56,9 @@ export default async function TeacherGroupClassesPage() {
       .sort({ sessionDate: -1, meetingNumber: -1 })
       .limit(500)
       .toArray(),
-    db.collection<{ batchName?: string; teacherId?: string; status?: string }>(getBatchesCollectionName())
+    db.collection<{ batchName?: string; program?: string; teacherId?: string; status?: string }>(getBatchesCollectionName())
       .find({ teacherId: teacher.id, status: { $ne: "archived" } })
-      .project({ batchName: 1 })
+      .project({ batchName: 1, program: 1 })
       .sort({ batchName: 1 })
       .toArray()
   ]);
@@ -68,7 +68,7 @@ export default async function TeacherGroupClassesPage() {
   const completed = sessions.filter((session) => session.status === "Completed").slice(0, 12);
   const currentMonthKey = getJakartaMonthKey();
   const rosters = new Map(await Promise.all([...new Set(open.map((session) => session.batchId))].map(async (batchId) =>
-    [batchId, await getBatchAttendanceRoster(db, batchId)] as const
+    [batchId, await getBatchAttendanceRoster(db, batchId, open.find((session) => session.batchId === batchId)?.batchType)] as const
   )));
   for (const session of open) session.studentSnapshot = rosters.get(session.batchId) || [];
 
@@ -98,7 +98,8 @@ export default async function TeacherGroupClassesPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           {assignedBatches.map((batch) => {
             const batchId = batch._id.toString();
-            const progress = buildBatchCourseProgress(sessions.filter((session) => session.batchId === batchId));
+            const courseTarget = getCourseClassTarget(batch.program || "");
+            const progress = buildBatchCourseProgress(sessions.filter((session) => session.batchId === batchId), courseTarget);
             const currentMonth = progress.months.find((month) => month.monthKey === currentMonthKey);
             return (
               <Card key={batchId} className="overflow-hidden">
@@ -108,12 +109,12 @@ export default async function TeacherGroupClassesPage() {
                 </div>
                 <div className="p-5">
                   <div className="grid grid-cols-3 gap-3 text-center">
-                    <ProgressMetric label="Completed" value={`${progress.completedClasses}/${GROUP_COURSE_CLASS_TARGET}`} />
+                    <ProgressMetric label="Completed" value={`${progress.completedClasses}/${courseTarget}`} />
                     <ProgressMetric label="Remaining" value={String(progress.remainingClasses)} />
                     <ProgressMetric label="This month" value={String(currentMonth?.completedClasses || 0)} />
                   </div>
                   <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-lead-blue" style={{ width: `${progress.progressPercent}%` }} /></div>
-                  <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs font-semibold text-lead-gray"><span>{progress.progressPercent}% of 72 classes complete</span><span>{currentMonth?.studentsAttended || 0} students attended this month</span></div>
+                  <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs font-semibold text-lead-gray"><span>{progress.progressPercent}% of {courseTarget} classes complete</span><span>{currentMonth?.studentsAttended || 0} students attended this month</span></div>
                   <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <summary className="cursor-pointer text-sm font-bold text-lead-blue">Monthly history</summary>
                     <div className="mt-3 space-y-2">{progress.months.map((month) => <div key={month.monthKey} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="font-semibold text-lead-navy">{month.monthLabel}</span><span className="text-lead-gray">{month.completedClasses} classes · {month.studentsAttended} students</span></div>)}{!progress.months.length ? <p className="text-sm text-lead-gray">No completed classes yet.</p> : null}</div>

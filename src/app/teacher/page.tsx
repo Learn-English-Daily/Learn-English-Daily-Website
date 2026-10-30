@@ -394,7 +394,7 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
       .find({
         $and: [
           getActiveStudentFilter(),
-          { classType: "Basic Group" },
+          { classType: { $in: ["Basic Group", "Standard/Buddy"] } },
           { activeBatchId: { $exists: true, $ne: "" } }
         ]
       })

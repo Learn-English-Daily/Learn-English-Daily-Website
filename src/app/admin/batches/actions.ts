@@ -7,8 +7,10 @@ import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-auth";
 import { getAuthenticatedAdmin } from "@/lib/admin-auth";
 import {
   generateBatchMeetingDates,
+  getBatchType,
   getBatchClassSessionsCollectionName,
-  parseBatchWeekdays
+  parseBatchWeekdays,
+  type BatchType
 } from "@/lib/batch-class-sessions";
 import {
   getBatchesCollectionName,
@@ -22,6 +24,7 @@ import {
   isClassMode
 } from "@/lib/student-registration";
 import { resolveAvailableTeacher } from "@/lib/teachers";
+import { getAdminAccessForUsername } from "@/lib/admin-permissions";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -107,19 +110,30 @@ function parseBatchFields(formData: FormData) {
   const startDate = clean(formData.get("startDate"));
   const days = clean(formData.get("days"));
   const time = clean(formData.get("time"));
-  const maximumStudents = numberInRange(formData.get("maximumStudents"), 1, 100, 12);
+  const batchType = getBatchType(clean(formData.get("batchType")));
+  const maximumStudents = batchType === "Standard/Buddy" ? 2 : numberInRange(formData.get("maximumStudents"), 1, 100, 12);
 
   if (!batchName || !isAssessmentProgram(program) || !teacherId || !startDate || !days || !time || !maximumStudents) {
     throw new Error("Invalid batch details");
   }
+  if (program === "Academic English" && batchType !== "Standard/Buddy") {
+    throw new Error("Academic English batches must use the Buddy type.");
+  }
 
-  return { batchName, program, teacherId, startDate, days, time, maximumStudents };
+  return { batchName, program, batchType, teacherId, startDate, days, time, maximumStudents };
+}
+
+function assertBatchTypeAccess(admin: { username: string }, batchType: BatchType) {
+  if (batchType === "Standard/Buddy" && getAdminAccessForUsername(admin.username) !== "full") {
+    throw new Error("You do not have permission to manage Buddy batches.");
+  }
 }
 
 export async function createBatch(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
 
   const fields = parseBatchFields(formData);
+  assertBatchTypeAccess(admin, fields.batchType);
   const teacher = await resolveTeacher(fields.teacherId);
   const now = new Date();
   const db = await getMongoDb();
@@ -136,17 +150,19 @@ export async function createBatch(formData: FormData) {
 }
 
 export async function updateBatch(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
 
   const id = clean(formData.get("id"));
   const fields = parseBatchFields(formData);
-  const teacher = await resolveTeacher(fields.teacherId);
-
+  assertBatchTypeAccess(admin, fields.batchType);
   if (!ObjectId.isValid(id)) {
     throw new Error("Invalid batch");
   }
 
   const db = await getMongoDb();
+  const existingBatch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(id) });
+  if (existingBatch) assertBatchTypeAccess(admin, getBatchType(existingBatch.batchType));
+  const teacher = await resolveTeacher(fields.teacherId);
   await db.collection(getBatchesCollectionName()).updateOne(
     { _id: new ObjectId(id) },
     {
@@ -162,7 +178,7 @@ export async function updateBatch(formData: FormData) {
 }
 
 export async function archiveBatch(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
 
   const id = clean(formData.get("id"));
   if (!ObjectId.isValid(id)) {
@@ -170,6 +186,8 @@ export async function archiveBatch(formData: FormData) {
   }
 
   const db = await getMongoDb();
+  const batch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(id) });
+  if (batch) assertBatchTypeAccess(admin, getBatchType(batch.batchType));
   await db.collection(getBatchesCollectionName()).updateOne(
     { _id: new ObjectId(id) },
     {
@@ -185,7 +203,7 @@ export async function archiveBatch(formData: FormData) {
 }
 
 export async function assignStudentToBatch(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
 
   const batchId = clean(formData.get("batchId"));
   const studentId = clean(formData.get("studentId"));
@@ -203,11 +221,16 @@ export async function assignStudentToBatch(formData: FormData) {
   if (!batch) {
     throw new Error("Batch not found");
   }
+  const batchType = getBatchType(batch.batchType);
+  assertBatchTypeAccess(admin, batchType);
+  const assignedCount = await db.collection(getStudentRegistrationCollectionName()).countDocuments({ activeBatchId: batchId, ...getActiveStudentFilter() });
+  const capacity = batchType === "Standard/Buddy" ? 2 : Number(batch.maximumStudents || 12);
+  if (assignedCount >= capacity) throw new Error(`${batchType === "Standard/Buddy" ? "Buddy pair" : "Batch"} is already full.`);
 
   const updateResult = await db.collection(getStudentRegistrationCollectionName()).updateOne(
     {
       studentId,
-      ...getBasicGroupStudentFilter()
+      $and: [getActiveStudentFilter(), { classType: batchType }, { courseJoined: batch.program }]
     },
     {
       $set: {
@@ -222,7 +245,7 @@ export async function assignStudentToBatch(formData: FormData) {
   );
 
   if (!updateResult.matchedCount) {
-    throw new Error("Student not found");
+    throw new Error(`Select an active ${String(batch.program || "course")} student registered as ${batchType}.`);
   }
 
   const assignedStudent = await db.collection<{
@@ -234,7 +257,7 @@ export async function assignStudentToBatch(formData: FormData) {
     groupRegistrationFeeStatus?: "pending" | "paid" | "waived";
     groupRegistrationFeeInvoiceId?: string;
   }>(getStudentRegistrationCollectionName()).findOne({ studentId });
-  if (assignedStudent) {
+  if (assignedStudent && batchType === "Basic Group") {
     await ensureGroupMonthlyInvoice(db, {
       ...assignedStudent,
       activeBatchId: batch._id.toString(),
@@ -249,7 +272,7 @@ export async function assignStudentToBatch(formData: FormData) {
 }
 
 export async function removeStudentFromBatch(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
 
   const batchId = clean(formData.get("batchId"));
   const studentId = clean(formData.get("studentId"));
@@ -259,6 +282,10 @@ export async function removeStudentFromBatch(formData: FormData) {
   }
 
   const db = await getMongoDb();
+  if (ObjectId.isValid(batchId)) {
+    const batch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId) });
+    if (batch) assertBatchTypeAccess(admin, getBatchType(batch.batchType));
+  }
   await db.collection(getStudentRegistrationCollectionName()).updateOne(
     { studentId, activeBatchId: batchId },
     {
@@ -298,6 +325,8 @@ export async function scheduleBatchClasses(formData: FormData) {
   const db = await getMongoDb();
   const batch = await db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), status: "active" });
   if (!batch) throw new Error("Active batch not found.");
+  const batchType = getBatchType(batch.batchType);
+  assertBatchTypeAccess(admin, batchType);
 
   if (scheduleMode === "series" && !/^\d{4}-\d{2}$/.test(seriesMonth)) throw new Error("Select a valid month for the 12-class series.");
   const existingMeetings = await db.collection(getBatchClassSessionsCollectionName()).find({
@@ -343,7 +372,7 @@ export async function scheduleBatchClasses(formData: FormData) {
   if (conflict) throw new Error(`Meeting ${conflict.meetingNumber} is already scheduled for this batch.`);
 
   const students = await db.collection(getStudentRegistrationCollectionName()).find({
-    ...getBasicGroupStudentFilter(),
+    $and: [getActiveStudentFilter(), { classType: batchType }],
     activeBatchId: batchId
   }).sort({ studentName: 1 }).toArray();
   if (!students.length) throw new Error("Assign at least one student before scheduling classes.");
@@ -353,6 +382,7 @@ export async function scheduleBatchClasses(formData: FormData) {
     batchId,
     batchName: String(batch.batchName || "Batch"),
     program: String(batch.program || ""),
+    batchType,
     meetingNumber: meetingNumbers[index],
     sessionDate,
     startTime,
@@ -386,11 +416,13 @@ export async function scheduleBatchClasses(formData: FormData) {
 }
 
 export async function cancelBatchClass(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
   const sessionId = clean(formData.get("sessionId"));
   if (!ObjectId.isValid(sessionId)) throw new Error("Invalid group class.");
 
   const db = await getMongoDb();
+  const session = await db.collection(getBatchClassSessionsCollectionName()).findOne({ _id: new ObjectId(sessionId) });
+  if (session) assertBatchTypeAccess(admin, getBatchType(session.batchType));
   await db.collection(getBatchClassSessionsCollectionName()).updateOne(
     { _id: new ObjectId(sessionId), attendanceMarked: { $ne: true } },
     { $set: { status: "Cancelled", updatedAt: new Date() } }
@@ -400,13 +432,15 @@ export async function cancelBatchClass(formData: FormData) {
 }
 
 export async function deleteBatchClass(formData: FormData) {
-  await assertAdmin();
+  const admin = await assertAdmin();
   const sessionId = clean(formData.get("sessionId"));
   if (!ObjectId.isValid(sessionId)) {
     return { success: false, message: "Invalid group class." };
   }
 
   const db = await getMongoDb();
+  const session = await db.collection(getBatchClassSessionsCollectionName()).findOne({ _id: new ObjectId(sessionId) });
+  if (session) assertBatchTypeAccess(admin, getBatchType(session.batchType));
   const result = await db.collection(getBatchClassSessionsCollectionName()).deleteOne({
     _id: new ObjectId(sessionId),
     status: "Scheduled",
@@ -435,6 +469,8 @@ export async function updateBatchClassTime(formData: FormData) {
     return { success: false, message: "Enter a valid class date, WIB time range, and class mode." };
   }
   const db = await getMongoDb();
+  const existingSession = await db.collection(getBatchClassSessionsCollectionName()).findOne({ _id: new ObjectId(sessionId) });
+  if (existingSession) assertBatchTypeAccess(admin, getBatchType(existingSession.batchType));
   const result = await db.collection(getBatchClassSessionsCollectionName()).updateOne(
     { _id: new ObjectId(sessionId), status: "Scheduled", attendanceMarked: { $ne: true } },
     { $set: { sessionDate, startTime, endTime, classMode, updatedAt: new Date(), updatedBy: admin.name } }

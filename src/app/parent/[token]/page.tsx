@@ -199,7 +199,8 @@ async function getParentPortalData(token: string): Promise<{
   const classesTakenInMonth = (monthKey: string) => attendanceDocs.filter((record) =>
     record.meetingDate?.startsWith(monthKey) && (record.status === "Present" || record.status === "Late")
   ).length;
-  const groupSessions = studentDoc.classType === "Basic Group" ? await db
+  const usesBatchClasses = studentDoc.classType === "Basic Group" || studentDoc.classType === "Standard/Buddy";
+  const groupSessions = usesBatchClasses ? await db
     .collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
     .find({
       status: "Completed",
@@ -287,7 +288,7 @@ export default async function ParentAttendancePortalPage({
   }
 
   const { student, attendance, privateMonthProgress, latestGroupClass, groupClassProgress } = data;
-  const isGroupStudent = student.classType === "Basic Group";
+  const isGroupStudent = student.classType === "Basic Group" || student.classType === "Standard/Buddy";
   const latestAttendance = attendance[0];
   const presentCount = countStatus(attendance, "Present");
   const lateCount = countStatus(attendance, "Late");

@@ -2,6 +2,12 @@ import type { BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 
 export const GROUP_COURSE_CLASS_TARGET = 72;
 
+export function getCourseClassTarget(program: string) {
+  if (program === "Foundation English" || program === "Academic English") return 48;
+  if (program === "Fluent English") return 96;
+  return 72;
+}
+
 export type BatchMonthProgress = {
   monthKey: string;
   monthLabel: string;
@@ -31,7 +37,7 @@ export function getJakartaMonthKey(now = new Date()) {
   }).format(now);
 }
 
-export function buildBatchCourseProgress(sessions: BatchClassSessionDocument[]): BatchCourseProgress {
+export function buildBatchCourseProgress(sessions: BatchClassSessionDocument[], targetClasses = GROUP_COURSE_CLASS_TARGET): BatchCourseProgress {
   const completed = sessions.filter((session) => session.status === "Completed");
   const monthly = new Map<string, { completedClasses: number; studentIds: Set<string> }>();
 
@@ -49,8 +55,8 @@ export function buildBatchCourseProgress(sessions: BatchClassSessionDocument[]):
   const completedClasses = completed.length;
   return {
     completedClasses,
-    remainingClasses: Math.max(0, GROUP_COURSE_CLASS_TARGET - completedClasses),
-    progressPercent: Math.min(100, Math.round((completedClasses / GROUP_COURSE_CLASS_TARGET) * 100)),
+    remainingClasses: Math.max(0, targetClasses - completedClasses),
+    progressPercent: Math.min(100, Math.round((completedClasses / targetClasses) * 100)),
     months: [...monthly.entries()]
       .sort(([left], [right]) => right.localeCompare(left))
       .map(([monthKey, entry]) => ({

@@ -112,7 +112,7 @@ const PRIVATE_COURSE_TARGETS: Record<string, number> = {
 };
 
 type RegistrationViewMode = "active" | "trial" | "archived";
-type StudentListScope = "all" | "private" | "group";
+type StudentListScope = "all" | "private" | "group" | "batch";
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -150,7 +150,13 @@ async function getStudentRegistrations(query = "", mode: RegistrationViewMode, s
         }))
       }
     : {};
-  const accessFilter = scope === "group" ? { classType: "Basic Group" } : scope === "private" ? { classType: { $ne: "Basic Group" } } : {};
+  const accessFilter = scope === "group"
+    ? { classType: "Basic Group" }
+    : scope === "batch"
+      ? { classType: { $in: ["Basic Group", "Standard/Buddy"] } }
+      : scope === "private"
+        ? { classType: "Premium 1-to-1" }
+        : {};
   const filter = search ? { $and: [modeFilter, accessFilter, searchFilter] } : { $and: [modeFilter, accessFilter] };
 
   const docs = (await db
@@ -327,7 +333,7 @@ export default async function AdminStudentsPage({
   const splitActiveStudents = mode === "active" && !groupOnly;
   const [registrations, groupRegistrations, activeGroupStudentCount, admin] = await Promise.all([
     getStudentRegistrations(searchQuery, mode, groupOnly ? "group" : splitActiveStudents ? "private" : "all"),
-    splitActiveStudents ? getStudentRegistrations(searchQuery, mode, "group") : Promise.resolve([]),
+    splitActiveStudents ? getStudentRegistrations(searchQuery, mode, "batch") : Promise.resolve([]),
     groupOnly && mode === "active" ? getActiveBasicGroupStudentCount() : Promise.resolve(0),
     getAuthenticatedAdmin()
   ]);
@@ -406,7 +412,7 @@ export default async function AdminStudentsPage({
             <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 bg-blue-50 px-5 py-4 [&::-webkit-details-marker]:hidden">
               <span className="flex items-center gap-3">
                 <span className="grid h-10 w-10 place-items-center rounded-lg bg-lead-blue text-white"><Users className="h-5 w-5" /></span>
-                <span><strong className="block font-heading text-lg text-lead-navy">Group Students</strong><span className="text-sm text-lead-gray">{groupRegistrations.length} active Basic Group student{groupRegistrations.length === 1 ? "" : "s"}</span></span>
+                <span><strong className="block font-heading text-lg text-lead-navy">Group &amp; Buddy Students</strong><span className="text-sm text-lead-gray">{groupRegistrations.length} active batch student{groupRegistrations.length === 1 ? "" : "s"}</span></span>
               </span>
               <ChevronDown className="h-5 w-5 text-lead-blue transition group-open:rotate-180" />
             </summary>

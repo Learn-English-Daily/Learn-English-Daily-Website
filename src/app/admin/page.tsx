@@ -134,7 +134,7 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
       .toArray() as Promise<WithId<AttendanceDocument>[]>,
     db
       .collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
-      .find({ status: { $ne: "Cancelled" } })
+      .find({ status: { $ne: "Cancelled" }, ...(groupOnly ? { $or: [{ batchType: "Basic Group" }, { batchType: { $exists: false } }] } : {}) })
       .sort({ sessionDate: 1, startTime: 1 })
       .limit(500)
       .toArray() as Promise<WithId<BatchClassSessionDocument>[]>,
@@ -142,7 +142,7 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
     groupOnly ? Promise.resolve(0) : db.collection<ReviewDocument>(getReviewCollectionName()).countDocuments({ status: "pending" }),
     db.collection(getStudentRegistrationCollectionName()).countDocuments(groupOnly ? { $and: [getActiveStudentFilter(), { classType: "Basic Group" }] } : getActiveStudentFilter()),
     groupOnly ? Promise.resolve(0) : db.collection(getStudentRegistrationCollectionName()).countDocuments(getTrialStudentFilter()),
-    db.collection(getBatchesCollectionName()).countDocuments({ status: "active" }),
+    db.collection(getBatchesCollectionName()).countDocuments({ status: "active", ...(groupOnly ? { $or: [{ batchType: "Basic Group" }, { batchType: { $exists: false } }] } : {}) }),
     groupOnly ? Promise.resolve(null) : db.collection<LeadDocument>(leadsCollectionName).find({}).sort({ createdAt: -1 }).limit(1).next()
   ]);
 

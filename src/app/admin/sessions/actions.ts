@@ -124,8 +124,8 @@ export async function createClassSession(formData: FormData) {
     throw new Error("Active course student not found");
   }
 
-  if (student.classType === "Basic Group") {
-    throw new Error("Group students must be scheduled from Group Batch Classes.");
+  if (student.classType !== "Premium 1-to-1") {
+    throw new Error("Group and Buddy students must be scheduled from Group Batch Classes.");
   }
 
   const { teacherIds, teacherNames } = await resolveSelectedTeachers(db, formData);
@@ -252,7 +252,7 @@ export async function resetStudentMeetingSequence(formData: FormData) {
   const student = await db.collection<{ studentId?: string; classType?: string }>(getStudentRegistrationCollectionName()).findOne({
     $and: [{ studentId }, getActiveStudentFilter()]
   });
-  if (!student || student.classType === "Basic Group") return { success: false, message: "Active private student not found." };
+  if (!student || student.classType !== "Premium 1-to-1") return { success: false, message: "Active private student not found." };
 
   const scheduledCount = await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).countDocuments({ studentId });
   if (scheduledCount) {

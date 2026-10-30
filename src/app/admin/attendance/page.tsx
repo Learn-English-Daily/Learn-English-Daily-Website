@@ -389,7 +389,7 @@ async function getGroupAttendanceData({
   const [studentDocs, selectedDoc, sessionDocs, teachers] = await Promise.all([
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find(studentFilter).sort({ studentId: 1, studentName: 1 }).limit(300).toArray() as Promise<WithId<StudentDocument>[]>,
     studentId ? db.collection<StudentDocument>(getStudentRegistrationCollectionName()).findOne(selectedFilter) : null,
-    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: { $ne: "Cancelled" } }).sort({ sessionDate: -1, meetingNumber: -1 }).limit(1500).toArray(),
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: { $ne: "Cancelled" }, $or: [{ batchType: "Basic Group" }, { batchType: { $exists: false } }] }).sort({ sessionDate: -1, meetingNumber: -1 }).limit(1500).toArray(),
     getAvailableTeachers(db)
   ]);
   const students = studentDocs.map((doc) => ({

@@ -84,7 +84,7 @@ export async function importPrivateClassSessions(formData: FormData) {
   const db = await getMongoDb();
   const studentIds = [...new Set(rows.map((row) => row.studentId))];
   const students = await db.collection<ImportStudent>(getStudentRegistrationCollectionName()).find({
-    $and: [{ studentId: { $in: studentIds } }, getActiveStudentFilter(), { classType: { $ne: "Basic Group" } }]
+    $and: [{ studentId: { $in: studentIds } }, getActiveStudentFilter(), { classType: "Premium 1-to-1" }]
   }).toArray();
   const studentsById = new Map(students.map((student) => [student.studentId || "", student]));
   const missingStudents = studentIds.filter((studentId) => !studentsById.has(studentId));

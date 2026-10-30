@@ -7,20 +7,21 @@ export type PaymentMethod = (typeof paymentMethods)[number];
 const perMeetingPrices: Record<string, Record<string, number>> = {
   "Foundation English": {
     "Basic Group": 15000,
-    "Standard/Buddy": 45000,
+    "Standard/Buddy": 40000,
     "Premium 1-to-1": 80000
   },
   "Confident English": {
     "Basic Group": 16000,
-    "Standard/Buddy": 50000,
+    "Standard/Buddy": 42500,
     "Premium 1-to-1": 85000
   },
   "Fluent English": {
     "Basic Group": 17000,
-    "Standard/Buddy": 55000,
+    "Standard/Buddy": 45000,
     "Premium 1-to-1": 90000
   },
   "Academic English": {
+    "Standard/Buddy": 75000,
     "Premium 1-to-1": 100000
   }
 };

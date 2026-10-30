@@ -23,6 +23,7 @@ import {
 import { getClassSessionsCollectionName, hasClassSessionEnded, type ClassSessionDocument } from "@/lib/class-sessions";
 import {
   getBatchClassSessionsCollectionName,
+  getBatchType,
   hasBatchClassEnded,
   buildGroupClassComment,
   type BatchAttendanceEntry,
@@ -434,14 +435,14 @@ export async function saveTeacherMonthlyAssessment(formData: FormData) {
   const db = await getMongoDb();
   const [batch, student] = await Promise.all([
     db.collection(getBatchesCollectionName()).findOne({ _id: new ObjectId(batchId), teacherId: teacher.id }),
-    db.collection(getStudentRegistrationCollectionName()).findOne({
-      studentId,
-      ...getBasicGroupStudentFilter()
-    })
+    db.collection(getStudentRegistrationCollectionName()).findOne({ studentId, ...getActiveStudentFilter() })
   ]);
 
   if (!batch || !student) {
     throw new Error("Student or batch not found for this teacher");
+  }
+  if (student.classType !== getBatchType(batch.batchType)) {
+    throw new Error("Student class type does not match this batch");
   }
 
   if (student.activeBatchId !== batchId) {
@@ -556,7 +557,7 @@ export async function saveBatchClassAttendance(formData: FormData) {
   if (!session) throw new Error("Scheduled group class not found for this teacher.");
   if (!hasBatchClassEnded(session)) throw new Error("Attendance can only be marked after the class end time (WIB).");
 
-  const roster = await getBatchAttendanceRoster(db, session.batchId);
+  const roster = await getBatchAttendanceRoster(db, session.batchId, session.batchType);
   if (clean(formData.get("rosterStudentIds")) !== JSON.stringify(roster.map((student) => student.studentId))) {
     throw new Error("Batch students have changed. Refresh the page before marking attendance.");
   }
@@ -584,6 +585,18 @@ export async function saveBatchClassAttendance(formData: FormData) {
   });
 
   const now = new Date();
+  if (session.batchType === "Standard/Buddy") {
+    await Promise.all(attendance.map((entry) => syncPaymentFromTeacherAttendance({
+      studentId: entry.studentId,
+      studentName: entry.studentName,
+      courseJoined: session.program,
+      classType: "Standard/Buddy",
+      classMode: session.classMode,
+      meetingNumber: session.meetingNumber,
+      meetingDate: session.sessionDate,
+      status: entry.attendance === "Present" ? "Present" : "Cancelled"
+    })));
+  }
   await sessions.updateOne(
     { _id: session._id, status: "Scheduled" },
     { $set: { topic, studentSnapshot: roster, attendance, attendanceMarked: true, attendanceMarkedAt: now, attendanceMarkedBy: teacher.id, status: "Completed", updatedAt: now } }
@@ -592,5 +605,6 @@ export async function saveBatchClassAttendance(formData: FormData) {
   revalidatePath("/teacher/group-classes");
   revalidatePath("/admin/sessions");
   revalidatePath("/admin/batches");
+  revalidatePath("/finance/payments");
   revalidatePath("/parent");
 }

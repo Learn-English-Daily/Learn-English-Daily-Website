@@ -1,5 +1,10 @@
 export const batchSessionStatuses = ["Scheduled", "Completed", "Cancelled"] as const;
 export type BatchSessionStatus = (typeof batchSessionStatuses)[number];
+export type BatchType = "Basic Group" | "Standard/Buddy";
+
+export function getBatchType(value: unknown): BatchType {
+  return value === "Standard/Buddy" ? "Standard/Buddy" : "Basic Group";
+}
 
 export type BatchSessionStudent = {
   studentId: string;
@@ -42,6 +47,7 @@ export type BatchClassSessionDocument = {
   batchId: string;
   batchName: string;
   program: string;
+  batchType?: BatchType;
   meetingNumber: number;
   sessionDate: string;
   startTime: string;

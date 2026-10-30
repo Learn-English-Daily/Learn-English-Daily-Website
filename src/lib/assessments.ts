@@ -1,4 +1,4 @@
-export const assessmentPrograms = ["Foundation English", "Confident English", "Fluent English"] as const;
+export const assessmentPrograms = ["Foundation English", "Confident English", "Fluent English", "Academic English"] as const;
 export const assessmentAttendanceStatuses = ["Present", "Absent", "Excused"] as const;
 
 export type AssessmentProgram = (typeof assessmentPrograms)[number];
