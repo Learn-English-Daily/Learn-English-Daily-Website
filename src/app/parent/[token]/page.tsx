@@ -89,6 +89,13 @@ type GroupClassProgress = {
   averagePerformance: number | null;
 };
 
+type PrivateMonthProgress = {
+  currentMonthClasses: number;
+  currentMonthLabel: string;
+  lastMonthClasses: number;
+  lastMonthLabel: string;
+};
+
 function formatDate(value: string) {
   if (!value) return "Not set";
   return new Intl.DateTimeFormat("en", {
@@ -115,6 +122,26 @@ function jakartaDateKey(value = new Date()) {
     month: "2-digit",
     day: "2-digit"
   }).format(value);
+}
+
+function jakartaMonthKey(value = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit"
+  }).format(value);
+}
+
+function previousMonthKey(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const previous = new Date(Date.UTC(year, month - 2, 15));
+  return `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthName(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "Asia/Jakarta" })
+    .format(new Date(Date.UTC(year, month - 1, 15)));
 }
 
 function journalTopic(notes: string) {
@@ -147,6 +174,7 @@ function roundedAverage(values: number[]) {
 async function getParentPortalData(token: string): Promise<{
   student: Student;
   attendance: Attendance[];
+  privateMonthProgress: PrivateMonthProgress;
   latestGroupClass: LatestGroupClass | null;
   groupClassProgress: GroupClassProgress | null;
 } | null> {
@@ -166,6 +194,11 @@ async function getParentPortalData(token: string): Promise<{
     .limit(500)
     .toArray()) as WithId<AttendanceDocument>[];
   const currentPhaseAttendanceDocs = getCurrentPhaseAttendance(attendanceDocs);
+  const currentMonthKey = jakartaMonthKey();
+  const lastMonthKey = previousMonthKey(currentMonthKey);
+  const classesTakenInMonth = (monthKey: string) => attendanceDocs.filter((record) =>
+    record.meetingDate?.startsWith(monthKey) && (record.status === "Present" || record.status === "Late")
+  ).length;
   const groupSessions = studentDoc.classType === "Basic Group" ? await db
     .collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
     .find({
@@ -205,6 +238,12 @@ async function getParentPortalData(token: string): Promise<{
       notes: record.notes || "",
       teacherNames: record.teacherNames || []
     })),
+    privateMonthProgress: {
+      currentMonthClasses: classesTakenInMonth(currentMonthKey),
+      currentMonthLabel: monthName(currentMonthKey),
+      lastMonthClasses: classesTakenInMonth(lastMonthKey),
+      lastMonthLabel: monthName(lastMonthKey)
+    },
     groupClassProgress: groupEntries.length ? {
       totalClasses: groupEntries.length,
       presentClasses,
@@ -247,13 +286,12 @@ export default async function ParentAttendancePortalPage({
     notFound();
   }
 
-  const { student, attendance, latestGroupClass, groupClassProgress } = data;
+  const { student, attendance, privateMonthProgress, latestGroupClass, groupClassProgress } = data;
   const isGroupStudent = student.classType === "Basic Group";
   const latestAttendance = attendance[0];
   const presentCount = countStatus(attendance, "Present");
   const lateCount = countStatus(attendance, "Late");
   const absentCount = countStatus(attendance, "Absent");
-  const cancelledCount = countStatus(attendance, "Cancelled");
   const countedMeetings = presentCount + lateCount + absentCount;
   const attendanceRate = countedMeetings ? Math.round(((presentCount + lateCount) / countedMeetings) * 100) : null;
   const sevenDaysAgo = new Date(`${jakartaDateKey()}T00:00:00+07:00`);
@@ -298,8 +336,8 @@ export default async function ParentAttendancePortalPage({
               <div className="mt-4 grid gap-4 md:grid-cols-4">
                 <Summary label="Present" value={presentCount} total={countedMeetings} className="text-emerald-600" description={`Attended ${presentCount} ${meetingWord(presentCount)} on time.`} />
                 <Summary label="Late" value={lateCount} total={countedMeetings} className="text-yellow-700" description={`Attended ${lateCount} ${meetingWord(lateCount)} after the scheduled start time.`} />
-                <Summary label="Absent" value={absentCount} total={countedMeetings} className="text-rose-600" description={`Missed ${absentCount} scheduled ${meetingWord(absentCount)}.`} />
-                <Summary label="Cancelled" value={cancelledCount} total={attendance.length} className="text-slate-600" description={`${cancelledCount} ${meetingWord(cancelledCount)} cancelled and excluded from the attendance rate.`} />
+                <MonthSummary label="Current Month Classes Taken" value={privateMonthProgress.currentMonthClasses} monthLabel={privateMonthProgress.currentMonthLabel} className="text-lead-blue" />
+                <MonthSummary label="Last Month Classes Taken" value={privateMonthProgress.lastMonthClasses} monthLabel={privateMonthProgress.lastMonthLabel} className="text-violet-700" />
               </div>
             </div>
           ) : null}
@@ -553,6 +591,16 @@ function Summary({
 
 function meetingWord(count: number) {
   return count === 1 ? "meeting" : "meetings";
+}
+
+function MonthSummary({ label, value, monthLabel, className }: { label: string; value: number; monthLabel: string; className: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-4">
+      <p className={`font-heading text-3xl font-extrabold ${className}`}>{value}</p>
+      <p className="mt-1 text-sm font-semibold text-lead-gray">{label}</p>
+      <p className="mt-2 text-xs leading-5 text-lead-gray">{monthLabel} · Present and Late classes</p>
+    </div>
+  );
 }
 
 function ProgressStat({ label, value }: { label: string; value: string }) {
