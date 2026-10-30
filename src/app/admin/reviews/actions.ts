@@ -28,6 +28,7 @@ export async function updateReviewStatus(formData: FormData) {
   );
 
   revalidatePath("/admin/reviews");
+  revalidatePath("/admin/reviews-inquiries");
   revalidatePath("/en");
   revalidatePath("/id");
 }

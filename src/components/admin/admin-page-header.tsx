@@ -3,29 +3,29 @@ import {
   CalendarClock,
   Layers3,
   Gauge,
-  Inbox,
+  GraduationCap,
   MessageSquareText,
   Star,
   Users
 } from "lucide-react";
 import { getAdminAccessForUsername } from "@/lib/admin-permissions";
 
-type AdminPageKey = "dashboard" | "inquiries" | "sessions" | "attendance" | "students" | "batches" | "reviews";
+type AdminPageKey = "dashboard" | "sessions" | "attendance" | "students" | "teachers" | "batches" | "feedback";
 
 const adminNavItems: Array<{
   key: AdminPageKey;
   label: string;
   href: string;
   helper: string;
-  icon: typeof Inbox;
+  icon: typeof Gauge;
 }> = [
   { key: "dashboard", label: "Dashboard", href: "/admin", helper: "Daily overview", icon: Gauge },
-  { key: "inquiries", label: "Inquiries", href: "/admin/inquiries", helper: "New leads", icon: Inbox },
   { key: "sessions", label: "Sessions", href: "/admin/sessions", helper: "Class schedule", icon: CalendarClock },
   { key: "attendance", label: "Attendance", href: "/admin/attendance", helper: "Meeting records", icon: CalendarCheck },
   { key: "students", label: "Students", href: "/admin/students", helper: "Registrations", icon: Users },
+  { key: "teachers", label: "Teachers", href: "/admin/teachers", helper: "Team overview", icon: GraduationCap },
   { key: "batches", label: "Batches", href: "/admin/batches", helper: "Group classes", icon: Layers3 },
-  { key: "reviews", label: "Reviews", href: "/admin/reviews", helper: "Testimonials", icon: Star }
+  { key: "feedback", label: "Reviews / Inquiries", href: "/admin/reviews-inquiries", helper: "Leads & testimonials", icon: Star }
 ];
 
 export function AdminPageHeader({

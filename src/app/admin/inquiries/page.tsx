@@ -114,13 +114,14 @@ export default async function AdminPage({
   }
 
   if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
+  redirect("/admin/reviews-inquiries?view=inquiries");
 
   const [leads, admin] = await Promise.all([getLeads(searchQuery), getAuthenticatedAdmin()]);
 
   return (
     <main className="min-h-screen bg-lead-soft">
       <AdminPageHeader
-        active="inquiries"
+        active="feedback"
         title="Student inquiries"
         description={
           searchQuery

@@ -140,13 +140,14 @@ export default async function AdminReviewsPage({
   }
 
   if (isGroupStudentAdminSession(session)) redirect("/admin/batches");
+  redirect("/admin/reviews-inquiries?view=reviews");
 
   const [reviews, admin] = await Promise.all([getReviews(searchQuery), getAuthenticatedAdmin()]);
 
   return (
     <main className="min-h-screen bg-lead-soft">
       <AdminPageHeader
-        active="reviews"
+        active="feedback"
         title="Student and parent reviews"
         description={
           searchQuery
