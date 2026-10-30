@@ -9,6 +9,7 @@ export type AdminEmployeeDocument = {
   preferredName?: string;
   email?: string;
   role?: string;
+  portalRoles?: string[];
   status?: string;
   employeeStatus?: string;
   username?: string;
@@ -35,7 +36,7 @@ function isActiveAdminEmployee(employee: AdminEmployeeDocument) {
   const username = normalizeEmployeeUsername(employee.username || employee.email || "");
 
   return (
-    (employee.role === "Admin" || isMasterUsername(username)) &&
+    (employee.role === "Admin" || employee.portalRoles?.includes("Admin") || isMasterUsername(username)) &&
     employeeStatus !== "inactive" &&
     !["inactive", "archived", "rejected"].includes(submissionStatus)
   );
@@ -61,7 +62,7 @@ export async function getAdminEmployeeById(db: Db, employeeId: string): Promise<
 
   const employee = await db.collection<AdminEmployeeDocument>(getEmployeeOnboardingCollectionName()).findOne({
     _id: new ObjectId(rawId),
-    role: "Admin"
+    $or: [{ role: "Admin" }, { portalRoles: "Admin" }]
   });
 
   return employee ? mapAdminEmployee(employee) : getMasterEmployeeById(db, employeeId);
@@ -72,12 +73,14 @@ export async function getAdminEmployeeByUsername(db: Db, username: string): Prom
   if (!normalizedUsername) return null;
 
   const employee = await db.collection<AdminEmployeeDocument>(getEmployeeOnboardingCollectionName()).findOne({
-    role: "Admin",
-    $or: [
-      { username: normalizedUsername },
-      { username: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: "i" } },
-      { email: normalizedUsername },
-      { email: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: "i" } }
+    $and: [
+      { $or: [{ role: "Admin" }, { portalRoles: "Admin" }] },
+      { $or: [
+        { username: normalizedUsername },
+        { username: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: "i" } },
+        { email: normalizedUsername },
+        { email: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: "i" } }
+      ] }
     ]
   });
 

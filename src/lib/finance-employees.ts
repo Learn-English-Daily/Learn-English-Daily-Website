@@ -9,6 +9,7 @@ export type FinanceEmployeeDocument = {
   preferredName?: string;
   email?: string;
   role?: string;
+  portalRoles?: string[];
   status?: string;
   employeeStatus?: string;
   username?: string;
@@ -31,7 +32,7 @@ function isActiveFinanceEmployee(employee: FinanceEmployeeDocument) {
   const username = normalizeEmployeeUsername(employee.username || employee.email || "");
 
   return (
-    (employee.role === "Finance" || isMasterUsername(username)) &&
+    (employee.role === "Finance" || employee.portalRoles?.includes("Finance") || isMasterUsername(username)) &&
     employeeStatus !== "inactive" &&
     !["inactive", "archived", "rejected"].includes(submissionStatus)
   );
@@ -57,7 +58,7 @@ export async function getFinanceEmployeeById(db: Db, employeeId: string): Promis
 
   const employee = await db.collection<FinanceEmployeeDocument>(getEmployeeOnboardingCollectionName()).findOne({
     _id: new ObjectId(rawId),
-    role: "Finance"
+    $or: [{ role: "Finance" }, { portalRoles: "Finance" }]
   });
 
   return employee ? mapFinanceEmployee(employee) : getMasterEmployeeById(db, employeeId);
@@ -69,7 +70,7 @@ export async function getFinanceEmployeeByUsername(db: Db, username: string): Pr
 
   const employee = await db.collection<FinanceEmployeeDocument>(getEmployeeOnboardingCollectionName()).findOne({
     $and: [
-      { role: "Finance" },
+      { $or: [{ role: "Finance" }, { portalRoles: "Finance" }] },
       {
         $or: [
           { username: normalizedUsername },
