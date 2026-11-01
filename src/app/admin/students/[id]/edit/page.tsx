@@ -6,7 +6,7 @@ import { ObjectId, type WithId } from "mongodb";
 import type { ReactNode } from "react";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
-import { changeStudentStatus, updateStudentRegistration, waiveUnpaidGroupMonthlyFee } from "@/app/admin/students/actions";
+import { changeStudentStatus, updateStudentRegistration, waiveUnpaidGroupMonthlyFees } from "@/app/admin/students/actions";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -165,11 +165,16 @@ async function getStudentRegistration(id: string): Promise<StudentRegistration |
 }
 
 async function getLifecycleWarnings(studentId: string) {
-  if (!studentId) return { futureSessions: 0, unpaidPayments: 0, attendanceNeeded: 0, missingJournals: 0 };
+  if (!studentId) return { futureSessions: 0, unpaidPayments: 0, unpaidGroupInvoices: [], attendanceNeeded: 0, missingJournals: 0 };
   const db = await getMongoDb();
-  const [futureSessions, unpaidPayments, reminders, missingJournals] = await Promise.all([
+  const [futureSessions, unpaidPaymentRecords, reminders, missingJournals] = await Promise.all([
     db.collection(getClassSessionsCollectionName()).countDocuments({ studentId, status: { $ne: "Completed" } }),
-    db.collection(getStudentPaymentsCollectionName()).countDocuments({ studentId, status: "Unpaid", financeExcluded: { $ne: true } }),
+    db.collection(getStudentPaymentsCollectionName()).find({ studentId, status: "Unpaid", financeExcluded: { $ne: true } }).project<{
+      billingYear?: number;
+      billingMonth?: number;
+      amountDue?: number;
+      source?: string;
+    }>({ billingYear: 1, billingMonth: 1, amountDue: 1, source: 1 }).toArray(),
     getAttendanceReminders(db),
     db.collection(getStudentAttendanceCollectionName()).countDocuments({
       studentId,
@@ -177,7 +182,29 @@ async function getLifecycleWarnings(studentId: string) {
       $or: [{ notes: { $exists: false } }, { notes: null }, { notes: "" }, { notes: { $regex: "^\\s*$" } }]
     })
   ]);
-  return { futureSessions, unpaidPayments, attendanceNeeded: reminders.filter((record) => record.studentId === studentId).length, missingJournals };
+  const unpaidGroupInvoices = unpaidPaymentRecords
+    .filter((payment) => ["batch-monthly", "batch-assessment"].includes(payment.source || "") && payment.billingYear && payment.billingMonth)
+    .map((payment) => ({
+      month: `${payment.billingYear}-${String(payment.billingMonth).padStart(2, "0")}`,
+      amountDue: payment.amountDue || 0
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+  return {
+    futureSessions,
+    unpaidPayments: unpaidPaymentRecords.length,
+    unpaidGroupInvoices,
+    attendanceNeeded: reminders.filter((record) => record.studentId === studentId).length,
+    missingJournals
+  };
+}
+
+function formatBillingMonth(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function formatRupiah(value: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 }
 
 function formatDate(value: string) {
@@ -419,21 +446,39 @@ export default async function EditStudentRegistrationPage({
                 Reason / Note
                 <textarea name="statusNote" rows={3} placeholder="Example: Completed Fluent English course" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" />
               </label>
-              {registration.classType === "Basic Group" ? (
-                <label className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-lead-navy md:col-span-2">
-                  <input name="waiveGroupMonthlyFee" type="checkbox" className="mt-1 h-4 w-4 accent-lead-blue" />
-                  <span><strong>Waive this month&apos;s unpaid group fee when withdrawing</strong><span className="mt-1 block text-xs leading-5 text-lead-gray">Uses the effective date&apos;s month. Paid invoices are never changed, and the waived invoice is retained internally for audit.</span></span>
-                </label>
+              {registration.classType === "Basic Group" && lifecycleWarnings.unpaidGroupInvoices.length ? (
+                <fieldset className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 md:col-span-2">
+                  <legend className="px-1 text-sm font-bold text-lead-navy">Optional fee waivers when withdrawing</legend>
+                  <p className="mb-3 text-xs leading-5 text-lead-gray">Select every unpaid month that should be waived. Leave months unchecked when payment is still due. Paid invoices are never changed, and waived invoices remain in the audit history.</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {lifecycleWarnings.unpaidGroupInvoices.map((invoice) => (
+                      <label key={invoice.month} className="flex items-center gap-3 rounded-lg border border-yellow-200 bg-white px-4 py-3 text-sm font-semibold text-lead-navy">
+                        <input name="waiveBillingMonths" value={invoice.month} type="checkbox" className="h-4 w-4 accent-lead-blue" />
+                        <span>{formatBillingMonth(invoice.month)} <span className="font-normal text-lead-gray">({formatRupiah(invoice.amountDue)})</span></span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
               ) : null}
-              <p className="text-xs leading-5 text-lead-gray md:col-span-2">Changing away from Active closes unfinished scheduled classes but preserves attendance, journals, receipts, Parent QR access, and Student ID. Payments remain unchanged unless the withdrawal fee-waiver option is selected.</p>
+              <p className="text-xs leading-5 text-lead-gray md:col-span-2">Changing away from Active closes unfinished scheduled classes but preserves attendance, journals, receipts, Parent QR access, and Student ID. Selected fee waivers apply only when the new status is Withdrawn.</p>
               <Button type="submit" className="md:col-span-2 md:w-fit">Update Student Status</Button>
             </form>
-            {registration.classType === "Basic Group" && registration.studentStatus !== "Active" && lifecycleWarnings.unpaidPayments ? (
-              <ActionFeedbackForm action={waiveUnpaidGroupMonthlyFee} successMessage="The unpaid group fee was waived and removed from active Finance totals." className="mt-4 grid gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 md:grid-cols-2">
+            {registration.classType === "Basic Group" && registration.studentStatus !== "Active" && lifecycleWarnings.unpaidGroupInvoices.length ? (
+              <ActionFeedbackForm action={waiveUnpaidGroupMonthlyFees} successMessage="The selected unpaid group fees were waived and removed from active Finance totals." className="mt-4 grid gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 md:grid-cols-2">
                 <input type="hidden" name="id" value={registration.id} />
-                <label className="grid gap-2 text-sm font-semibold text-lead-navy">Fee month<input name="billingMonth" type="month" required defaultValue={todayWib.slice(0, 7)} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" /></label>
-                <label className="grid gap-2 text-sm font-semibold text-lead-navy">Reason<input name="waiverReason" required defaultValue="Withdrawn without taking classes" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" /></label>
-                <Button type="submit" variant="secondary" className="md:col-span-2 md:w-fit">Waive Unpaid Group Fee</Button>
+                <fieldset className="md:col-span-2">
+                  <legend className="text-sm font-bold text-lead-navy">Choose unpaid months to waive</legend>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {lifecycleWarnings.unpaidGroupInvoices.map((invoice) => (
+                      <label key={invoice.month} className="flex items-center gap-3 rounded-lg border border-yellow-200 bg-white px-4 py-3 text-sm font-semibold text-lead-navy">
+                        <input name="waiveBillingMonths" value={invoice.month} type="checkbox" className="h-4 w-4 accent-lead-blue" />
+                        <span>{formatBillingMonth(invoice.month)} <span className="font-normal text-lead-gray">({formatRupiah(invoice.amountDue)})</span></span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="grid gap-2 text-sm font-semibold text-lead-navy md:col-span-2">Reason<input name="waiverReason" required defaultValue="Withdrawn without taking classes" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-lead-navy" /></label>
+                <Button type="submit" variant="secondary" className="md:col-span-2 md:w-fit">Waive Selected Group Fees</Button>
               </ActionFeedbackForm>
             ) : null}
             <div className="mt-4 grid gap-3">

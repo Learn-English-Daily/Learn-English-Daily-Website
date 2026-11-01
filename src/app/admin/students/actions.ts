@@ -288,7 +288,8 @@ export async function changeStudentStatus(formData: FormData) {
   const toStatus = clean(formData.get("studentStatus")) as StudentStatus;
   const effectiveDate = clean(formData.get("effectiveDate"));
   const note = clean(formData.get("statusNote"));
-  const waiveGroupMonthlyFee = formData.get("waiveGroupMonthlyFee") === "on";
+  const waiveBillingMonths = [...new Set(formData.getAll("waiveBillingMonths").map(clean))]
+    .filter((month) => /^\d{4}-\d{2}$/.test(month));
 
   if (!ObjectId.isValid(id) || !isStudentStatus(toStatus) || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
     throw new Error("Choose a valid student status and effective date.");
@@ -362,8 +363,10 @@ export async function changeStudentStatus(formData: FormData) {
     );
   }
 
-  if (toStatus === "Withdrawn" && student.classType === "Basic Group" && waiveGroupMonthlyFee) {
-    await excludeUnpaidGroupMonthlyFee({ db, student, month: effectiveDate.slice(0, 7), admin, reason: note });
+  if (toStatus === "Withdrawn" && student.classType === "Basic Group") {
+    for (const month of waiveBillingMonths) {
+      await excludeUnpaidGroupMonthlyFee({ db, student, month, admin, reason: note });
+    }
   }
 
   revalidatePath("/admin");
@@ -429,23 +432,27 @@ async function excludeUnpaidGroupMonthlyFee({
   return result.modifiedCount;
 }
 
-export async function waiveUnpaidGroupMonthlyFee(formData: FormData) {
+export async function waiveUnpaidGroupMonthlyFees(formData: FormData) {
   const admin = await assertAdmin();
   const id = clean(formData.get("id"));
-  const month = clean(formData.get("billingMonth"));
+  const months = [...new Set(formData.getAll("waiveBillingMonths").map(clean))]
+    .filter((month) => /^\d{4}-\d{2}$/.test(month));
   const reason = clean(formData.get("waiverReason"));
-  if (!ObjectId.isValid(id) || !/^\d{4}-\d{2}$/.test(month) || reason.length < 3 || reason.length > 500) {
-    return { success: false, message: "Choose a valid month and add a short reason." };
+  if (!ObjectId.isValid(id) || !months.length || reason.length < 3 || reason.length > 500) {
+    return { success: false, message: "Choose at least one unpaid month and add a short reason." };
   }
   const db = await getMongoDb();
   const student = await db.collection<EditableStudentDocument>(getStudentRegistrationCollectionName()).findOne({ _id: new ObjectId(id) });
   if (!student?.studentId || student.classType !== "Basic Group") return { success: false, message: "Basic Group student not found." };
   if (getAdminAccessForUsername(admin.username) === "group-students" && student.classType !== "Basic Group") return { success: false, message: "You can only manage Basic Group students." };
-  const modified = await excludeUnpaidGroupMonthlyFee({ db, student, month, admin, reason });
-  if (!modified) return { success: false, message: `No active unpaid group invoice was found for ${month}.` };
+  let modified = 0;
+  for (const month of months) {
+    modified += await excludeUnpaidGroupMonthlyFee({ db, student, month, admin, reason });
+  }
+  if (!modified) return { success: false, message: "No active unpaid group invoice was found for the selected months." };
   revalidatePath("/finance/payments");
   revalidatePath("/ceo");
   revalidatePath("/ceo/finance");
   revalidatePath(`/admin/students/${id}/edit`);
-  return { success: true, message: "The unpaid group fee was waived and removed from active Finance totals." };
+  return { success: true, message: `${modified} unpaid group fee${modified === 1 ? " was" : "s were"} waived and removed from active Finance totals.` };
 }
