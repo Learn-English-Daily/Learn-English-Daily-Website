@@ -3,7 +3,7 @@ import type { BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 export const GROUP_COURSE_CLASS_TARGET = 72;
 
 export function getCourseClassTarget(program: string) {
-  if (program === "Foundation English" || program === "Academic English") return 48;
+  if (program === "Academic English") return 48;
   if (program === "Fluent English") return 96;
   return 72;
 }
