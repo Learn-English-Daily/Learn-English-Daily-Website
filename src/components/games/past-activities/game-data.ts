@@ -1,4 +1,4 @@
-export const stageNames = ["Verb Bowling", "Verb Ninja", "Past Bingo", "Story Train", "Memory Director"];
+export const stageNames = ["Verb Bowling", "Time Ninja", "Past Bingo", "Story Train", "Memory Director"];
 
 export const verbPairs = [
   { base: "go", past: "went", emoji: "🏫", sentence: "I went to school." },

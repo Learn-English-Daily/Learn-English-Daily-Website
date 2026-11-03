@@ -10,7 +10,7 @@ import { stageNames } from "./game-data";
 
 const intros = [
   { emoji: "🎳⚡", title: "PAST-TENSE BOWLING", purpose: "Control your aim and knock down the pin carrying the correct past form.", controls: "Watch the moving red marker and press BOWL or Space at exactly the right moment. Wrong pins cost a heart." },
-  { emoji: "🥷⚡", title: "VERB NINJA", purpose: "Slice the correct past forms before they escape, while regular and irregular verbs fly across the dojo.", controls: "Read the mission verb, then tap only its correct past form. Protect your three hearts." },
+  { emoji: "🥷🔊", title: "FUTURE-TO-PAST NINJA", purpose: "Listen to a complete future sentence, transform its meaning, and slice the matching complete past sentence.", controls: "The speaker describes tomorrow. Listen carefully, then choose what happened yesterday before the timer ends." },
   { emoji: "🎯🏆", title: "PAST TENSE BINGO", purpose: "Listen to activity clues and mark the matching past-tense actions until you complete a line.", controls: "Press Call activity, listen carefully, then mark the matching square. Wrong squares cost a heart." },
   { emoji: "🚂📖", title: "STORY TRAIN", purpose: "Repair three scrambled trains by connecting past events from first to finally.", controls: "Tap the event cars in story order. A wrong car sends the train back to the station." },
   { emoji: "🎬🧠", title: "MEMORY DIRECTOR", purpose: "Direct your own past-activity movie, then survive an expanding Simon-style memory sequence.", controls: "Choose four scenes, watch the director's sequence, and replay it from memory." }
