@@ -2,15 +2,11 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getBatchAttendanceRoster } from "@/lib/batch-attendance-roster";
-import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument, type BatchSelfCheckIn } from "@/lib/batch-class-sessions";
+import { getBatchClassSessionsCollectionName, hasBatchClassEnded, type BatchClassSessionDocument, type BatchSelfCheckIn } from "@/lib/batch-class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { isValidTeacherSession, TEACHER_ID_COOKIE, TEACHER_SESSION_COOKIE } from "@/lib/teacher-auth";
 import { getEmployeeTeacherById } from "@/lib/teachers";
-
-function jakartaDateKey() {
-  return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date());
-}
 
 function parentTokenFromQr(raw: unknown) {
   const value = typeof raw === "string" ? raw.trim() : "";
@@ -42,7 +38,7 @@ export async function POST(request: Request) {
   const sessions = db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName());
   const session = await sessions.findOne({ _id: new ObjectId(sessionId), teacherId: teacher.id, status: "Scheduled" });
   if (!session) return NextResponse.json({ error: "This group class is no longer open for check-in." }, { status: 404 });
-  if (session.sessionDate !== jakartaDateKey()) return NextResponse.json({ error: "QR check-in is available only on the scheduled class date (WIB)." }, { status: 400 });
+  if (!hasBatchClassEnded(session)) return NextResponse.json({ error: "QR attendance opens after this class has ended (WIB)." }, { status: 400 });
 
   const student = await db.collection<{ studentId?: string; studentName?: string }>(getStudentRegistrationCollectionName()).findOne(
     { parentAccessToken: token },
