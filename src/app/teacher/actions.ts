@@ -573,6 +573,7 @@ export async function saveBatchClassAttendance(formData: FormData) {
       learningHabits: numberInRange(formData.get(`learningHabits_${index}`), 0, 5, 0)
     };
     const comments = buildGroupClassComment(ratings);
+    const qrCheckIn = session.selfCheckIns?.find((entry) => entry.studentId === student.studentId);
     return {
       ...student,
       attendance: status,
@@ -580,7 +581,9 @@ export async function saveBatchClassAttendance(formData: FormData) {
       minutesLate: numberInRange(formData.get(`late_${index}`), 0, 240, 0),
       ...ratings,
       automaticCommentEn: comments.en,
-      automaticCommentId: comments.id
+      automaticCommentId: comments.id,
+      attendanceSource: qrCheckIn ? "parent-qr-self-check-in" : "teacher-manual",
+      ...(qrCheckIn ? { selfCheckedInAt: qrCheckIn.checkedInAt } : {})
     };
   });
 

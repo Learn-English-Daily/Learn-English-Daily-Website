@@ -21,6 +21,13 @@ export type BatchAttendanceEntry = BatchSessionStudent & {
   learningHabits: number;
   automaticCommentEn: string;
   automaticCommentId: string;
+  selfCheckedInAt?: Date;
+  attendanceSource?: "parent-qr-self-check-in" | "teacher-manual";
+};
+
+export type BatchSelfCheckIn = BatchSessionStudent & {
+  checkedInAt: Date;
+  source: "parent-qr";
 };
 
 export function buildGroupClassComment(entry: Pick<BatchAttendanceEntry, "communication" | "englishSkills" | "creativity" | "learningHabits">) {
@@ -62,6 +69,7 @@ export type BatchClassSessionDocument = {
   attendanceMarked?: boolean;
   attendanceMarkedAt?: Date;
   attendanceMarkedBy?: string;
+  selfCheckIns?: BatchSelfCheckIn[];
   createdBy?: string;
   createdAt?: Date;
   updatedAt?: Date;

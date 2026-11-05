@@ -1,10 +1,11 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { BarChart3, BookOpen, CalendarDays, CheckCircle2, Clock3, LogOut, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, CheckCircle2, Clock3, LogOut, QrCode, Users } from "lucide-react";
 import { logoutTeacher, saveBatchClassAttendance } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
+import { GroupQrCheckIn } from "@/app/teacher/group-classes/group-qr-check-in";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,6 +22,15 @@ export const metadata: Metadata = { title: "Group Classes | LEAD Teacher", robot
 
 function displayDate(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "full", timeZone: "Asia/Jakarta" }).format(new Date(`${value}T00:00:00+07:00`));
+}
+
+function jakartaDateKey() {
+  return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date());
+}
+
+function defaultGroupAttendance(session: BatchClassSessionDocument, studentId: string) {
+  if (!session.selfCheckIns?.length) return "Present";
+  return session.selfCheckIns.some((entry) => entry.studentId === studentId) ? "Present" : "Absent";
 }
 
 async function authenticatedTeacher() {
@@ -66,11 +76,13 @@ export default async function TeacherGroupClassesPage() {
   const open = sessions.filter((session) => session.status === "Scheduled" && hasBatchClassEnded(session, now)).reverse();
   const future = sessions.filter((session) => session.status === "Scheduled" && !hasBatchClassEnded(session, now)).reverse();
   const completed = sessions.filter((session) => session.status === "Completed").slice(0, 12);
+  const checkInSessions = sessions.filter((session) => session.status === "Scheduled" && session.sessionDate === jakartaDateKey()).reverse();
   const currentMonthKey = getJakartaMonthKey();
-  const rosters = new Map(await Promise.all([...new Set(open.map((session) => session.batchId))].map(async (batchId) =>
-    [batchId, await getBatchAttendanceRoster(db, batchId, open.find((session) => session.batchId === batchId)?.batchType)] as const
+  const rosterSessions = [...open, ...checkInSessions];
+  const rosters = new Map(await Promise.all([...new Set(rosterSessions.map((session) => session.batchId))].map(async (batchId) =>
+    [batchId, await getBatchAttendanceRoster(db, batchId, rosterSessions.find((session) => session.batchId === batchId)?.batchType)] as const
   )));
-  for (const session of open) session.studentSnapshot = rosters.get(session.batchId) || [];
+  for (const session of rosterSessions) session.studentSnapshot = rosters.get(session.batchId) || [];
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -125,6 +137,8 @@ export default async function TeacherGroupClassesPage() {
           })}
         </div>
 
+        {checkInSessions.length ? <div className="grid gap-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-100 text-lead-blue"><QrCode className="h-5 w-5" /></span><div><h2 className="font-heading text-2xl font-extrabold text-lead-navy">Today&apos;s QR Self Check-in</h2><p className="text-sm text-lead-gray">Open the scanner during class. Existing manual attendance stays available below after class ends.</p></div></div>{checkInSessions.map((session) => <GroupQrCheckIn key={session._id.toString()} sessionId={session._id.toString()} batchName={session.batchName} meetingNumber={session.meetingNumber} roster={session.studentSnapshot} initialCheckIns={(session.selfCheckIns || []).map((entry) => ({ studentId: entry.studentId, studentName: entry.studentName, checkedInAt: new Date(entry.checkedInAt).toISOString() }))} />)}</div> : null}
+
         <div className="grid gap-5">
           {open.map((session) => (
             <Card id={`group-session-${session._id.toString()}`} key={session._id.toString()} className="scroll-mt-6 overflow-hidden">
@@ -153,7 +167,7 @@ export default async function TeacherGroupClassesPage() {
                     <thead className="text-xs uppercase tracking-[0.12em] text-lead-gray"><tr><th className="pb-3">Student</th><th className="pb-3">Attendance</th><th className="pb-3">Stars</th><th className="pb-3">Minutes Late</th><th className="pb-3">Communication</th><th className="pb-3">English Skills</th><th className="pb-3">Creativity</th><th className="pb-3">Learning Habits</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {session.studentSnapshot.map((student, index) => (
-                        <tr key={student.studentId}><td className="py-3 pr-3"><p className="font-bold text-lead-navy">{student.studentName}</p><p className="text-xs text-lead-gray">{student.studentId}</p></td><td className="py-3 pr-3"><select name={`attendance_${index}`} defaultValue="Present" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{assessmentAttendanceStatuses.map((status) => <option key={status}>{status}</option>)}</select></td><td className="py-3 pr-3"><select name={`stars_${index}`} defaultValue="0" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{[0,1,2,3,4,5].map((stars) => <option key={stars} value={stars}>{stars} stars</option>)}</select></td><td className="py-3 pr-3"><input name={`late_${index}`} type="number" min={0} max={240} defaultValue={0} className="w-full rounded-lg border border-slate-200 px-3 py-2" /></td>{["communication","englishSkills","creativity","learningHabits"].map((metric) => <td key={metric} className="py-3 pr-3"><select name={`${metric}_${index}`} defaultValue="0" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{[0,1,2,3,4,5].map((rating) => <option key={rating} value={rating}>{rating} stars</option>)}</select></td>)}</tr>
+                        <tr key={student.studentId}><td className="py-3 pr-3"><p className="font-bold text-lead-navy">{student.studentName}</p><p className="text-xs text-lead-gray">{student.studentId}{session.selfCheckIns?.some((entry) => entry.studentId === student.studentId) ? " · QR checked in" : ""}</p></td><td className="py-3 pr-3"><select name={`attendance_${index}`} defaultValue={defaultGroupAttendance(session, student.studentId)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{assessmentAttendanceStatuses.map((status) => <option key={status}>{status}</option>)}</select></td><td className="py-3 pr-3"><select name={`stars_${index}`} defaultValue="0" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{[0,1,2,3,4,5].map((stars) => <option key={stars} value={stars}>{stars} stars</option>)}</select></td><td className="py-3 pr-3"><input name={`late_${index}`} type="number" min={0} max={240} defaultValue={0} className="w-full rounded-lg border border-slate-200 px-3 py-2" /></td>{["communication","englishSkills","creativity","learningHabits"].map((metric) => <td key={metric} className="py-3 pr-3"><select name={`${metric}_${index}`} defaultValue="0" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2">{[0,1,2,3,4,5].map((rating) => <option key={rating} value={rating}>{rating} stars</option>)}</select></td>)}</tr>
                       ))}
                     </tbody>
                   </table>
