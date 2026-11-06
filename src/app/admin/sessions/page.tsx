@@ -564,7 +564,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                       <div className="mt-4">
                         <ClassGamePanel classSessionId={session.id} link={session.gameLink} />
                       </div>
-                      {session.sessionDate === today && session.classMode === "Online" && session.classType === "Premium 1-to-1" ? <WhatsappClassReminders sessionId={session.id} studentName={session.studentName} sessionDate={session.sessionDate} startTime={session.startTime} endTime={session.endTime} permanentMeetLink={session.permanentMeetLink} parentWhatsapp={session.parentWhatsapp} teachers={session.reminderTeachers} parentSentAt={session.parentReminderSentAt} teacherSentAt={session.teacherReminderSentAt} /> : null}
+                      {session.sessionDate === today && session.classType === "Premium 1-to-1" ? <WhatsappClassReminders sessionId={session.id} studentName={session.studentName} sessionDate={session.sessionDate} startTime={session.startTime} endTime={session.endTime} classMode={session.classMode} permanentMeetLink={session.permanentMeetLink} parentWhatsapp={session.parentWhatsapp} teachers={session.reminderTeachers} parentSentAt={session.parentReminderSentAt} teacherSentAt={session.teacherReminderSentAt} /> : null}
                       <div className="mt-4 flex flex-wrap gap-2">
                         {session.status === "Needs Attendance" ? (
                           <span className="inline-flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">

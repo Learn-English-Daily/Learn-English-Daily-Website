@@ -437,8 +437,9 @@ export async function markWhatsappReminderSent(formData: FormData) {
   const field = recipient === "parent" ? "parentReminderSentAt" : "teacherReminderSentAt";
   const byField = recipient === "parent" ? "parentReminderSentBy" : "teacherReminderSentBy";
   const today = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date());
+  const modeFilter = recipient === "teacher" ? { classMode: "Online" } : {};
   const result = await (await getMongoDb()).collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
-    { _id: new ObjectId(id), classType: "Premium 1-to-1", classMode: "Online", sessionDate: today, status: "Scheduled" },
+    { _id: new ObjectId(id), classType: "Premium 1-to-1", sessionDate: today, status: "Scheduled", ...modeFilter },
     { $set: { [field]: new Date(), [byField]: "admin", updatedAt: new Date() } }
   );
   if (!result.matchedCount) return { success: false, message: "The private class could not be found." };
