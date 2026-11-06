@@ -9,11 +9,11 @@ import { AgoBlaster, CaseFile, ClueLab, TimeRunner, WeekDash } from "./challenge
 import { stageNames } from "./game-data";
 
 const intros = [
-  { emoji: "🏃⚡", title: "YESTERDAY TIME RUNNER", purpose: "Race through a 2D city, change lanes, collect past memories, and dodge dangerous time cracks.", controls: "Use Up and Down (or the buttons) to switch lanes. Collect all five memories before the finish line." },
+  { emoji: "🏃⚡", title: "YESTERDAY TIME RUNNER", purpose: "Race through three longer 2D worlds, change lanes, collect past memories, and stop to read a complete sentence after every run.", controls: "Use Up and Down (or the buttons) to switch lanes. At each finish line, read the checkpoint sentence aloud before starting the next run." },
   { emoji: "🛵📅", title: "LAST WEEK DELIVERY DASH", purpose: "Drive the activity package to the correct day before the countdown ends.", controls: "Move the scooter with Left and Right. Press Space or Deliver when you reach the correct day." },
   { emoji: "🚀☄️", title: "AGO ASTEROID BLASTER", purpose: "Protect the timeline by blasting the word that completes each past-time sentence.", controls: "Aim left or right, then fire. Build a combo by hitting the correct asteroid without a miss." },
   { emoji: "🕵️🔎", title: "WHAT HAPPENED? CLUE LAB", purpose: "Search three visual crime scenes and identify the connected evidence that reveals each past event.", controls: "Inspect the objects. Three belong to the event; three are decoys. Wrong evidence breaks your streak." },
-  { emoji: "🎙️📁", title: "THE MISSING WEEKEND CASE", purpose: "Create a unique memorable event, then speak your complete testimony to solve the final case.", controls: "Choose when, what, and why. Listen to your sentence, then say the full testimony clearly into the microphone." },
+  { emoji: "🎙️📁", title: "THE MISSING WEEKEND CASE", purpose: "Create and speak four different testimonies—Yesterday, Last night, Last week, and Two days ago—to solve the final case.", controls: "Complete every time tab. Choose what happened and why, then say each full testimony clearly into the microphone." },
 ];
 
 export function WhatHappenedGame() {
