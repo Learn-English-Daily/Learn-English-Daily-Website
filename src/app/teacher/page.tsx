@@ -3,7 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import type { Filter, WithId } from "mongodb";
 import { CalendarCheck, CalendarClock, Gamepad2, LogOut, NotebookPen, Search, Users } from "lucide-react";
-import { generateTeacherGamesLink, logoutTeacher, saveTeacherAttendance, saveTeacherMonthlyAssessment } from "@/app/teacher/actions";
+import { generateTeacherGamesLink, logoutTeacher, requestClassReschedule, saveTeacherAttendance, saveTeacherMonthlyAssessment } from "@/app/teacher/actions";
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { FlowerCelebration } from "@/app/teacher/flower-celebration";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
@@ -133,6 +133,8 @@ type TeacherSession = {
   scheduledAt: string;
   endsAt: string;
   status: ComputedClassSessionStatus;
+  rescheduleRequested: boolean;
+  rescheduleRequestReason: string;
   gameLink: { url: string; expiresAt: string } | null;
 };
 
@@ -464,6 +466,8 @@ async function getTeacherPortalData(teacherId: string, month: number, year: numb
         endsAt: doc.endsAt,
         hasAttendance: attendanceKeys.has(attendanceKey)
       }),
+      rescheduleRequested: Boolean(doc.rescheduleRequested),
+      rescheduleRequestReason: doc.rescheduleRequestReason || "",
       gameLink: gameSessionsByClassId.get(doc._id.toString()) || null
     }];
   });
@@ -604,9 +608,11 @@ export default async function TeacherPortalPage({
     .find({ teacherId: teacher.id, status: "Scheduled", attendanceMarked: { $ne: true } })
     .sort({ sessionDate: 1, startTime: 1, meetingNumber: 1 }).toArray();
   const todaysGroupSessions = pendingGroupSessions.filter((session) => session.sessionDate === today);
+  const missedGroupSessions = pendingGroupSessions.filter((session) => session.sessionDate < today);
   const groupAttendanceNeeded = pendingGroupSessions.filter((session) => hasBatchClassEnded(session)).length;
   const todaysSessions = data.sessions.filter((session) => session.sessionDate === today);
   const missedSessions = data.sessions.filter((session) => session.sessionDate < today);
+  const rescheduleRequestCount = data.sessions.filter((session) => session.rescheduleRequested).length + pendingGroupSessions.filter((session) => session.rescheduleRequested).length;
   const attendanceNeededSessions = data.sessions.filter((session) => session.status === "Needs Attendance");
   const attendanceNeededCount = attendanceNeededSessions.length + groupAttendanceNeeded;
   const selectedBatch = data.batches.find((batch) => batch.id === selectedAssessmentBatchId);
@@ -671,12 +677,13 @@ export default async function TeacherPortalPage({
       </header>
 
       <section className="container-shell grid gap-6 py-8">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length + todaysGroupSessions.length} detail="Private and group classes today" />
           <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={attendanceNeededCount} detail="Private and group classes waiting" tone="rose" />
           <TeacherKpi icon={CalendarCheck} label="Missed" value={missedSessions.length} detail="Past unmarked classes" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Journal Missing" value={data.journalMissingCount} detail="Attendance records needing journal" tone="rose" />
           <TeacherKpi icon={NotebookPen} label="Recent Records" value={data.recentAttendance.length} detail="Your latest attendance entries" tone="blue" />
+          <TeacherKpi icon={CalendarClock} label="Reschedule Sent" value={rescheduleRequestCount} detail="Waiting for admin decision" tone="blue" />
         </div>
 
         {attendanceNeededSessions.length ? <TeacherAttendanceNeededCard sessions={attendanceNeededSessions.slice(0, 5)} total={attendanceNeededSessions.length} /> : null}
@@ -695,8 +702,9 @@ export default async function TeacherPortalPage({
             <TeacherSessionList
               title="Missed Attendance"
               description="Past assigned classes that still do not have attendance. Future scheduled classes stay hidden."
-              badge={`${missedSessions.length} missed`}
+              badge={`${missedSessions.length + missedGroupSessions.length} missed`}
               sessions={missedSessions}
+              groupSessions={missedGroupSessions}
               emptyText="No missed attendance. Nice and clean."
               urgent
             />
@@ -917,6 +925,7 @@ function TeacherSessionList({
             <p className="mt-1 text-sm text-lead-gray">{session.program}{session.topic ? ` / ${session.topic}` : ""}</p>
             <Button asChild size="sm" variant="secondary" className="mt-3"><a href={ready ? `/teacher/group-classes#group-session-${session._id.toString()}` : "/teacher/group-classes#group-schedules"}>{ready ? "Mark Group Attendance" : "View Group Class"}</a></Button>
             {!ready ? <p className="mt-2 text-xs text-lead-gray">Attendance opens after the class ends.</p> : null}
+            <RescheduleRequestPanel sessionId={session._id.toString()} sessionType="group" requested={Boolean(session.rescheduleRequested)} reason={session.rescheduleRequestReason || ""} />
           </div>;
         })}
         {sessions.map((session) => (
@@ -985,8 +994,14 @@ function TeacherSessionCard({ session }: { session: TeacherSession }) {
           {session.gameLink ? <div className="mt-3"><GameSessionLink url={session.gameLink.url} expiresAt={session.gameLink.expiresAt} /></div> : null}
         </div>
       </div>
+      <RescheduleRequestPanel sessionId={session.id} sessionType="private" requested={session.rescheduleRequested} reason={session.rescheduleRequestReason} />
     </div>
   );
+}
+
+function RescheduleRequestPanel({ sessionId, sessionType, requested, reason }: { sessionId: string; sessionType: "private" | "group"; requested: boolean; reason: string }) {
+  if (requested) return <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50 p-4"><p className="text-sm font-bold text-violet-800">✓ Reschedule request sent to admin</p><p className="mt-1 text-sm text-violet-700">Reason: {reason}</p><p className="mt-2 text-xs font-semibold text-violet-600">The class stays on the current schedule until admin confirms a new date and time.</p></div>;
+  return <details className="mt-4 rounded-lg border border-amber-200 bg-amber-50"><summary className="focus-ring cursor-pointer list-none px-4 py-3 text-sm font-bold text-amber-900 [&::-webkit-details-marker]:hidden">Class cancelled? Request reschedule</summary><ActionFeedbackForm action={requestClassReschedule} successMessage="Reschedule request sent to admin." className="grid gap-3 border-t border-amber-200 p-4"><input type="hidden" name="sessionId" value={sessionId} /><input type="hidden" name="sessionType" value={sessionType} /><label className="grid gap-2 text-sm font-bold text-amber-950">Reason for admin<textarea name="reason" required minLength={3} maxLength={300} rows={2} placeholder="Example: Parent cancelled because the student is sick." className="focus-ring rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-normal text-lead-navy" /></label><Button type="submit" size="sm" className="w-fit"><CalendarClock className="h-4 w-4" />Send to Admin</Button></ActionFeedbackForm></details>;
 }
 
 function MeetingAssessmentRow({

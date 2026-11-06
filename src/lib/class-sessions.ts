@@ -36,6 +36,11 @@ export type ClassSessionDocument = {
   rescheduledFromEndTime?: string;
   rescheduleCount?: number;
   rescheduledAt?: Date;
+  rescheduleRequested?: boolean;
+  rescheduleRequestReason?: string;
+  rescheduleRequestedAt?: Date;
+  rescheduleRequestedById?: string;
+  rescheduleRequestedByName?: string;
   completedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;

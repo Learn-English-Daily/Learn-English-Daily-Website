@@ -473,7 +473,10 @@ export async function updateBatchClassTime(formData: FormData) {
   if (existingSession) assertBatchTypeAccess(admin, getBatchType(existingSession.batchType));
   const result = await db.collection(getBatchClassSessionsCollectionName()).updateOne(
     { _id: new ObjectId(sessionId), status: "Scheduled", attendanceMarked: { $ne: true } },
-    { $set: { sessionDate, startTime, endTime, classMode, updatedAt: new Date(), updatedBy: admin.name } }
+    {
+      $set: { sessionDate, startTime, endTime, classMode, updatedAt: new Date(), updatedBy: admin.name },
+      $unset: { rescheduleRequested: "", rescheduleRequestReason: "", rescheduleRequestedAt: "", rescheduleRequestedById: "", rescheduleRequestedByName: "" }
+    }
   );
   if (!result.matchedCount) return { success: false, message: "Only scheduled classes without attendance can be edited. Refresh the page." };
   revalidatePath("/admin/sessions");

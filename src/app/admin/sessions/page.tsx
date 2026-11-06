@@ -104,6 +104,10 @@ type ClassSession = {
   rescheduledFromDate: string;
   rescheduledFromStartTime: string;
   rescheduledFromEndTime: string;
+  rescheduleRequested: boolean;
+  rescheduleRequestReason: string;
+  rescheduleRequestedByName: string;
+  rescheduleRequestedAt: string;
   gameLink: GameLink | null;
 };
 
@@ -135,6 +139,9 @@ type GroupClassSession = {
   studentCount: number;
   status: string;
   attendanceMarked: boolean;
+  rescheduleRequested: boolean;
+  rescheduleRequestReason: string;
+  rescheduleRequestedByName: string;
 };
 
 async function getStudents(): Promise<Student[]> {
@@ -195,7 +202,10 @@ async function getGroupSchedulingData(groupOnly: boolean) {
       teacherName: session.teacherName || "Not assigned",
       studentCount: session.studentSnapshot?.length || 0,
       status: session.status,
-      attendanceMarked: Boolean(session.attendanceMarked)
+      attendanceMarked: Boolean(session.attendanceMarked),
+      rescheduleRequested: Boolean(session.rescheduleRequested),
+      rescheduleRequestReason: session.rescheduleRequestReason || "",
+      rescheduleRequestedByName: session.rescheduleRequestedByName || session.teacherName || "Teacher"
     }))
   };
 }
@@ -277,6 +287,10 @@ async function getSessions(): Promise<ClassSession[]> {
       rescheduledFromDate: doc.rescheduledFromDate || "",
       rescheduledFromStartTime: doc.rescheduledFromStartTime || "",
       rescheduledFromEndTime: doc.rescheduledFromEndTime || "",
+      rescheduleRequested: Boolean(doc.rescheduleRequested),
+      rescheduleRequestReason: doc.rescheduleRequestReason || "",
+      rescheduleRequestedByName: doc.rescheduleRequestedByName || doc.teacherNames?.[0] || "Teacher",
+      rescheduleRequestedAt: doc.rescheduleRequestedAt ? new Date(doc.rescheduleRequestedAt).toISOString() : "",
       status: getComputedClassSessionStatus({
         status: doc.status,
         scheduledAt: doc.scheduledAt,
@@ -407,12 +421,14 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
   const selectedBatchSessions = groupData.sessions.filter((groupSession) => groupSession.batchId === selectedBatchId);
   const visibleGroupSessions = groupData.sessions.filter((groupSession) => groupSession.status !== "Completed" && !groupSession.attendanceMarked);
   const needsAttendance = sessions.filter((session) => session.status === "Needs Attendance");
+  const privateRescheduleRequests = sessions.filter((session) => session.rescheduleRequested);
+  const groupRescheduleRequests = visibleGroupSessions.filter((session) => session.rescheduleRequested);
   const today = getIndonesiaDateInput();
   const todaysSessions = sessions.filter((session) => session.sessionDate === today);
   const normalizedSessionSearch = sessionSearch.toLocaleLowerCase();
-  const filteredSessions = normalizedSessionSearch
+  const filteredSessions = (normalizedSessionSearch
     ? sessions.filter((classSession) => classSession.studentName.toLocaleLowerCase().includes(normalizedSessionSearch) || classSession.studentId.toLocaleLowerCase().includes(normalizedSessionSearch))
-    : sessions;
+    : sessions).sort((a, b) => Number(b.rescheduleRequested) - Number(a.rescheduleRequested));
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -460,6 +476,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
 
 
           <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+            <SummaryCard label="Reschedule requests" value={privateRescheduleRequests.length} tone="text-violet-700" />
             <SummaryCard label="Needs attendance" value={needsAttendance.length} tone="text-rose-600" />
             <SummaryCard label="Today scheduled" value={todaysSessions.length} tone="text-lead-blue" />
           </div>
@@ -501,6 +518,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                         {session.rescheduled ? (
                           <span className="rounded-lg bg-violet-50 px-3 py-1 text-xs font-bold uppercase text-violet-700">Rescheduled</span>
                         ) : null}
+                        {session.rescheduleRequested ? <span className="rounded-lg bg-amber-100 px-3 py-1 text-xs font-bold uppercase text-amber-900">Teacher requested reschedule</span> : null}
                       </div>
                       <p className="mt-2 text-sm font-semibold text-lead-gray">
                         Meeting {session.meetingNumber} / {formatDate(session.scheduledAt)} / {formatTimeRange(session.scheduledAt, session.endsAt)}
@@ -515,6 +533,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                           {session.rescheduleCount > 1 ? ` / Rescheduled ${session.rescheduleCount} times` : ""}
                         </p>
                       ) : null}
+                      {session.rescheduleRequested ? <div className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4"><p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">Action needed · sent by {session.rescheduleRequestedByName}</p><p className="mt-2 font-bold text-amber-950">{session.rescheduleRequestReason}</p><p className="mt-2 text-xs text-amber-700">Discuss the new time with the parent and teacher, then use Reschedule class below. The request clears automatically after confirmation.</p></div> : null}
                       <div className="mt-4">
                         <GchatSessionMessage
                           studentName={session.studentName}
@@ -552,7 +571,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                           </Button>
                         </ActionFeedbackForm>
                       </div>
-                    <details open={Boolean(sessionSearch) && filteredSessions.length === 1} className="mt-4 rounded-lg border border-blue-200 bg-blue-50/60">
+                    <details open={session.rescheduleRequested || (Boolean(sessionSearch) && filteredSessions.length === 1)} className="mt-4 rounded-lg border border-blue-200 bg-blue-50/60">
                       <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-bold text-lead-blue [&::-webkit-details-marker]:hidden">
                         <CalendarClock className="h-4 w-4" />
                         Reschedule class
@@ -632,12 +651,12 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
             {!selectedBatch ? <Card className="p-6 text-sm text-lead-gray">Create an active batch and assign its students before scheduling group classes.</Card> : null}
           </div>
 
-          <div><h2 className="font-heading text-2xl font-extrabold text-lead-navy">All Group Schedules</h2><p className="mt-2 text-sm text-lead-gray">View each batch below. Choose a batch above only when creating classes.</p></div>
+          <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-heading text-2xl font-extrabold text-lead-navy">All Group Schedules</h2><p className="mt-2 text-sm text-lead-gray">View each batch below. Choose a batch above only when creating classes.</p></div>{groupRescheduleRequests.length ? <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-900">{groupRescheduleRequests.length} reschedule request{groupRescheduleRequests.length === 1 ? "" : "s"}</span> : null}</div>
           {Array.from(new Map([
             ...visibleGroupSessions.map((session) => [session.batchId, { id: session.batchId, batchName: session.batchName }] as const),
             ...groupData.batches.map((batch) => [batch.id, batch] as const)
           ]).values()).sort((a, b) => a.batchName.localeCompare(b.batchName)).map((batch) => {
-            const batchSessions = visibleGroupSessions.filter((session) => session.batchId === batch.id).sort((a, b) => a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime));
+            const batchSessions = visibleGroupSessions.filter((session) => session.batchId === batch.id).sort((a, b) => Number(b.rescheduleRequested) - Number(a.rescheduleRequested) || a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime));
             return <Card key={batch.id} className="p-5">
             <div className="flex items-start justify-between gap-3"><h3 className="font-heading text-xl font-extrabold text-lead-navy">{batch.batchName} Schedule</h3><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-lead-blue">{batchSessions.length} classes</span></div>
             <div className="mt-5 max-h-[540px] space-y-3 overflow-y-auto pr-1">
@@ -647,6 +666,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                     <div><p className="font-heading text-lg font-bold text-lead-navy">Meeting {groupSession.meetingNumber}</p><p className="mt-1 text-sm font-semibold text-lead-gray">{formatDate(groupSession.sessionDate)} / {groupSession.startTime} - {groupSession.endTime} WIB</p><p className="mt-1 text-sm text-lead-gray">{groupSession.classMode} / {groupSession.teacherName} / {groupSession.studentCount} students{groupSession.topic ? ` / ${groupSession.topic}` : ""}</p></div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-full px-3 py-1 text-xs font-bold ${groupSession.status === "Completed" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-lead-blue"}`}>{groupSession.status}</span>
+                      {groupSession.rescheduleRequested ? <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">Reschedule requested</span> : null}
                       {groupSession.status === "Scheduled" && !groupSession.attendanceMarked ? (
                         <>
                           <ActionFeedbackForm action={cancelBatchClass} successMessage="Group class cancelled." className="contents">
@@ -664,8 +684,9 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                       ) : null}
                     </div>
                   </div>
+                  {groupSession.rescheduleRequested ? <div className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4"><p className="text-xs font-black uppercase text-amber-800">Action needed · sent by {groupSession.rescheduleRequestedByName}</p><p className="mt-2 font-bold text-amber-950">{groupSession.rescheduleRequestReason}</p><p className="mt-2 text-xs text-amber-700">Agree on the new time, then update this class below. Saving the new date/time clears the request.</p></div> : null}
                   {groupSession.status === "Scheduled" && !groupSession.attendanceMarked ? (
-                    <details className="mt-3 rounded-lg border border-blue-100 bg-blue-50/50">
+                    <details open={groupSession.rescheduleRequested} className="mt-3 rounded-lg border border-blue-100 bg-blue-50/50">
                       <summary className="focus-ring cursor-pointer px-4 py-3 text-sm font-bold text-lead-blue">Edit class</summary>
                       <ActionFeedbackForm action={updateBatchClassTime} successMessage="Group class updated." className="grid gap-3 border-t border-blue-100 p-4 sm:grid-cols-2">
                         <input type="hidden" name="sessionId" value={groupSession.id} />

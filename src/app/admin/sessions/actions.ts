@@ -368,6 +368,13 @@ export async function rescheduleClassSession(formData: FormData) {
         rescheduledAt: new Date(),
         updatedAt: new Date()
       },
+      $unset: {
+        rescheduleRequested: "",
+        rescheduleRequestReason: "",
+        rescheduleRequestedAt: "",
+        rescheduleRequestedById: "",
+        rescheduleRequestedByName: ""
+      },
       $inc: { rescheduleCount: 1 }
     }
   );

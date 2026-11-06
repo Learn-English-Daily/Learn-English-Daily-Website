@@ -241,6 +241,50 @@ export async function logoutTeacher() {
   redirect("/teacher");
 }
 
+export async function requestClassReschedule(formData: FormData) {
+  const teacher = await assertTeacher();
+  const sessionId = clean(formData.get("sessionId"));
+  const sessionType = clean(formData.get("sessionType"));
+  const reason = clean(formData.get("reason"));
+
+  if (!ObjectId.isValid(sessionId) || !["private", "group"].includes(sessionType)) {
+    return { success: false, message: "This class could not be found. Refresh and try again." };
+  }
+  if (reason.length < 3 || reason.length > 300) {
+    return { success: false, message: "Write a short reason (3-300 characters) for the admin." };
+  }
+
+  const db = await getMongoDb();
+  const now = new Date();
+  const today = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Jakarta" }).format(now);
+  const request = {
+    rescheduleRequested: true,
+    rescheduleRequestReason: reason,
+    rescheduleRequestedAt: now,
+    rescheduleRequestedById: teacher.id,
+    rescheduleRequestedByName: teacher.name,
+    updatedAt: now
+  };
+  const result = sessionType === "group"
+    ? await db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).updateOne(
+        { _id: new ObjectId(sessionId), teacherId: teacher.id, status: "Scheduled", attendanceMarked: { $ne: true }, sessionDate: { $lte: today } },
+        { $set: request }
+      )
+    : await db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
+        { _id: new ObjectId(sessionId), teacherIds: teacher.id, status: "Scheduled", attendanceId: { $exists: false }, sessionDate: { $lte: today } },
+        { $set: request }
+      );
+
+  if (!result.matchedCount) {
+    return { success: false, message: "Only today's classes or past classes needing attendance can be sent for rescheduling." };
+  }
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/group-classes");
+  revalidatePath("/admin");
+  revalidatePath("/admin/sessions");
+  return { success: true };
+}
+
 export async function saveTeacherAttendance(formData: FormData) {
   const teacher = await assertTeacher();
 

@@ -70,6 +70,11 @@ export type BatchClassSessionDocument = {
   attendanceMarkedAt?: Date;
   attendanceMarkedBy?: string;
   selfCheckIns?: BatchSelfCheckIn[];
+  rescheduleRequested?: boolean;
+  rescheduleRequestReason?: string;
+  rescheduleRequestedAt?: Date;
+  rescheduleRequestedById?: string;
+  rescheduleRequestedByName?: string;
   createdBy?: string;
   createdAt?: Date;
   updatedAt?: Date;
