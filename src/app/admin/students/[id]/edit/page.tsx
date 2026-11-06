@@ -42,6 +42,7 @@ type StudentRegistrationDocument = {
   whatsapp?: string;
   email?: string;
   parentName?: string;
+  permanentMeetLink?: string;
   age?: string;
   dateOfBirth?: string;
   grade?: string;
@@ -71,6 +72,7 @@ type StudentRegistration = {
   whatsapp: string;
   email: string;
   parentName: string;
+  permanentMeetLink: string;
   age: string;
   dateOfBirth: string;
   grade: string;
@@ -125,6 +127,7 @@ async function getStudentRegistration(id: string): Promise<StudentRegistration |
     whatsapp: doc.whatsapp || "",
     email: doc.email || "",
     parentName: doc.parentName || "",
+    permanentMeetLink: doc.permanentMeetLink || "",
     age: doc.age || "",
     dateOfBirth: doc.dateOfBirth || "",
     grade: doc.grade || "",
@@ -350,6 +353,10 @@ export default async function EditStudentRegistrationPage({
             <Field label="Parent Name">
               <input name="parentName" required defaultValue={registration.parentName} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
             </Field>
+            {registration.classType === "Premium 1-to-1" ? <Field label="Permanent Google Meet Link">
+              <input name="permanentMeetLink" type="url" pattern="https://meet.google.com/.*" defaultValue={registration.permanentMeetLink} placeholder="https://meet.google.com/xxx-xxxx-xxx" className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
+              <span className="text-xs font-medium text-lead-gray">Used for today&apos;s private-class WhatsApp reminders.</span>
+            </Field> : <input type="hidden" name="permanentMeetLink" value={registration.permanentMeetLink} />}
             <Field label="Date of Birth">
               <input name="dateOfBirth" type="date" max={todayWib} defaultValue={registration.dateOfBirth} className="focus-ring rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-lead-navy" />
               <span className="text-xs font-medium text-lead-gray">

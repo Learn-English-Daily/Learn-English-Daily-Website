@@ -41,6 +41,10 @@ export type ClassSessionDocument = {
   rescheduleRequestedAt?: Date;
   rescheduleRequestedById?: string;
   rescheduleRequestedByName?: string;
+  parentReminderSentAt?: Date;
+  parentReminderSentBy?: string;
+  teacherReminderSentAt?: Date;
+  teacherReminderSentBy?: string;
   completedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;

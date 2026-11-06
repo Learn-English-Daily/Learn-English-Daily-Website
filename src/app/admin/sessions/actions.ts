@@ -427,6 +427,25 @@ export async function deleteClassSession(formData: FormData) {
   revalidatePath("/admin/sessions");
 }
 
+export async function markWhatsappReminderSent(formData: FormData) {
+  await assertAdmin();
+  const id = clean(formData.get("id"));
+  const recipient = clean(formData.get("recipient"));
+  if (!ObjectId.isValid(id) || !["parent", "teacher"].includes(recipient)) {
+    return { success: false, message: "Invalid reminder record." };
+  }
+  const field = recipient === "parent" ? "parentReminderSentAt" : "teacherReminderSentAt";
+  const byField = recipient === "parent" ? "parentReminderSentBy" : "teacherReminderSentBy";
+  const today = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date());
+  const result = await (await getMongoDb()).collection<ClassSessionDocument>(getClassSessionsCollectionName()).updateOne(
+    { _id: new ObjectId(id), classType: "Premium 1-to-1", classMode: "Online", sessionDate: today, status: "Scheduled" },
+    { $set: { [field]: new Date(), [byField]: "admin", updatedAt: new Date() } }
+  );
+  if (!result.matchedCount) return { success: false, message: "The private class could not be found." };
+  revalidatePath("/admin/sessions");
+  return { success: true };
+}
+
 async function generateClassGameLink(formData: FormData, gameType: GameType) {
   await assertAdmin();
 

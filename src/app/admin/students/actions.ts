@@ -95,6 +95,7 @@ export async function updateStudentRegistration(formData: FormData) {
     email: clean(formData.get("email")).toLowerCase(),
     normalizedWhatsapp: normalizeWhatsapp(clean(formData.get("whatsapp"))),
     parentName: clean(formData.get("parentName")),
+    permanentMeetLink: clean(formData.get("permanentMeetLink")),
     dateOfBirth: clean(formData.get("dateOfBirth")),
     grade: clean(formData.get("grade")),
     preferredSchedule: clean(formData.get("preferredSchedule")),
@@ -119,6 +120,7 @@ export async function updateStudentRegistration(formData: FormData) {
     !isReasonableShortText(registration.whatsapp) ||
     !isValidEmail(registration.email) ||
     !isReasonableShortText(registration.parentName) ||
+    (registration.permanentMeetLink !== "" && !/^https:\/\/meet\.google\.com\/[a-z-]+$/i.test(registration.permanentMeetLink)) ||
     (registration.dateOfBirth !== "" && !isValidDateOfBirth(registration.dateOfBirth)) ||
     !isReasonableShortText(registration.grade, 60) ||
     !isReasonableShortText(registration.preferredSchedule) ||

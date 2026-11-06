@@ -6,6 +6,7 @@ export type EmployeeTeacherDocument = {
   fullName?: string;
   preferredName?: string;
   email?: string;
+  whatsapp?: string;
   role?: string;
   status?: string;
   employeeStatus?: string;
@@ -20,6 +21,7 @@ export type TeacherOption = {
   id: string;
   name: string;
   username: string;
+  whatsapp: string;
   source: "employee-onboarding";
 };
 
@@ -54,6 +56,7 @@ function mapEmployeeTeacher(teacher: EmployeeTeacherDocument): TeacherOption | n
     id: employeeTeacherId(teacher._id),
     name: formatTeacherDisplayName(name, teacher),
     username: normalizeEmployeeUsername(teacher.username || teacher.teacherUsername || ""),
+    whatsapp: teacher.whatsapp || "",
     source: "employee-onboarding"
   };
 }

@@ -16,6 +16,7 @@ import {
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { GchatSessionMessage } from "@/app/admin/sessions/gchat-session-message";
 import { TemporaryMeetLink } from "@/app/admin/sessions/temporary-meet-link";
+import { WhatsappClassReminders } from "@/app/admin/sessions/whatsapp-class-reminders";
 import { PrivateSessionForm } from "@/app/admin/sessions/private-session-form";
 import { PrivateSessionImport } from "@/app/admin/sessions/private-session-import";
 import { AdminLoginForm } from "@/app/admin/login-form";
@@ -59,6 +60,8 @@ type StudentDocument = {
   classType?: string;
   classMode?: string;
   meetingSequenceNextNumber?: number;
+  whatsapp?: string;
+  permanentMeetLink?: string;
 };
 
 type Student = {
@@ -108,6 +111,11 @@ type ClassSession = {
   rescheduleRequestReason: string;
   rescheduleRequestedByName: string;
   rescheduleRequestedAt: string;
+  parentWhatsapp: string;
+  permanentMeetLink: string;
+  reminderTeachers: Array<{ name: string; whatsapp: string }>;
+  parentReminderSentAt: string;
+  teacherReminderSentAt: string;
   gameLink: GameLink | null;
 };
 
@@ -217,7 +225,7 @@ async function getTeachers(): Promise<Teacher[]> {
 
 async function getSessions(): Promise<ClassSession[]> {
   const db = await getMongoDb();
-  const [sessionDocs, attendanceDocs, gameSessionDocs] = await Promise.all([
+  const [sessionDocs, attendanceDocs, gameSessionDocs, reminderStudents, reminderTeachers] = await Promise.all([
     db
       .collection<ClassSessionDocument>(getClassSessionsCollectionName())
       .find({})
@@ -235,8 +243,12 @@ async function getSessions(): Promise<ClassSession[]> {
       .find({ gameType: "games-hub" })
       .sort({ updatedAt: -1 })
       .limit(500)
-      .toArray()
+      .toArray(),
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({ classType: "Premium 1-to-1" }).project({ studentId: 1, whatsapp: 1, permanentMeetLink: 1 }).limit(500).toArray(),
+    getAvailableTeachers(db)
   ]);
+  const reminderStudentById = new Map(reminderStudents.map((student) => [student.studentId || "", student]));
+  const reminderTeacherById = new Map(reminderTeachers.map((teacher) => [teacher.id, teacher]));
   const attendanceKeys = new Set(
     attendanceDocs.map((doc) => {
       const period = getRecordBillingPeriod(doc);
@@ -261,6 +273,7 @@ async function getSessions(): Promise<ClassSession[]> {
     const classSessionId = doc._id.toString();
     const period = getRecordBillingPeriod(doc);
     const attendanceKey = `${studentId}:${meetingNumber}:${period.billingPeriod}`;
+    const reminderStudent = reminderStudentById.get(studentId);
 
     if (doc.status === "Completed" || attendanceKeys.has(attendanceKey)) {
       return [];
@@ -291,6 +304,11 @@ async function getSessions(): Promise<ClassSession[]> {
       rescheduleRequestReason: doc.rescheduleRequestReason || "",
       rescheduleRequestedByName: doc.rescheduleRequestedByName || doc.teacherNames?.[0] || "Teacher",
       rescheduleRequestedAt: doc.rescheduleRequestedAt ? new Date(doc.rescheduleRequestedAt).toISOString() : "",
+      parentWhatsapp: reminderStudent?.whatsapp || "",
+      permanentMeetLink: reminderStudent?.permanentMeetLink || "",
+      reminderTeachers: (doc.teacherIds || []).map((id) => reminderTeacherById.get(id)).filter((teacher): teacher is TeacherOption => Boolean(teacher)).map((teacher) => ({ name: teacher.name, whatsapp: teacher.whatsapp })),
+      parentReminderSentAt: doc.parentReminderSentAt ? new Date(doc.parentReminderSentAt).toISOString() : "",
+      teacherReminderSentAt: doc.teacherReminderSentAt ? new Date(doc.teacherReminderSentAt).toISOString() : "",
       status: getComputedClassSessionStatus({
         status: doc.status,
         scheduledAt: doc.scheduledAt,
@@ -546,6 +564,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
                       <div className="mt-4">
                         <ClassGamePanel classSessionId={session.id} link={session.gameLink} />
                       </div>
+                      {session.sessionDate === today && session.classMode === "Online" && session.classType === "Premium 1-to-1" ? <WhatsappClassReminders sessionId={session.id} studentName={session.studentName} sessionDate={session.sessionDate} startTime={session.startTime} endTime={session.endTime} permanentMeetLink={session.permanentMeetLink} parentWhatsapp={session.parentWhatsapp} teachers={session.reminderTeachers} parentSentAt={session.parentReminderSentAt} teacherSentAt={session.teacherReminderSentAt} /> : null}
                       <div className="mt-4 flex flex-wrap gap-2">
                         {session.status === "Needs Attendance" ? (
                           <span className="inline-flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">
