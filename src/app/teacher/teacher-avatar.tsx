@@ -9,6 +9,7 @@ export function avatarSettings(profile?: TeacherEngagementDocument | null) {
   const presentation = profile?.avatarPresentation || defaultTeacherAvatar.avatarPresentation;
   const compatibleHair = presentation === "female" ? teacherAvatarFemaleHairStyles : presentation === "male" ? teacherAvatarMaleHairStyles : teacherAvatarNeutralHairStyles;
   const savedHair = profile?.avatarHairStyle || "";
+  const legacyFacialHair = profile?.avatarFacialHair || "none";
   return {
     avatarPresentation: presentation,
     avatarSkinTone: profile?.avatarSkinTone || defaultTeacherAvatar.avatarSkinTone,
@@ -18,6 +19,8 @@ export function avatarSettings(profile?: TeacherEngagementDocument | null) {
     avatarHairColor: profile?.avatarHairColor || defaultTeacherAvatar.avatarHairColor,
     avatarHijabColor: profile?.avatarHijabColor || defaultTeacherAvatar.avatarHijabColor,
     avatarFacialHair: profile?.avatarFacialHair || defaultTeacherAvatar.avatarFacialHair,
+    avatarMoustache: profile?.avatarMoustache || (["small-moustache", "moustache"].includes(legacyFacialHair) ? legacyFacialHair : defaultTeacherAvatar.avatarMoustache),
+    avatarBeard: profile?.avatarBeard || (["small-beard", "full-beard", "long-beard"].includes(legacyFacialHair) ? legacyFacialHair : defaultTeacherAvatar.avatarBeard),
     avatarOutfit: profile?.avatarOutfit || defaultTeacherAvatar.avatarOutfit,
     avatarOutfitColor: profile?.avatarOutfitColor || defaultTeacherAvatar.avatarOutfitColor,
     avatarAccessory: profile?.avatarAccessory && profile.avatarAccessory !== "✨" ? profile.avatarAccessory : defaultTeacherAvatar.avatarAccessory
@@ -78,11 +81,11 @@ export function TeacherAvatar({ settings, className = "h-60 w-52" }: { settings:
     {settings.avatarEyeStyle === "calm" ? <><path d="M82 119q13 12 26 0" fill="none" stroke="#34251F" strokeWidth="5" strokeLinecap="round"/><path d="M132 119q13 12 26 0" fill="none" stroke="#34251F" strokeWidth="5" strokeLinecap="round"/></> : <><ellipse cx="95" cy="121" rx={settings.avatarEyeStyle === "bright" ? 8 : 6} ry={settings.avatarEyeStyle === "bright" ? 10 : 8} fill="#34251F"/><ellipse cx="145" cy="121" rx={settings.avatarEyeStyle === "bright" ? 8 : 6} ry={settings.avatarEyeStyle === "bright" ? 10 : 8} fill="#34251F"/>{settings.avatarEyeStyle === "wink" ? <path d="M134 120q11 10 22 0" fill="none" stroke={skin} strokeWidth="14"/> : null}</>}
     {female ? <><path d="M79 108q16-10 31 0M130 108q16-10 31 0" fill="none" stroke={hair} strokeWidth="3" strokeLinecap="round"/><path d="M87 116l-6-5m72 5l6-5" stroke="#34251F" strokeWidth="2"/></> : <path d="M80 108q15-7 29 0M131 108q15-7 29 0" fill="none" stroke={hair} strokeWidth="5" strokeLinecap="round"/>}
     <path d={male ? "M110 142q10 8 20 0" : "M113 143q7 5 14 0"} fill="none" stroke="#9B6049" strokeWidth={male ? 4 : 3} strokeLinecap="round"/><path d={female ? "M98 157q22 18 44 0-22 28-44 0z" : "M96 156q24 24 48 0"} fill={female ? "#C95F70" : "#fff"} stroke="#9B4D55" strokeWidth="3" strokeLinejoin="round"/>
-    {male && settings.avatarFacialHair === "small-moustache" ? <path d="M105 151q15-10 30 0-15 8-30 0z" fill={hair}/> : null}
-    {male && settings.avatarFacialHair === "moustache" ? <path d="M91 152q15-18 29-3 14-15 29 3-16 14-29 2-13 12-29-2z" fill={hair}/> : null}
-    {male && settings.avatarFacialHair === "small-beard" ? <path d="M91 166q29 25 58 0-8 30-29 32-21-2-29-32z" fill={hair} opacity=".95"/> : null}
-    {male && settings.avatarFacialHair === "full-beard" ? <path d="M75 146q7 52 45 60 38-8 45-60-11 17-22 22-23 18-46 0-11-5-22-22z" fill={hair} opacity=".96"/> : null}
-    {male && settings.avatarFacialHair === "long-beard" ? <path d="M74 145q5 58 46 88 41-30 46-88-16 22-29 25-17 9-34 0-13-3-29-25z" fill={hair} opacity=".97"/> : null}
+    {male && settings.avatarMoustache === "small-moustache" ? <path d="M105 151q15-10 30 0-15 8-30 0z" fill={hair}/> : null}
+    {male && settings.avatarMoustache === "moustache" ? <path d="M91 152q15-18 29-3 14-15 29 3-16 14-29 2-13 12-29-2z" fill={hair}/> : null}
+    {male && settings.avatarBeard === "small-beard" ? <path d="M91 166q29 25 58 0-8 30-29 32-21-2-29-32z" fill={hair} opacity=".95"/> : null}
+    {male && settings.avatarBeard === "full-beard" ? <path d="M75 146q7 52 45 60 38-8 45-60-11 17-22 22-23 18-46 0-11-5-22-22z" fill={hair} opacity=".96"/> : null}
+    {male && settings.avatarBeard === "long-beard" ? <path d="M74 145q5 58 46 88 41-30 46-88-16 22-29 25-17 9-34 0-13-3-29-25z" fill={hair} opacity=".97"/> : null}
     {glasses ? <g fill="none" stroke="#26334D" strokeWidth="5"><circle cx="94" cy="121" r={settings.avatarAccessory === "round-glasses" ? 18 : 17}/><circle cx="146" cy="121" r={settings.avatarAccessory === "round-glasses" ? 18 : 17}/><path d="M111 121h18M76 116l-14-5m102 5l14-5"/></g> : null}
     {settings.avatarAccessory === "headphones" ? <g fill="none" stroke="#172554" strokeWidth="9"><path d="M63 122V98q0-57 57-57t57 57v24"/><path d="M59 114v38m122-38v38"/></g> : null}
     {settings.avatarAccessory === "earrings" ? <g fill="#F6BE3B"><circle cx="66" cy="150" r="7"/><circle cx="174" cy="150" r="7"/></g> : null}

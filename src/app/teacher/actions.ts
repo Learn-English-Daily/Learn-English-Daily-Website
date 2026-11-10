@@ -62,7 +62,8 @@ import {
   teacherAvatarHairColors,
   teacherAvatarHijabColors,
   teacherAvatarHairStyles,
-  teacherAvatarFacialHairStyles,
+  teacherAvatarMoustacheStyles,
+  teacherAvatarBeardStyles,
   teacherAvatarOutfitColors,
   teacherAvatarOutfits,
   teacherAvatarPresentations,
@@ -329,16 +330,17 @@ export async function saveTeacherClassroomProfile(formData: FormData) {
   const avatarHairStyle = clean(formData.get("avatarHairStyle"));
   const avatarHairColor = clean(formData.get("avatarHairColor"));
   const avatarHijabColor = clean(formData.get("avatarHijabColor"));
-  const avatarFacialHair = clean(formData.get("avatarFacialHair"));
+  const avatarMoustache = clean(formData.get("avatarMoustache"));
+  const avatarBeard = clean(formData.get("avatarBeard"));
   const avatarOutfit = clean(formData.get("avatarOutfit"));
   const avatarOutfitColor = clean(formData.get("avatarOutfitColor"));
   const avatarAccessory = clean(formData.get("avatarAccessory"));
   const classroomTheme = clean(formData.get("classroomTheme"));
-  if (!teacherAvatarPresentations.includes(avatarPresentation as (typeof teacherAvatarPresentations)[number]) || !teacherAvatarSkinTones.includes(avatarSkinTone as (typeof teacherAvatarSkinTones)[number]) || !teacherAvatarFaceShapes.includes(avatarFaceShape as (typeof teacherAvatarFaceShapes)[number]) || !teacherAvatarEyeStyles.includes(avatarEyeStyle as (typeof teacherAvatarEyeStyles)[number]) || !teacherAvatarHairStyles.includes(avatarHairStyle as (typeof teacherAvatarHairStyles)[number]) || !teacherAvatarHairColors.includes(avatarHairColor as (typeof teacherAvatarHairColors)[number]) || !teacherAvatarHijabColors.includes(avatarHijabColor as (typeof teacherAvatarHijabColors)[number]) || !teacherAvatarFacialHairStyles.includes(avatarFacialHair as (typeof teacherAvatarFacialHairStyles)[number]) || !teacherAvatarOutfits.includes(avatarOutfit as (typeof teacherAvatarOutfits)[number]) || !teacherAvatarOutfitColors.includes(avatarOutfitColor as (typeof teacherAvatarOutfitColors)[number]) || !teacherAvatarAccessories.includes(avatarAccessory as (typeof teacherAvatarAccessories)[number]) || !teacherClassroomThemes.includes(classroomTheme as (typeof teacherClassroomThemes)[number])) return { success: false, message: "Choose valid avatar and classroom items." };
+  if (!teacherAvatarPresentations.includes(avatarPresentation as (typeof teacherAvatarPresentations)[number]) || !teacherAvatarSkinTones.includes(avatarSkinTone as (typeof teacherAvatarSkinTones)[number]) || !teacherAvatarFaceShapes.includes(avatarFaceShape as (typeof teacherAvatarFaceShapes)[number]) || !teacherAvatarEyeStyles.includes(avatarEyeStyle as (typeof teacherAvatarEyeStyles)[number]) || !teacherAvatarHairStyles.includes(avatarHairStyle as (typeof teacherAvatarHairStyles)[number]) || !teacherAvatarHairColors.includes(avatarHairColor as (typeof teacherAvatarHairColors)[number]) || !teacherAvatarHijabColors.includes(avatarHijabColor as (typeof teacherAvatarHijabColors)[number]) || !teacherAvatarMoustacheStyles.includes(avatarMoustache as (typeof teacherAvatarMoustacheStyles)[number]) || !teacherAvatarBeardStyles.includes(avatarBeard as (typeof teacherAvatarBeardStyles)[number]) || !teacherAvatarOutfits.includes(avatarOutfit as (typeof teacherAvatarOutfits)[number]) || !teacherAvatarOutfitColors.includes(avatarOutfitColor as (typeof teacherAvatarOutfitColors)[number]) || !teacherAvatarAccessories.includes(avatarAccessory as (typeof teacherAvatarAccessories)[number]) || !teacherClassroomThemes.includes(classroomTheme as (typeof teacherClassroomThemes)[number])) return { success: false, message: "Choose valid avatar and classroom items." };
   const now = new Date();
   await (await getMongoDb()).collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).updateOne(
     { teacherId: teacher.id },
-    { $set: { teacherName: teacher.name, avatarPresentation, avatarSkinTone, avatarFaceShape, avatarEyeStyle, avatarHairStyle, avatarHairColor, avatarHijabColor, avatarFacialHair: avatarPresentation === "male" ? avatarFacialHair : "none", avatarOutfit, avatarOutfitColor, avatarAccessory, classroomTheme, updatedAt: now }, $setOnInsert: { teacherId: teacher.id, createdAt: now } },
+    { $set: { teacherName: teacher.name, avatarPresentation, avatarSkinTone, avatarFaceShape, avatarEyeStyle, avatarHairStyle, avatarHairColor, avatarHijabColor, avatarFacialHair: "none", avatarMoustache: avatarPresentation === "male" ? avatarMoustache : "none", avatarBeard: avatarPresentation === "male" ? avatarBeard : "none", avatarOutfit, avatarOutfitColor, avatarAccessory, classroomTheme, updatedAt: now }, $setOnInsert: { teacherId: teacher.id, createdAt: now } },
     { upsert: true }
   );
   revalidatePath("/teacher");

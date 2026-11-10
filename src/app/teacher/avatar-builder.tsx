@@ -6,7 +6,7 @@ import { avatarSettings, TeacherAvatar, type TeacherAvatarSettings } from "@/app
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import {
-  teacherAvatarAccessories, teacherAvatarEyeStyles, teacherAvatarFaceShapes, teacherAvatarFacialHairStyles, teacherAvatarFemaleHairStyles, teacherAvatarHairColors, teacherAvatarHijabColors,
+  teacherAvatarAccessories, teacherAvatarBeardStyles, teacherAvatarEyeStyles, teacherAvatarFaceShapes, teacherAvatarFemaleHairStyles, teacherAvatarHairColors, teacherAvatarHijabColors, teacherAvatarMoustacheStyles,
   teacherAvatarMaleHairStyles, teacherAvatarNeutralHairStyles, teacherAvatarOutfitColors, teacherAvatarOutfits, teacherAvatarPresentations,
   teacherAvatarSkinTones, teacherClassroomThemes, type TeacherEngagementDocument
 } from "@/lib/teacher-engagement";
@@ -33,7 +33,7 @@ export function AvatarBuilder({ profile }: { profile: TeacherEngagementDocument 
   const [theme, setTheme] = useState(profile?.classroomTheme || "garden");
   const change = (key: keyof TeacherAvatarSettings, value: string) => setSettings((current) => ({ ...current, [key]: value }));
   const hairStyles = settings.avatarPresentation === "female" ? teacherAvatarFemaleHairStyles : settings.avatarPresentation === "male" ? teacherAvatarMaleHairStyles : teacherAvatarNeutralHairStyles;
-  const changePresentation = (value: string) => setSettings((current) => ({ ...current, avatarPresentation: value, avatarHairStyle: value === "female" ? "bob" : value === "male" ? "textured-crop" : "short", avatarFacialHair: "none" }));
+  const changePresentation = (value: string) => setSettings((current) => ({ ...current, avatarPresentation: value, avatarHairStyle: value === "female" ? "bob" : value === "male" ? "textured-crop" : "short", avatarMoustache: "none", avatarBeard: "none" }));
   return <ActionFeedbackForm action={saveTeacherClassroomProfile} successMessage="Your avatar and classroom have been saved." preserveValuesAfterSubmit className="mt-5 grid gap-6">
     <div className="sticky top-3 z-10 grid place-items-center rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-3 shadow-sm"><TeacherAvatar settings={settings} className="h-56 w-48 drop-shadow-lg" /><p className="-mt-2 rounded-full bg-white px-4 py-1 text-xs font-black text-lead-blue shadow-sm">LIVE PREVIEW</p></div>
     <OptionGroup title="Character" name="avatarPresentation" values={teacherAvatarPresentations} selected={settings.avatarPresentation} onChange={changePresentation} />
@@ -42,7 +42,7 @@ export function AvatarBuilder({ profile }: { profile: TeacherEngagementDocument 
     <OptionGroup title="Eyes" name="avatarEyeStyle" values={teacherAvatarEyeStyles} selected={settings.avatarEyeStyle} onChange={(v) => change("avatarEyeStyle", v)} />
     <OptionGroup title={`${labels[settings.avatarPresentation]} hairstyles`} name="avatarHairStyle" values={hairStyles} selected={settings.avatarHairStyle} onChange={(v) => change("avatarHairStyle", v)} />
     {settings.avatarHairStyle === "hijab" ? <><input type="hidden" name="avatarHairColor" value={settings.avatarHairColor} /><OptionGroup title="Hijab color" name="avatarHijabColor" values={teacherAvatarHijabColors} selected={settings.avatarHijabColor} onChange={(v) => change("avatarHijabColor", v)} swatch /></> : <><OptionGroup title="Hair color" name="avatarHairColor" values={teacherAvatarHairColors} selected={settings.avatarHairColor} onChange={(v) => change("avatarHairColor", v)} swatch /><input type="hidden" name="avatarHijabColor" value={settings.avatarHijabColor} /></>}
-    {settings.avatarPresentation === "male" ? <OptionGroup title="Moustache & beard" name="avatarFacialHair" values={teacherAvatarFacialHairStyles} selected={settings.avatarFacialHair} onChange={(v) => change("avatarFacialHair", v)} /> : <input type="hidden" name="avatarFacialHair" value="none" />}
+    {settings.avatarPresentation === "male" ? <><OptionGroup title="Moustache" name="avatarMoustache" values={teacherAvatarMoustacheStyles} selected={settings.avatarMoustache} onChange={(v) => change("avatarMoustache", v)} /><OptionGroup title="Beard" name="avatarBeard" values={teacherAvatarBeardStyles} selected={settings.avatarBeard} onChange={(v) => change("avatarBeard", v)} /></> : <><input type="hidden" name="avatarMoustache" value="none" /><input type="hidden" name="avatarBeard" value="none" /></>}
     <OptionGroup title="Outfit" name="avatarOutfit" values={teacherAvatarOutfits} selected={settings.avatarOutfit} onChange={(v) => change("avatarOutfit", v)} />
     <OptionGroup title="Outfit color" name="avatarOutfitColor" values={teacherAvatarOutfitColors} selected={settings.avatarOutfitColor} onChange={(v) => change("avatarOutfitColor", v)} swatch />
     <OptionGroup title="Accessories" name="avatarAccessory" values={teacherAvatarAccessories} selected={settings.avatarAccessory} onChange={(v) => change("avatarAccessory", v)} />

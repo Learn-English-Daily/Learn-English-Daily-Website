@@ -15,6 +15,8 @@ export const teacherAvatarMaleHairStyles = ["buzz-cut", "crew-cut", "textured-cr
 export const teacherAvatarNeutralHairStyles = ["short", "side", "waves", "curls", "bun", "ponytail", "hijab", "bald"] as const;
 export const teacherAvatarHairStyles = [...teacherAvatarFemaleHairStyles, ...teacherAvatarMaleHairStyles, ...teacherAvatarNeutralHairStyles] as const;
 export const teacherAvatarFacialHairStyles = ["none", "small-moustache", "moustache", "small-beard", "full-beard", "long-beard"] as const;
+export const teacherAvatarMoustacheStyles = ["none", "small-moustache", "moustache"] as const;
+export const teacherAvatarBeardStyles = ["none", "small-beard", "full-beard", "long-beard"] as const;
 export const teacherAvatarHairColors = ["black", "espresso", "chestnut", "blonde", "violet", "rose"] as const;
 export const teacherAvatarHijabColors = ["hijab-navy", "hijab-rose", "hijab-sage", "hijab-mocha", "hijab-lavender", "hijab-cream", "hijab-black"] as const;
 export const teacherAvatarOutfits = ["blazer", "sweater", "shirt", "dress", "hoodie"] as const;
@@ -31,6 +33,8 @@ export const defaultTeacherAvatar = {
   avatarHairColor: "espresso",
   avatarHijabColor: "hijab-navy",
   avatarFacialHair: "none",
+  avatarMoustache: "none",
+  avatarBeard: "none",
   avatarOutfit: "blazer",
   avatarOutfitColor: "lead-blue",
   avatarAccessory: "none"
@@ -51,6 +55,8 @@ export type TeacherEngagementDocument = {
   avatarHairColor?: string;
   avatarHijabColor?: string;
   avatarFacialHair?: string;
+  avatarMoustache?: string;
+  avatarBeard?: string;
   avatarOutfit?: string;
   avatarOutfitColor?: string;
   avatarAccessory?: string;
