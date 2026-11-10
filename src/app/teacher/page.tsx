@@ -7,7 +7,7 @@ import { generateTeacherGamesLink, logoutTeacher, requestClassReschedule, saveTe
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { FlowerCelebration } from "@/app/teacher/flower-celebration";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
-import { TeacherClassroomPreview } from "@/app/teacher/teacher-classroom-preview";
+import { TeacherHeaderAvatar, TeacherMoodControl } from "@/app/teacher/teacher-classroom-preview";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ import {
   TEACHER_SESSION_COOKIE
 } from "@/lib/teacher-auth";
 import { getEmployeeTeacherById } from "@/lib/teachers";
-import { calculateTeacherStars, getTeacherEngagementCollectionName, type TeacherEngagementDocument } from "@/lib/teacher-engagement";
+import { getTeacherEngagementCollectionName, type TeacherEngagementDocument } from "@/lib/teacher-engagement";
 
 export const dynamic = "force-dynamic";
 
@@ -618,9 +618,6 @@ export default async function TeacherPortalPage({
   const rescheduleRequestCount = data.sessions.filter((session) => session.rescheduleRequested).length + pendingGroupSessions.filter((session) => session.rescheduleRequested).length;
   const attendanceNeededSessions = data.sessions.filter((session) => session.status === "Needs Attendance");
   const attendanceNeededCount = attendanceNeededSessions.length + groupAttendanceNeeded;
-  const completedAttendanceCount = data.recentAttendance.filter((record) => record.status === "Present" || record.status === "Late").length;
-  const completedJournalCount = data.recentAttendance.filter((record) => Boolean(record.notes.trim())).length;
-  const teacherStars = calculateTeacherStars(completedAttendanceCount, completedJournalCount, engagement?.challengeDates?.length || 0);
   const selectedBatch = data.batches.find((batch) => batch.id === selectedAssessmentBatchId);
   const selectedStudent = selectedBatch?.students.find((student) => student.studentId === selectedAssessmentStudentId);
   const selectedAssessment = data.assessments.find(
@@ -658,7 +655,9 @@ export default async function TeacherPortalPage({
       <FlowerCelebration teacherId={teacher.id} attendanceCount={attendanceNeededCount} journalCount={data.journalMissingCount} />
       <header className="border-b border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
         <div className="container-shell flex flex-col gap-4 py-6 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+          <div className="flex items-center gap-4">
+            <TeacherHeaderAvatar teacherName={teacher.name} profile={engagement} />
+            <div>
             <p className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-lead-blue shadow-[0_8px_24px_rgba(37,99,235,0.08)]">
               <NotebookPen className="h-4 w-4" />
               LEAD Teacher
@@ -669,8 +668,10 @@ export default async function TeacherPortalPage({
             <p className="mt-3 text-sm leading-6 text-lead-gray">
               Your teaching command center: classes, attendance, journal notes, games links, and batch overview.
             </p>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3 lg:pt-2">
+          <div className="flex flex-wrap items-center gap-3 lg:pt-2">
+            <TeacherMoodControl profile={engagement} />
             <form action={logoutTeacher}>
               <Button type="submit" variant="secondary">
                 <LogOut className="h-4 w-4" />
@@ -683,7 +684,6 @@ export default async function TeacherPortalPage({
       </header>
 
       <section className="container-shell grid gap-6 py-8">
-        <TeacherClassroomPreview teacherName={teacher.name} profile={engagement} stars={teacherStars} attendanceRemaining={attendanceNeededCount} journalRemaining={data.journalMissingCount} />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length + todaysGroupSessions.length} detail="Private and group classes today" />
           <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={attendanceNeededCount} detail="Private and group classes waiting" tone="rose" />
