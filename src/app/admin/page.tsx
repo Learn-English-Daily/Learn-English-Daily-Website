@@ -56,6 +56,10 @@ type AttendanceDocument = {
   studentName?: string;
   meetingNumber?: number;
   meetingDate?: string;
+  scheduledAt?: string;
+  endsAt?: string;
+  startTime?: string;
+  endTime?: string;
   teacherNames?: string[];
 };
 
@@ -65,6 +69,8 @@ type DashboardData = {
     studentName: string;
     meetingNumber: number;
     scheduledAt: string;
+    sessionDate: string;
+    timeRecorded: boolean;
     status: string;
     teacherNames: string[];
   }>;
@@ -96,6 +102,16 @@ function formatDateTime(value: string) {
     timeStyle: "short",
     timeZone: "Asia/Jakarta"
   }).format(new Date(value));
+}
+
+function formatDashboardDateTime(sessionDate: string, scheduledAt: string, timeRecorded: boolean) {
+  if (timeRecorded && scheduledAt) return formatDateTime(scheduledAt);
+  if (!sessionDate) return "Date and time not recorded";
+  const date = new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeZone: "Asia/Jakarta"
+  }).format(new Date(`${sessionDate}T00:00:00+07:00`));
+  return `${date}, Time not recorded`;
 }
 
 async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
@@ -153,6 +169,8 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
       studentName: doc.studentName || "Unknown",
       meetingNumber: doc.meetingNumber || 0,
       scheduledAt: doc.scheduledAt || "",
+      sessionDate: doc.sessionDate || "",
+      timeRecorded: Boolean(doc.scheduledAt),
       teacherNames: doc.teacherNames || [],
       status: getComputedClassSessionStatus({
         status: doc.status,
@@ -168,6 +186,8 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
       studentName: `${doc.batchName} (Group)`,
       meetingNumber: doc.meetingNumber,
       scheduledAt: `${doc.sessionDate}T${doc.startTime}:00+07:00`,
+      sessionDate: doc.sessionDate,
+      timeRecorded: Boolean(doc.startTime),
       teacherNames: doc.teacherName ? [doc.teacherName] : [],
       status: doc.status === "Completed" || doc.attendanceMarked ? "Completed" : hasBatchClassEnded(doc) ? "Needs Attendance" : "Scheduled"
     }));
@@ -183,13 +203,18 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
       id: `attendance-${doc._id.toString()}`,
       studentName: doc.studentName || "Unknown",
       meetingNumber: doc.meetingNumber || 0,
-      scheduledAt: doc.meetingDate ? `${doc.meetingDate}T00:00:00+07:00` : "",
+      scheduledAt: doc.scheduledAt || (doc.meetingDate && doc.startTime ? `${doc.meetingDate}T${doc.startTime}:00+07:00` : ""),
+      sessionDate: doc.meetingDate || "",
+      timeRecorded: Boolean(doc.scheduledAt || doc.startTime),
       teacherNames: doc.teacherNames || [],
       status: "Completed"
     }));
 
   const todaySessions = [...privateTodaySessions, ...completedPrivateAttendance, ...groupTodaySessions]
-    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+    .sort((a, b) => {
+      if (a.timeRecorded !== b.timeRecorded) return a.timeRecorded ? -1 : 1;
+      return a.scheduledAt.localeCompare(b.scheduledAt);
+    });
 
   const privateNeedsAttendance = sessionDocs.filter(
     (doc) =>
@@ -297,7 +322,7 @@ export default async function AdminDashboardPage() {
                     <span className="font-heading font-bold text-lead-navy">{session.studentName}</span>
                     <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-lead-blue">{session.status}</span>
                   </div>
-                  <p className="mt-2 text-sm text-lead-gray">{formatDateTime(session.scheduledAt)}</p>
+                  <p className="mt-2 text-sm text-lead-gray">{formatDashboardDateTime(session.sessionDate, session.scheduledAt, session.timeRecorded)}</p>
                   <p className="mt-1 text-sm text-lead-gray">
                     <span className="font-bold text-lead-navy">Teachers:</span> {session.teacherNames.length ? session.teacherNames.join(", ") : "Not assigned"}
                   </p>
