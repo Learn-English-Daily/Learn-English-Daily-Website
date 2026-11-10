@@ -57,8 +57,15 @@ import {
   getDailyTeacherChallenge,
   getJakartaToday,
   getTeacherEngagementCollectionName,
+  teacherAvatarEyeStyles,
+  teacherAvatarFaceShapes,
+  teacherAvatarHairColors,
+  teacherAvatarHairStyles,
+  teacherAvatarOutfitColors,
+  teacherAvatarOutfits,
+  teacherAvatarPresentations,
+  teacherAvatarSkinTones,
   teacherAvatarAccessories,
-  teacherAvatarFaces,
   teacherClassroomThemes,
   teacherMoodOptions,
   type TeacherEngagementDocument
@@ -313,14 +320,21 @@ export async function saveTeacherMood(formData: FormData) {
 
 export async function saveTeacherClassroomProfile(formData: FormData) {
   const teacher = await assertTeacher();
-  const avatarFace = clean(formData.get("avatarFace"));
+  const avatarPresentation = clean(formData.get("avatarPresentation"));
+  const avatarSkinTone = clean(formData.get("avatarSkinTone"));
+  const avatarFaceShape = clean(formData.get("avatarFaceShape"));
+  const avatarEyeStyle = clean(formData.get("avatarEyeStyle"));
+  const avatarHairStyle = clean(formData.get("avatarHairStyle"));
+  const avatarHairColor = clean(formData.get("avatarHairColor"));
+  const avatarOutfit = clean(formData.get("avatarOutfit"));
+  const avatarOutfitColor = clean(formData.get("avatarOutfitColor"));
   const avatarAccessory = clean(formData.get("avatarAccessory"));
   const classroomTheme = clean(formData.get("classroomTheme"));
-  if (!teacherAvatarFaces.includes(avatarFace as (typeof teacherAvatarFaces)[number]) || !teacherAvatarAccessories.includes(avatarAccessory as (typeof teacherAvatarAccessories)[number]) || !teacherClassroomThemes.includes(classroomTheme as (typeof teacherClassroomThemes)[number])) return { success: false, message: "Choose valid classroom items." };
+  if (!teacherAvatarPresentations.includes(avatarPresentation as (typeof teacherAvatarPresentations)[number]) || !teacherAvatarSkinTones.includes(avatarSkinTone as (typeof teacherAvatarSkinTones)[number]) || !teacherAvatarFaceShapes.includes(avatarFaceShape as (typeof teacherAvatarFaceShapes)[number]) || !teacherAvatarEyeStyles.includes(avatarEyeStyle as (typeof teacherAvatarEyeStyles)[number]) || !teacherAvatarHairStyles.includes(avatarHairStyle as (typeof teacherAvatarHairStyles)[number]) || !teacherAvatarHairColors.includes(avatarHairColor as (typeof teacherAvatarHairColors)[number]) || !teacherAvatarOutfits.includes(avatarOutfit as (typeof teacherAvatarOutfits)[number]) || !teacherAvatarOutfitColors.includes(avatarOutfitColor as (typeof teacherAvatarOutfitColors)[number]) || !teacherAvatarAccessories.includes(avatarAccessory as (typeof teacherAvatarAccessories)[number]) || !teacherClassroomThemes.includes(classroomTheme as (typeof teacherClassroomThemes)[number])) return { success: false, message: "Choose valid avatar and classroom items." };
   const now = new Date();
   await (await getMongoDb()).collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).updateOne(
     { teacherId: teacher.id },
-    { $set: { teacherName: teacher.name, avatarFace, avatarAccessory, classroomTheme, updatedAt: now }, $setOnInsert: { teacherId: teacher.id, createdAt: now } },
+    { $set: { teacherName: teacher.name, avatarPresentation, avatarSkinTone, avatarFaceShape, avatarEyeStyle, avatarHairStyle, avatarHairColor, avatarOutfit, avatarOutfitColor, avatarAccessory, classroomTheme, updatedAt: now }, $setOnInsert: { teacherId: teacher.id, createdAt: now } },
     { upsert: true }
   );
   revalidatePath("/teacher");

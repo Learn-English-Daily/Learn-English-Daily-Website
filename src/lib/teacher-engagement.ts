@@ -6,9 +6,28 @@ export const teacherMoodOptions = [
   { value: "stressed", emoji: "😟", label: "Stressed" }
 ] as const;
 
-export const teacherAvatarFaces = ["👩‍🏫", "👨‍🏫", "🧑‍🏫", "🦸‍♀️", "🦸‍♂️"] as const;
-export const teacherAvatarAccessories = ["✨", "📚", "☕", "🌻", "🎧", "🪄"] as const;
+export const teacherAvatarPresentations = ["female", "male", "neutral"] as const;
+export const teacherAvatarSkinTones = ["porcelain", "warm", "golden", "brown", "deep"] as const;
+export const teacherAvatarFaceShapes = ["round", "oval", "square"] as const;
+export const teacherAvatarEyeStyles = ["friendly", "bright", "calm", "wink"] as const;
+export const teacherAvatarHairStyles = ["short", "side", "waves", "curls", "bun", "ponytail", "hijab", "bald"] as const;
+export const teacherAvatarHairColors = ["black", "espresso", "chestnut", "blonde", "violet", "rose"] as const;
+export const teacherAvatarOutfits = ["blazer", "sweater", "shirt", "dress", "hoodie"] as const;
+export const teacherAvatarOutfitColors = ["lead-blue", "navy", "teal", "rose", "violet", "amber"] as const;
+export const teacherAvatarAccessories = ["none", "glasses", "round-glasses", "headphones", "earrings", "cap"] as const;
 export const teacherClassroomThemes = ["garden", "ocean", "sunset", "space"] as const;
+
+export const defaultTeacherAvatar = {
+  avatarPresentation: "neutral",
+  avatarSkinTone: "golden",
+  avatarFaceShape: "oval",
+  avatarEyeStyle: "friendly",
+  avatarHairStyle: "short",
+  avatarHairColor: "espresso",
+  avatarOutfit: "blazer",
+  avatarOutfitColor: "lead-blue",
+  avatarAccessory: "none"
+} as const;
 
 export type TeacherEngagementDocument = {
   teacherId: string;
@@ -17,6 +36,14 @@ export type TeacherEngagementDocument = {
   moodDate?: string;
   moodUpdatedAt?: Date;
   avatarFace?: string;
+  avatarPresentation?: string;
+  avatarSkinTone?: string;
+  avatarFaceShape?: string;
+  avatarEyeStyle?: string;
+  avatarHairStyle?: string;
+  avatarHairColor?: string;
+  avatarOutfit?: string;
+  avatarOutfitColor?: string;
   avatarAccessory?: string;
   classroomTheme?: string;
   challengeDates?: string[];
