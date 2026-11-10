@@ -23,7 +23,7 @@ import {
   getBatchesCollectionName
 } from "@/lib/assessments";
 import { getBatchClassSessionsCollectionName, getBatchType, type BatchClassSessionDocument, type BatchType } from "@/lib/batch-class-sessions";
-import { buildBatchCourseProgress, buildStudentGroupClassProgress, getCourseClassTarget, getJakartaMonthKey } from "@/lib/batch-course-progress";
+import { buildBatchCourseProgress, buildStudentGroupClassProgress, getCourseClassTarget, getJakartaMonthKey, type BatchMonthProgress } from "@/lib/batch-course-progress";
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getAvailableTeachers, type TeacherOption } from "@/lib/teachers";
@@ -138,6 +138,10 @@ async function getBatchPageData(groupOnly: boolean) {
       activeBatchId: student.activeBatchId || ""
     })),
     batchProgress,
+    batchClassHistory: new Map(batchDocs.map((batch) => {
+      const id = batch._id.toString();
+      return [id, sessionDocs.filter((session) => session.batchId === id)] as const;
+    })),
     studentClassProgress: buildStudentGroupClassProgress(sessionDocs),
     currentMonthKey: getJakartaMonthKey()
   };
@@ -175,7 +179,7 @@ export default async function AdminBatchesPage() {
 
   const groupOnly = isGroupStudentAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value || "");
   const [batchPageData, admin] = await Promise.all([getBatchPageData(groupOnly), getAuthenticatedAdmin()]);
-  const { batches, teachers, students, batchProgress, studentClassProgress, currentMonthKey } = batchPageData;
+  const { batches, teachers, students, batchProgress, batchClassHistory, studentClassProgress, currentMonthKey } = batchPageData;
   const activeBatches = batches.filter((batch) => batch.status === "active");
   const archivedBatches = batches.filter((batch) => batch.status === "archived");
   const unassignedStudents = students.filter((student) => !student.activeBatchId);
@@ -242,6 +246,7 @@ export default async function AdminBatchesPage() {
               const batchStudents = students.filter((student) => student.activeBatchId === batch.id);
               const courseTarget = getCourseClassTarget(batch.program);
               const progress = batchProgress.get(batch.id) || buildBatchCourseProgress([], courseTarget);
+              const classHistory = batchClassHistory.get(batch.id) || [];
               const currentMonth = progress.months.find((month) => month.monthKey === currentMonthKey);
 
               return (
@@ -294,14 +299,15 @@ export default async function AdminBatchesPage() {
                     </div>
                     <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
                       <summary className="cursor-pointer text-sm font-bold text-lead-blue">View month-by-month class history</summary>
-                      <div className="mt-3 overflow-x-auto">
-                        <table className="w-full min-w-[460px] text-left text-sm">
-                          <thead className="text-xs uppercase tracking-[0.1em] text-lead-gray"><tr><th className="pb-2">Month</th><th className="pb-2">Classes completed</th><th className="pb-2">Students attended</th></tr></thead>
-                          <tbody className="divide-y divide-slate-200">
-                            {progress.months.map((month) => <tr key={month.monthKey}><td className="py-2 font-semibold text-lead-navy">{month.monthLabel}</td><td className="py-2">{month.completedClasses}</td><td className="py-2">{month.studentsAttended}</td></tr>)}
-                            {!progress.months.length ? <tr><td colSpan={3} className="py-3 text-lead-gray">No completed group classes recorded yet.</td></tr> : null}
-                          </tbody>
-                        </table>
+                      <div className="mt-3 space-y-2">
+                        {progress.months.map((month) => (
+                          <BatchMonthHistory
+                            key={month.monthKey}
+                            month={month}
+                            sessions={classHistory.filter((session) => session.sessionDate.startsWith(month.monthKey))}
+                          />
+                        ))}
+                        {!progress.months.length ? <p className="py-3 text-sm text-lead-gray">No completed group classes recorded yet.</p> : null}
                       </div>
                     </details>
                   </div>
@@ -396,6 +402,79 @@ export default async function AdminBatchesPage() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+function BatchMonthHistory({ month, sessions }: { month: BatchMonthProgress; sessions: BatchClassSessionDocument[] }) {
+  return (
+    <details className="group rounded-xl border border-slate-200 bg-white">
+      <summary className="flex cursor-pointer list-none flex-col gap-2 p-3 marker:content-none sm:flex-row sm:items-center sm:justify-between">
+        <span className="font-bold text-lead-navy">{month.monthLabel}</span>
+        <span className="flex flex-wrap gap-2 text-xs font-bold">
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-lead-blue">{month.completedClasses} classes</span>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">{month.studentsAttended} students attended</span>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 group-open:hidden">View classes</span>
+        </span>
+      </summary>
+      <div className="space-y-2 border-t border-slate-200 bg-slate-50/70 p-3">
+        {sessions.map((session) => <BatchClassHistory key={`${session.batchId}-${session.meetingNumber}-${session.sessionDate}`} session={session} />)}
+        {!sessions.length ? <p className="py-2 text-sm text-lead-gray">No completed classes found for this month.</p> : null}
+      </div>
+    </details>
+  );
+}
+
+function BatchClassHistory({ session }: { session: BatchClassSessionDocument }) {
+  const attendance = session.attendance || [];
+  const onTime = attendance.filter((entry) => entry.attendance === "Present" && !entry.minutesLate);
+  const late = attendance.filter((entry) => entry.attendance === "Present" && entry.minutesLate > 0);
+  const absent = attendance.filter((entry) => entry.attendance === "Absent");
+  const excused = attendance.filter((entry) => entry.attendance === "Excused");
+  const recordedCount = attendance.length;
+
+  return (
+    <details className="group/class rounded-xl border border-slate-200 bg-white p-3">
+      <summary className="cursor-pointer list-none marker:content-none">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="font-bold text-lead-navy">Meeting {session.meetingNumber}</h4>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase text-emerald-700">Completed</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase text-slate-600">{session.classMode}</span>
+            </div>
+            <p className="mt-1 text-sm font-semibold text-lead-gray">{formatDate(session.sessionDate)} / {session.startTime} - {session.endTime} WIB</p>
+            <p className="mt-2 text-sm text-lead-navy"><span className="font-bold">Topic:</span> {session.topic?.trim() || "Not recorded"}</p>
+            <p className="mt-1 text-xs text-lead-gray">Teacher: {session.teacherName || "Not recorded"}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs font-bold lg:justify-end">
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">{onTime.length + late.length} present</span>
+            {late.length ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">{late.length} late</span> : null}
+            {absent.length ? <span className="rounded-full bg-rose-50 px-2.5 py-1 text-rose-700">{absent.length} absent</span> : null}
+            {excused.length ? <span className="rounded-full bg-violet-50 px-2.5 py-1 text-violet-700">{excused.length} excused</span> : null}
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 group-open/class:hidden">View students</span>
+          </div>
+        </div>
+      </summary>
+      <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-4">
+        <AttendanceNames label="Present" entries={onTime.map((entry) => entry.studentName)} className="border-emerald-100 bg-emerald-50/70 text-emerald-800" />
+        <AttendanceNames label="Late" entries={late.map((entry) => `${entry.studentName} (${entry.minutesLate} min)`)} className="border-amber-100 bg-amber-50/70 text-amber-800" />
+        <AttendanceNames label="Absent" entries={absent.map((entry) => entry.studentName)} className="border-rose-100 bg-rose-50/70 text-rose-800" />
+        <AttendanceNames label="Excused" entries={excused.map((entry) => entry.studentName)} className="border-violet-100 bg-violet-50/70 text-violet-800" />
+        {!recordedCount ? <p className="text-sm text-lead-gray sm:col-span-2 xl:col-span-4">No student attendance breakdown was recorded for this class.</p> : null}
+      </div>
+    </details>
+  );
+}
+
+function AttendanceNames({ label, entries, className }: { label: string; entries: string[]; className: string }) {
+  if (!entries.length) return null;
+  return (
+    <div className={`rounded-lg border p-3 ${className}`}>
+      <p className="text-xs font-black uppercase tracking-[0.1em]">{label} ({entries.length})</p>
+      <ul className="mt-2 space-y-1 text-sm font-semibold">
+        {entries.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)}
+      </ul>
+    </div>
   );
 }
 
