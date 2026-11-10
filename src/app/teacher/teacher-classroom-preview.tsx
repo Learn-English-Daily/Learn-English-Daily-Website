@@ -5,7 +5,7 @@ import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { getJakartaToday, moodDetails, teacherMoodOptions, type TeacherEngagementDocument } from "@/lib/teacher-engagement";
 
 export function TeacherHeaderAvatar({ teacherName, profile }: { teacherName: string; profile: TeacherEngagementDocument | null }) {
-  return <a href="/teacher/classroom" title="Visit My Classroom" className="focus-ring group flex shrink-0 items-center gap-2 rounded-2xl border border-blue-100 bg-white/80 p-1.5 pr-3 shadow-sm transition hover:-translate-y-0.5 hover:border-lead-blue"><span className="grid h-16 w-14 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-violet-100"><TeacherAvatar settings={avatarSettings(profile)} className="mt-3 h-20 w-16 drop-shadow" /></span><span className="hidden text-left sm:block"><span className="block text-[10px] font-black uppercase tracking-[.12em] text-lead-blue">My avatar</span><span className="block max-w-28 truncate text-xs font-bold text-lead-navy">{teacherName}</span></span></a>;
+  return <a href="/teacher/classroom" title="Visit My Classroom" aria-label={`Open ${teacherName}'s classroom`} className="focus-ring group grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-violet-100 shadow-md transition hover:-translate-y-1 hover:border-lead-blue hover:shadow-lg"><TeacherAvatar settings={avatarSettings(profile)} className="mt-8 h-32 w-28 drop-shadow-lg transition group-hover:scale-105" /></a>;
 }
 
 export function TeacherMoodControl({ profile }: { profile: TeacherEngagementDocument | null }) {
