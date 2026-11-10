@@ -6,15 +6,16 @@ import { avatarSettings, TeacherAvatar, type TeacherAvatarSettings } from "@/app
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
 import {
-  teacherAvatarAccessories, teacherAvatarEyeStyles, teacherAvatarFaceShapes, teacherAvatarHairColors,
-  teacherAvatarHairStyles, teacherAvatarOutfitColors, teacherAvatarOutfits, teacherAvatarPresentations,
+  teacherAvatarAccessories, teacherAvatarEyeStyles, teacherAvatarFaceShapes, teacherAvatarFacialHairStyles, teacherAvatarFemaleHairStyles, teacherAvatarHairColors,
+  teacherAvatarMaleHairStyles, teacherAvatarNeutralHairStyles, teacherAvatarOutfitColors, teacherAvatarOutfits, teacherAvatarPresentations,
   teacherAvatarSkinTones, teacherClassroomThemes, type TeacherEngagementDocument
 } from "@/lib/teacher-engagement";
 
 const labels: Record<string, string> = {
   female: "Woman", male: "Man", neutral: "Neutral", porcelain: "Porcelain", warm: "Warm", golden: "Golden", brown: "Brown", deep: "Deep",
   round: "Round", oval: "Oval", square: "Square", friendly: "Friendly", bright: "Bright", calm: "Calm", wink: "Wink",
-  short: "Short", side: "Side sweep", waves: "Waves", curls: "Curls", bun: "Bun", ponytail: "Ponytail", hijab: "Hijab", bald: "Bald",
+  short: "Short", side: "Side sweep", waves: "Waves", curls: "Curls", bun: "Bun", ponytail: "Ponytail", hijab: "Hijab", bald: "Bald", bob: "Bob", pixie: "Pixie", braids: "Braids",
+  crop: "Crop", fade: "Fade", quiff: "Quiff", long: "Long", "cap-hair": "Cap style", "small-moustache": "Small moustache", moustache: "Moustache", "small-beard": "Small beard", "full-beard": "Full beard", "long-beard": "Long beard",
   black: "Black", espresso: "Espresso", chestnut: "Chestnut", blonde: "Blonde", violet: "Violet", rose: "Rose",
   blazer: "Blazer", sweater: "Sweater", shirt: "Shirt", dress: "Dress", hoodie: "Hoodie", none: "None", glasses: "Glasses",
   "round-glasses": "Round glasses", headphones: "Headphones", earrings: "Earrings", cap: "Cap", "lead-blue": "LEAD blue", navy: "Navy", teal: "Teal", amber: "Amber"
@@ -29,14 +30,17 @@ export function AvatarBuilder({ profile }: { profile: TeacherEngagementDocument 
   const [settings, setSettings] = useState<TeacherAvatarSettings>(() => avatarSettings(profile));
   const [theme, setTheme] = useState(profile?.classroomTheme || "garden");
   const change = (key: keyof TeacherAvatarSettings, value: string) => setSettings((current) => ({ ...current, [key]: value }));
+  const hairStyles = settings.avatarPresentation === "female" ? teacherAvatarFemaleHairStyles : settings.avatarPresentation === "male" ? teacherAvatarMaleHairStyles : teacherAvatarNeutralHairStyles;
+  const changePresentation = (value: string) => setSettings((current) => ({ ...current, avatarPresentation: value, avatarHairStyle: value === "female" ? "bob" : value === "male" ? "crop" : "short", avatarFacialHair: "none" }));
   return <ActionFeedbackForm action={saveTeacherClassroomProfile} successMessage="Your avatar and classroom have been saved." preserveValuesAfterSubmit className="mt-5 grid gap-6">
     <div className="sticky top-3 z-10 grid place-items-center rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-3 shadow-sm"><TeacherAvatar settings={settings} className="h-56 w-48 drop-shadow-lg" /><p className="-mt-2 rounded-full bg-white px-4 py-1 text-xs font-black text-lead-blue shadow-sm">LIVE PREVIEW</p></div>
-    <OptionGroup title="Presentation" name="avatarPresentation" values={teacherAvatarPresentations} selected={settings.avatarPresentation} onChange={(v) => change("avatarPresentation", v)} />
+    <OptionGroup title="Character" name="avatarPresentation" values={teacherAvatarPresentations} selected={settings.avatarPresentation} onChange={changePresentation} />
     <OptionGroup title="Skin tone" name="avatarSkinTone" values={teacherAvatarSkinTones} selected={settings.avatarSkinTone} onChange={(v) => change("avatarSkinTone", v)} swatch />
     <OptionGroup title="Face shape" name="avatarFaceShape" values={teacherAvatarFaceShapes} selected={settings.avatarFaceShape} onChange={(v) => change("avatarFaceShape", v)} />
     <OptionGroup title="Eyes" name="avatarEyeStyle" values={teacherAvatarEyeStyles} selected={settings.avatarEyeStyle} onChange={(v) => change("avatarEyeStyle", v)} />
-    <OptionGroup title="Hairstyle" name="avatarHairStyle" values={teacherAvatarHairStyles} selected={settings.avatarHairStyle} onChange={(v) => change("avatarHairStyle", v)} />
+    <OptionGroup title={`${labels[settings.avatarPresentation]} hairstyles`} name="avatarHairStyle" values={hairStyles} selected={settings.avatarHairStyle} onChange={(v) => change("avatarHairStyle", v)} />
     <OptionGroup title="Hair color" name="avatarHairColor" values={teacherAvatarHairColors} selected={settings.avatarHairColor} onChange={(v) => change("avatarHairColor", v)} swatch />
+    {settings.avatarPresentation === "male" ? <OptionGroup title="Moustache & beard" name="avatarFacialHair" values={teacherAvatarFacialHairStyles} selected={settings.avatarFacialHair} onChange={(v) => change("avatarFacialHair", v)} /> : <input type="hidden" name="avatarFacialHair" value="none" />}
     <OptionGroup title="Outfit" name="avatarOutfit" values={teacherAvatarOutfits} selected={settings.avatarOutfit} onChange={(v) => change("avatarOutfit", v)} />
     <OptionGroup title="Outfit color" name="avatarOutfitColor" values={teacherAvatarOutfitColors} selected={settings.avatarOutfitColor} onChange={(v) => change("avatarOutfitColor", v)} swatch />
     <OptionGroup title="Accessories" name="avatarAccessory" values={teacherAvatarAccessories} selected={settings.avatarAccessory} onChange={(v) => change("avatarAccessory", v)} />
