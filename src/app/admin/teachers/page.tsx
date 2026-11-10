@@ -10,8 +10,9 @@ import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
 import { isGroupStudentAdminSession } from "@/lib/admin-permissions";
 import { getStudentAttendanceCollectionName } from "@/lib/attendance";
+import { getAttendanceReminders } from "@/lib/attendance-reminders";
 import { getBatchesCollectionName } from "@/lib/assessments";
-import { getBatchClassSessionsCollectionName, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
+import { getBatchClassSessionsCollectionName, hasBatchClassEnded, type BatchClassSessionDocument } from "@/lib/batch-class-sessions";
 import { getClassSessionsCollectionName, type ClassSessionDocument } from "@/lib/class-sessions";
 import { getEmployeeOnboardingCollectionName } from "@/lib/employee-onboarding";
 import { getMongoDb } from "@/lib/mongodb";
@@ -61,14 +62,15 @@ async function getTeacherOverview() {
   const db = await getMongoDb();
   const today = jakartaDate();
   const monthKey = today.slice(0, 7);
-  const [teachers, privateSessions, batchSessions, attendance, batches, batchStudents, engagements] = await Promise.all([
+  const [teachers, privateSessions, batchSessions, attendance, batches, batchStudents, engagements, privateAttendanceReminders] = await Promise.all([
     db.collection<TeacherDocument>(getEmployeeOnboardingCollectionName()).find({ role: "Teacher" }).sort({ employeeStatus: 1, fullName: 1 }).toArray(),
     db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({ studentLifecycleClosed: { $ne: true } }).limit(5000).toArray(),
     db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: { $ne: "Cancelled" } }).limit(5000).toArray(),
     db.collection<AttendanceDocument>(getStudentAttendanceCollectionName()).find({ meetingDate: { $regex: `^${monthKey}` } }).limit(5000).toArray(),
     db.collection<BatchDocument>(getBatchesCollectionName()).find({ status: "active" }).toArray(),
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({ ...getActiveStudentFilter(), activeBatchId: { $exists: true, $ne: "" } }).project({ studentId: 1, activeBatchId: 1 }).toArray(),
-    db.collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).find({ moodDate: today }).toArray()
+    db.collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).find({ moodDate: today }).toArray(),
+    getAttendanceReminders(db)
   ]);
   const engagementByTeacher = new Map(engagements.map((entry) => [entry.teacherId, entry]));
 
@@ -84,8 +86,8 @@ async function getTeacherOverview() {
     ]);
     const completedThisMonth = attendance.filter((record) => record.teacherIds?.includes(teacherId) && (record.status === "Present" || record.status === "Late")).length
       + teacherBatchSessions.filter((session) => session.status === "Completed" && session.sessionDate.startsWith(monthKey)).length;
-    const needsAttendance = teacherPrivateSessions.filter((session) => Boolean(session.sessionDate && session.sessionDate <= today) && session.status !== "Completed").length
-      + teacherBatchSessions.filter((session) => session.sessionDate <= today && session.status === "Scheduled" && !session.attendanceMarked).length;
+    const needsAttendance = privateAttendanceReminders.filter((reminder) => reminder.teacherIds.includes(teacherId)).length
+      + teacherBatchSessions.filter((session) => session.status === "Scheduled" && !session.attendanceMarked && hasBatchClassEnded(session)).length;
     const upcoming = teacherPrivateSessions.filter((session) => Boolean(session.sessionDate && session.sessionDate >= today) && session.status !== "Completed").length
       + teacherBatchSessions.filter((session) => session.sessionDate >= today && session.status === "Scheduled").length;
     const missingJournals = attendance.filter((record) => record.teacherIds?.includes(teacherId) && (record.status === "Present" || record.status === "Late") && !record.notes?.trim()).length;

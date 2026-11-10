@@ -298,7 +298,8 @@ async function getOperationsData(db: Awaited<ReturnType<typeof getMongoDb>>) {
       sessionDate: doc.sessionDate,
       scheduledAt: `${doc.sessionDate}T${doc.startTime}:00+07:00`,
       endsAt: `${doc.sessionDate}T${doc.endTime}:00+07:00`,
-      teacherNames: doc.teacherName ? [doc.teacherName] : []
+      teacherNames: doc.teacherName ? [doc.teacherName] : [],
+      teacherIds: doc.teacherId ? [doc.teacherId] : []
     }));
   const reminders = [...privateReminders, ...groupReminders]
     .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))

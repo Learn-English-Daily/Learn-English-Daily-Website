@@ -25,6 +25,7 @@ export type AttendanceReminder = {
   scheduledAt: string;
   endsAt: string;
   teacherNames: string[];
+  teacherIds: string[];
 };
 
 function attendanceKey(record: {
@@ -49,6 +50,7 @@ export async function getAttendanceReminders(
 ): Promise<AttendanceReminder[]> {
   const sessionFilter: Filter<ClassSessionDocument> = {
     status: { $ne: "Completed" },
+    studentLifecycleClosed: { $ne: true },
     ...(options.teacherId ? { teacherIds: options.teacherId } : {})
   };
 
@@ -90,7 +92,8 @@ export async function getAttendanceReminders(
         sessionDate: doc.sessionDate || "",
         scheduledAt: doc.scheduledAt || "",
         endsAt: doc.endsAt || "",
-        teacherNames: doc.teacherNames || []
+        teacherNames: doc.teacherNames || [],
+        teacherIds: doc.teacherIds || []
       }
     ];
   });
