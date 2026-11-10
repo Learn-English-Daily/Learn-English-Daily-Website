@@ -5,6 +5,7 @@ import { BookOpenCheck, CalendarClock, GraduationCap, Heart, Mail, MessageCircle
 import type { WithId } from "mongodb";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
+import { avatarSettings, TeacherAvatar } from "@/app/teacher/teacher-avatar";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Card } from "@/components/ui/card";
 import { ADMIN_SESSION_COOKIE, getAuthenticatedAdmin, isAdminConfigured, isValidAdminSession } from "@/lib/admin-auth";
@@ -69,7 +70,7 @@ async function getTeacherOverview() {
     db.collection<AttendanceDocument>(getStudentAttendanceCollectionName()).find({ meetingDate: { $regex: `^${monthKey}` } }).limit(5000).toArray(),
     db.collection<BatchDocument>(getBatchesCollectionName()).find({ status: "active" }).toArray(),
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({ ...getActiveStudentFilter(), activeBatchId: { $exists: true, $ne: "" } }).project({ studentId: 1, activeBatchId: 1 }).toArray(),
-    db.collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).find({ moodDate: today }).toArray(),
+    db.collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).find({}).toArray(),
     getAttendanceReminders(db)
   ]);
   const engagementByTeacher = new Map(engagements.map((entry) => [entry.teacherId, entry]));
@@ -92,7 +93,7 @@ async function getTeacherOverview() {
       + teacherBatchSessions.filter((session) => session.sessionDate >= today && session.status === "Scheduled").length;
     const missingJournals = attendance.filter((record) => record.teacherIds?.includes(teacherId) && (record.status === "Present" || record.status === "Late") && !record.notes?.trim()).length;
     const engagement = engagementByTeacher.get(teacherId);
-    const mood = moodDetails(engagement?.mood || "");
+    const mood = moodDetails(engagement?.moodDate === today ? engagement.mood : "");
 
     return {
       id: teacherId,
@@ -113,7 +114,8 @@ async function getTeacherOverview() {
       upcoming,
       missingJournals,
       mood,
-      moodUpdatedAt: engagement?.moodUpdatedAt
+      moodUpdatedAt: engagement?.moodUpdatedAt,
+      avatarProfile: engagement?.avatarPresentation ? engagement : null
     };
   });
 }
@@ -147,7 +149,7 @@ export default async function AdminTeachersPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         {teachers.map((teacher) => <Card key={teacher.id} className="overflow-hidden">
           <div className="border-b border-blue-100 bg-blue-50/60 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-lead-blue">{teacher.employeeId}</p><h2 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">{teacher.name}</h2><p className="mt-1 text-sm text-lead-gray">@{teacher.username} · {teacher.employmentType} · {teacher.workMode}</p>{teacher.mood ? <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-bold text-violet-700 shadow-sm"><span className="text-xl">{teacher.mood.emoji}</span>Today: {teacher.mood.label}<span className="text-xs font-medium text-lead-gray">· {formatDate(teacher.moodUpdatedAt)}</span></p> : <p className="mt-3 text-xs font-semibold text-lead-gray">No mood check-in today</p>}</div><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${teacher.status.toLowerCase() === "inactive" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>{teacher.status}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-lead-blue">{teacher.employeeId}</p><h2 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">{teacher.name}</h2><p className="mt-1 text-sm text-lead-gray">@{teacher.username} · {teacher.employmentType} · {teacher.workMode}</p>{teacher.mood ? <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-bold text-violet-700 shadow-sm"><span className="text-xl">{teacher.mood.emoji}</span>Today: {teacher.mood.label}<span className="text-xs font-medium text-lead-gray">· {formatDate(teacher.moodUpdatedAt)}</span></p> : <p className="mt-3 text-xs font-semibold text-lead-gray">No mood check-in today</p>}</div><div className="flex shrink-0 flex-col items-end gap-3"><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${teacher.status.toLowerCase() === "inactive" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>{teacher.status}</span>{teacher.avatarProfile ? <div title={`${teacher.name}'s custom avatar`} className="grid h-32 w-28 place-items-center overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-br from-white via-blue-50 to-violet-100 shadow-sm"><TeacherAvatar settings={avatarSettings(teacher.avatarProfile)} viewBox="38 18 164 222" className="h-full w-full p-1 drop-shadow-lg" /></div> : null}</div></div>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">{teacher.email ? <a className="inline-flex items-center gap-2 font-semibold text-lead-blue" href={`mailto:${teacher.email}`}><Mail className="h-4 w-4" />{teacher.email}</a> : null}{teacher.whatsapp ? <a className="inline-flex items-center gap-2 font-semibold text-emerald-700" href={`https://wa.me/${teacher.whatsapp.replace(/\D/g, "")}`}><MessageCircle className="h-4 w-4" />{teacher.whatsapp}</a> : null}</div>
           </div>
           <div className="p-5">
