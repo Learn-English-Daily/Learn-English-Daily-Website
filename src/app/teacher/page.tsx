@@ -7,6 +7,7 @@ import { generateTeacherGamesLink, logoutTeacher, requestClassReschedule, saveTe
 import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { FlowerCelebration } from "@/app/teacher/flower-celebration";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
+import { TeacherClassroomPreview } from "@/app/teacher/teacher-classroom-preview";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ import {
   TEACHER_SESSION_COOKIE
 } from "@/lib/teacher-auth";
 import { getEmployeeTeacherById } from "@/lib/teachers";
+import { calculateTeacherStars, getTeacherEngagementCollectionName, type TeacherEngagementDocument } from "@/lib/teacher-engagement";
 
 export const dynamic = "force-dynamic";
 
@@ -604,6 +606,7 @@ export default async function TeacherPortalPage({
   const data = await getTeacherPortalData(teacher.id, selectedAssessmentMonth, selectedAssessmentYear);
   const today = getTodayJakarta();
   const db = await getMongoDb();
+  const engagement = await db.collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).findOne({ teacherId: teacher.id });
   const pendingGroupSessions = await db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
     .find({ teacherId: teacher.id, status: "Scheduled", attendanceMarked: { $ne: true } })
     .sort({ sessionDate: 1, startTime: 1, meetingNumber: 1 }).toArray();
@@ -615,6 +618,9 @@ export default async function TeacherPortalPage({
   const rescheduleRequestCount = data.sessions.filter((session) => session.rescheduleRequested).length + pendingGroupSessions.filter((session) => session.rescheduleRequested).length;
   const attendanceNeededSessions = data.sessions.filter((session) => session.status === "Needs Attendance");
   const attendanceNeededCount = attendanceNeededSessions.length + groupAttendanceNeeded;
+  const completedAttendanceCount = data.recentAttendance.filter((record) => record.status === "Present" || record.status === "Late").length;
+  const completedJournalCount = data.recentAttendance.filter((record) => Boolean(record.notes.trim())).length;
+  const teacherStars = calculateTeacherStars(completedAttendanceCount, completedJournalCount, engagement?.challengeDates?.length || 0);
   const selectedBatch = data.batches.find((batch) => batch.id === selectedAssessmentBatchId);
   const selectedStudent = selectedBatch?.students.find((student) => student.studentId === selectedAssessmentStudentId);
   const selectedAssessment = data.assessments.find(
@@ -677,6 +683,7 @@ export default async function TeacherPortalPage({
       </header>
 
       <section className="container-shell grid gap-6 py-8">
+        <TeacherClassroomPreview teacherName={teacher.name} profile={engagement} stars={teacherStars} attendanceRemaining={attendanceNeededCount} journalRemaining={data.journalMissingCount} />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <TeacherKpi icon={CalendarClock} label="Today" value={todaysSessions.length + todaysGroupSessions.length} detail="Private and group classes today" />
           <TeacherKpi icon={CalendarCheck} label="Needs Attendance" value={attendanceNeededCount} detail="Private and group classes waiting" tone="rose" />

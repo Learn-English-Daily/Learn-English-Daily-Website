@@ -1,9 +1,10 @@
-import { BookOpenText, CalendarCheck, Users } from "lucide-react";
+import { BookOpenText, CalendarCheck, Sparkles, Users } from "lucide-react";
 
 const tabs = [
   { href: "/teacher", label: "Attendance", key: "attendance", icon: CalendarCheck },
   { href: "/teacher/journals", label: "Journal", key: "journal", icon: BookOpenText },
-  { href: "/teacher/group-classes", label: "Group Classes", key: "group-classes", icon: Users }
+  { href: "/teacher/group-classes", label: "Group Classes", key: "group-classes", icon: Users },
+  { href: "/teacher/classroom", label: "My Classroom", key: "classroom", icon: Sparkles }
 ] as const;
 
 type TeacherTabKey = (typeof tabs)[number]["key"] | "assessments";

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
-import { BookOpenCheck, CalendarClock, GraduationCap, Mail, MessageCircle, Users } from "lucide-react";
+import { BookOpenCheck, CalendarClock, GraduationCap, Heart, Mail, MessageCircle, Users } from "lucide-react";
 import type { WithId } from "mongodb";
 import { logoutAdmin } from "@/app/admin/actions";
 import { AdminLoginForm } from "@/app/admin/login-form";
@@ -17,6 +17,7 @@ import { getEmployeeOnboardingCollectionName } from "@/lib/employee-onboarding";
 import { getMongoDb } from "@/lib/mongodb";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { employeeTeacherId } from "@/lib/teachers";
+import { getTeacherEngagementCollectionName, moodDetails, type TeacherEngagementDocument } from "@/lib/teacher-engagement";
 
 export const dynamic = "force-dynamic";
 
@@ -60,14 +61,16 @@ async function getTeacherOverview() {
   const db = await getMongoDb();
   const today = jakartaDate();
   const monthKey = today.slice(0, 7);
-  const [teachers, privateSessions, batchSessions, attendance, batches, batchStudents] = await Promise.all([
+  const [teachers, privateSessions, batchSessions, attendance, batches, batchStudents, engagements] = await Promise.all([
     db.collection<TeacherDocument>(getEmployeeOnboardingCollectionName()).find({ role: "Teacher" }).sort({ employeeStatus: 1, fullName: 1 }).toArray(),
     db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({ studentLifecycleClosed: { $ne: true } }).limit(5000).toArray(),
     db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({ status: { $ne: "Cancelled" } }).limit(5000).toArray(),
     db.collection<AttendanceDocument>(getStudentAttendanceCollectionName()).find({ meetingDate: { $regex: `^${monthKey}` } }).limit(5000).toArray(),
     db.collection<BatchDocument>(getBatchesCollectionName()).find({ status: "active" }).toArray(),
-    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({ ...getActiveStudentFilter(), activeBatchId: { $exists: true, $ne: "" } }).project({ studentId: 1, activeBatchId: 1 }).toArray()
+    db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({ ...getActiveStudentFilter(), activeBatchId: { $exists: true, $ne: "" } }).project({ studentId: 1, activeBatchId: 1 }).toArray(),
+    db.collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).find({ moodDate: today }).toArray()
   ]);
+  const engagementByTeacher = new Map(engagements.map((entry) => [entry.teacherId, entry]));
 
   return teachers.map((teacher) => {
     const teacherId = employeeTeacherId(teacher._id);
@@ -86,6 +89,8 @@ async function getTeacherOverview() {
     const upcoming = teacherPrivateSessions.filter((session) => Boolean(session.sessionDate && session.sessionDate >= today) && session.status !== "Completed").length
       + teacherBatchSessions.filter((session) => session.sessionDate >= today && session.status === "Scheduled").length;
     const missingJournals = attendance.filter((record) => record.teacherIds?.includes(teacherId) && (record.status === "Present" || record.status === "Late") && !record.notes?.trim()).length;
+    const engagement = engagementByTeacher.get(teacherId);
+    const mood = moodDetails(engagement?.mood || "");
 
     return {
       id: teacherId,
@@ -104,7 +109,9 @@ async function getTeacherOverview() {
       completedThisMonth,
       needsAttendance,
       upcoming,
-      missingJournals
+      missingJournals,
+      mood,
+      moodUpdatedAt: engagement?.moodUpdatedAt
     };
   });
 }
@@ -123,20 +130,22 @@ export default async function AdminTeachersPage() {
   const totalStudents = activeTeachers.reduce((sum, teacher) => sum + teacher.assignedStudents, 0);
   const totalNeedsAttendance = activeTeachers.reduce((sum, teacher) => sum + teacher.needsAttendance, 0);
   const totalMissingJournals = activeTeachers.reduce((sum, teacher) => sum + teacher.missingJournals, 0);
+  const moodCheckIns = activeTeachers.filter((teacher) => teacher.mood).length;
 
   return <main className="min-h-screen bg-lead-soft">
     <AdminPageHeader active="teachers" title="Teachers" description="Teacher profiles, current workload, operational follow-ups, and recent activity for staffing decisions." userName={admin?.name} username={admin?.username} logoutAction={logoutAdmin} />
     <section className="container-shell grid gap-6 py-8">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Summary icon={GraduationCap} label="Active teachers" value={activeTeachers.length} />
         <Summary icon={Users} label="Students in schedule" value={totalStudents} />
         <Summary icon={CalendarClock} label="Needs attendance" value={totalNeedsAttendance} alert={totalNeedsAttendance > 0} />
         <Summary icon={BookOpenCheck} label="Missing journals" value={totalMissingJournals} alert={totalMissingJournals > 0} />
+        <Summary icon={Heart} label="Mood check-ins today" value={moodCheckIns} />
       </div>
       <div className="grid gap-5 xl:grid-cols-2">
         {teachers.map((teacher) => <Card key={teacher.id} className="overflow-hidden">
           <div className="border-b border-blue-100 bg-blue-50/60 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-lead-blue">{teacher.employeeId}</p><h2 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">{teacher.name}</h2><p className="mt-1 text-sm text-lead-gray">@{teacher.username} · {teacher.employmentType} · {teacher.workMode}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${teacher.status.toLowerCase() === "inactive" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>{teacher.status}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-lead-blue">{teacher.employeeId}</p><h2 className="mt-1 font-heading text-2xl font-extrabold text-lead-navy">{teacher.name}</h2><p className="mt-1 text-sm text-lead-gray">@{teacher.username} · {teacher.employmentType} · {teacher.workMode}</p>{teacher.mood ? <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-bold text-violet-700 shadow-sm"><span className="text-xl">{teacher.mood.emoji}</span>Today: {teacher.mood.label}<span className="text-xs font-medium text-lead-gray">· {formatDate(teacher.moodUpdatedAt)}</span></p> : <p className="mt-3 text-xs font-semibold text-lead-gray">No mood check-in today</p>}</div><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${teacher.status.toLowerCase() === "inactive" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>{teacher.status}</span></div>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">{teacher.email ? <a className="inline-flex items-center gap-2 font-semibold text-lead-blue" href={`mailto:${teacher.email}`}><Mail className="h-4 w-4" />{teacher.email}</a> : null}{teacher.whatsapp ? <a className="inline-flex items-center gap-2 font-semibold text-emerald-700" href={`https://wa.me/${teacher.whatsapp.replace(/\D/g, "")}`}><MessageCircle className="h-4 w-4" />{teacher.whatsapp}</a> : null}</div>
           </div>
           <div className="p-5">

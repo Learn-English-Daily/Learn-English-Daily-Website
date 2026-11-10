@@ -53,6 +53,16 @@ import {
   TEACHER_SESSION_COOKIE
 } from "@/lib/teacher-auth";
 import { getEmployeeTeacherById, getEmployeeTeacherByUsername, normalizeEmployeeUsername, type TeacherOption } from "@/lib/teachers";
+import {
+  getDailyTeacherChallenge,
+  getJakartaToday,
+  getTeacherEngagementCollectionName,
+  teacherAvatarAccessories,
+  teacherAvatarFaces,
+  teacherClassroomThemes,
+  teacherMoodOptions,
+  type TeacherEngagementDocument
+} from "@/lib/teacher-engagement";
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -283,6 +293,59 @@ export async function requestClassReschedule(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/sessions");
   return { success: true };
+}
+
+export async function saveTeacherMood(formData: FormData) {
+  const teacher = await assertTeacher();
+  const mood = clean(formData.get("mood"));
+  if (!teacherMoodOptions.some((option) => option.value === mood)) return { success: false, message: "Choose a valid mood." };
+  const now = new Date();
+  await (await getMongoDb()).collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).updateOne(
+    { teacherId: teacher.id },
+    { $set: { teacherName: teacher.name, mood, moodDate: getJakartaToday(), moodUpdatedAt: now, updatedAt: now }, $setOnInsert: { teacherId: teacher.id, createdAt: now } },
+    { upsert: true }
+  );
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/classroom");
+  revalidatePath("/admin/teachers");
+  return { success: true };
+}
+
+export async function saveTeacherClassroomProfile(formData: FormData) {
+  const teacher = await assertTeacher();
+  const avatarFace = clean(formData.get("avatarFace"));
+  const avatarAccessory = clean(formData.get("avatarAccessory"));
+  const classroomTheme = clean(formData.get("classroomTheme"));
+  if (!teacherAvatarFaces.includes(avatarFace as (typeof teacherAvatarFaces)[number]) || !teacherAvatarAccessories.includes(avatarAccessory as (typeof teacherAvatarAccessories)[number]) || !teacherClassroomThemes.includes(classroomTheme as (typeof teacherClassroomThemes)[number])) return { success: false, message: "Choose valid classroom items." };
+  const now = new Date();
+  await (await getMongoDb()).collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).updateOne(
+    { teacherId: teacher.id },
+    { $set: { teacherName: teacher.name, avatarFace, avatarAccessory, classroomTheme, updatedAt: now }, $setOnInsert: { teacherId: teacher.id, createdAt: now } },
+    { upsert: true }
+  );
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/classroom");
+  return { success: true };
+}
+
+export async function answerDailyTeacherChallenge(formData: FormData) {
+  const teacher = await assertTeacher();
+  const answer = clean(formData.get("answer"));
+  const today = getJakartaToday();
+  const challenge = getDailyTeacherChallenge(today);
+  if (!challenge.options.includes(answer as never)) return { success: false, message: "Choose one answer." };
+  const db = await getMongoDb();
+  const collection = db.collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName());
+  const now = new Date();
+  await collection.updateOne({ teacherId: teacher.id }, { $setOnInsert: { teacherId: teacher.id, teacherName: teacher.name, createdAt: now } }, { upsert: true });
+  const result = await collection.updateOne(
+    { teacherId: teacher.id, challengeDates: { $ne: today } },
+    { $addToSet: { challengeDates: today }, $set: { [`challengeAnswers.${today}`]: answer, teacherName: teacher.name, updatedAt: now } }
+  );
+  if (!result.modifiedCount) return { success: false, message: "Today's challenge is already complete." };
+  revalidatePath("/teacher");
+  revalidatePath("/teacher/classroom");
+  return { success: true, message: answer === challenge.answer ? "Great teaching instinct! +3 stars" : "Challenge complete! +3 stars for reflecting." };
 }
 
 export async function saveTeacherAttendance(formData: FormData) {
