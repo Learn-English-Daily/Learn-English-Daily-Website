@@ -2,6 +2,7 @@ import { defaultTeacherAvatar, teacherAvatarFemaleHairStyles, teacherAvatarMaleH
 
 const skinColors: Record<string, string> = { porcelain: "#F8D9C5", warm: "#E9B98F", golden: "#CF8D5D", brown: "#9B5F3F", deep: "#68402F" };
 const hairColors: Record<string, string> = { black: "#17151A", espresso: "#38251F", chestnut: "#7B4128", blonde: "#D5A94C", violet: "#6D4ACB", rose: "#BE4770" };
+const hijabColors: Record<string, string> = { "hijab-navy": "#26345F", "hijab-rose": "#B8757E", "hijab-sage": "#748B78", "hijab-mocha": "#806452", "hijab-lavender": "#8B7CB6", "hijab-cream": "#E8DDC8", "hijab-black": "#24242A" };
 const outfitColors: Record<string, string> = { "lead-blue": "#2463EB", navy: "#172554", teal: "#0F8B8D", rose: "#DB4F79", violet: "#7447D6", amber: "#E59B24" };
 
 export function avatarSettings(profile?: TeacherEngagementDocument | null) {
@@ -15,6 +16,7 @@ export function avatarSettings(profile?: TeacherEngagementDocument | null) {
     avatarEyeStyle: profile?.avatarEyeStyle || defaultTeacherAvatar.avatarEyeStyle,
     avatarHairStyle: compatibleHair.includes(savedHair as never) ? savedHair : presentation === "female" ? "bob" : presentation === "male" ? "crop" : defaultTeacherAvatar.avatarHairStyle,
     avatarHairColor: profile?.avatarHairColor || defaultTeacherAvatar.avatarHairColor,
+    avatarHijabColor: profile?.avatarHijabColor || defaultTeacherAvatar.avatarHijabColor,
     avatarFacialHair: profile?.avatarFacialHair || defaultTeacherAvatar.avatarFacialHair,
     avatarOutfit: profile?.avatarOutfit || defaultTeacherAvatar.avatarOutfit,
     avatarOutfitColor: profile?.avatarOutfitColor || defaultTeacherAvatar.avatarOutfitColor,
@@ -27,6 +29,7 @@ export type TeacherAvatarSettings = ReturnType<typeof avatarSettings>;
 export function TeacherAvatar({ settings, className = "h-60 w-52" }: { settings: TeacherAvatarSettings; className?: string }) {
   const skin = skinColors[settings.avatarSkinTone] || skinColors.golden;
   const hair = hairColors[settings.avatarHairColor] || hairColors.espresso;
+  const hijabColor = hijabColors[settings.avatarHijabColor] || hijabColors["hijab-navy"];
   const outfit = outfitColors[settings.avatarOutfitColor] || outfitColors["lead-blue"];
   const round = settings.avatarFaceShape === "round";
   const square = settings.avatarFaceShape === "square";
@@ -39,7 +42,6 @@ export function TeacherAvatar({ settings, className = "h-60 w-52" }: { settings:
     <ellipse cx="120" cy="264" rx="92" ry="12" fill="#172554" opacity=".12" />
     {["ponytail", "long"].includes(settings.avatarHairStyle) ? <ellipse cx="188" cy="116" rx="28" ry="46" fill={hair} /> : null}
     {settings.avatarHairStyle === "bun" ? <circle cx="120" cy="39" r="29" fill={hair} /> : null}
-    {hijab ? <path d="M57 126c0-64 27-96 63-96s63 32 63 96v77H57z" fill={hair} /> : null}
     <path d={settings.avatarOutfit === "hoodie" ? "M38 272c4-71 34-90 82-90s78 19 82 90z" : "M29 272c7-69 41-88 91-88s84 19 91 88z"} fill={outfit} />
     {settings.avatarOutfit === "blazer" ? <><path d="M52 205l46 67H39c1-31 5-52 13-67zm136 0l-46 67h59c-1-31-5-52-13-67z" fill="#fff" opacity=".22"/><path d="M98 190l22 26 22-26-6 82h-32z" fill="#fff"/></> : null}
     {settings.avatarOutfit === "shirt" ? <path d="M93 186l27 26 27-26-9 43h-36z" fill="#fff" /> : null}
@@ -47,10 +49,11 @@ export function TeacherAvatar({ settings, className = "h-60 w-52" }: { settings:
     {settings.avatarOutfit === "dress" ? <path d="M95 185l25 31 25-31 12 87H83z" fill="#fff" opacity=".2" /> : null}
     {settings.avatarOutfit === "hoodie" ? <path d="M73 208q47-42 94 0" fill="none" stroke="#fff" strokeWidth="8" opacity=".25" /> : null}
     <path d="M102 174h36v31q-18 14-36 0z" fill={skin} />
+    {hijab ? <><path d="M53 111q0-86 67-86t67 86l9 126q-35-28-57-30-19 14-38 0-22 2-57 30z" fill={hijabColor}/><path d="M50 189q30-23 55-14l15 20 15-20q25-9 55 14l12 83H38z" fill={hijabColor}/></> : null}
     {!hijab && !bald && !male ? <ellipse cx="120" cy="104" rx="67" ry="73" fill={hair} /> : null}
-    <ellipse cx="58" cy="121" rx="13" ry="18" fill={skin} /><ellipse cx="182" cy="121" rx="13" ry="18" fill={skin} />
+    {!hijab ? <><ellipse cx="58" cy="121" rx="13" ry="18" fill={skin} /><ellipse cx="182" cy="121" rx="13" ry="18" fill={skin} /></> : null}
     {male ? <path d={square ? "M66 59h108v91q-13 38-54 43-41-5-54-43z" : "M64 58h112v91q-17 40-56 44-39-4-56-44z"} fill={skin} /> : <rect x={square ? 66 : 62} y="58" width={square ? 108 : 116} height="127" rx={round ? 55 : square ? 33 : 48} fill={skin} />}
-    {hijab ? <path d="M65 105c0-46 23-72 55-72s55 26 55 72c-16-13-27-27-34-43-19 23-43 33-76 36z" fill={hair} /> : null}
+    {hijab ? <><path fill={hijabColor} fillRule="evenodd" d="M120 25q-68 0-68 91v91q25-19 48-13l20 17 20-17q23-6 48 13v-91q0-91-68-91zm0 27q-47 0-47 66 0 56 47 69 47-13 47-69 0-66-47-66z"/><path d="M70 83q15-42 50-42 35 0 50 42" fill="none" stroke="#fff" strokeWidth="5" opacity=".18" strokeLinecap="round"/><path d="M57 174q25-17 45 4m81-4q-25-17-45 4" fill="none" stroke="#fff" strokeWidth="4" opacity=".14" strokeLinecap="round"/></> : null}
     {!hijab && !bald && settings.avatarHairStyle === "short" ? <path d="M61 101c-2-49 25-72 59-72 42 0 65 30 59 76-20-6-36-21-45-42-18 23-41 34-73 38z" fill={hair} /> : null}
     {!hijab && !bald && settings.avatarHairStyle === "side" ? <path d="M60 104c-1-50 22-76 61-76 40 0 62 29 59 74-29-7-49-26-58-49-16 28-36 42-62 51z" fill={hair} /> : null}
     {!hijab && !bald && settings.avatarHairStyle === "waves" ? <path d="M59 112c-7-47 16-84 61-84 48 0 68 41 60 91-11-17-20-32-28-48-22 25-48 37-78 38z" fill={hair} /> : null}
