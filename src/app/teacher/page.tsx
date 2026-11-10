@@ -8,6 +8,7 @@ import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { FlowerCelebration } from "@/app/teacher/flower-celebration";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
 import { TeacherHeaderAvatar, TeacherMoodControl } from "@/app/teacher/teacher-classroom-preview";
+import { TeacherAvatarOnboarding } from "@/app/teacher/teacher-avatar-onboarding";
 import { GameSessionLink } from "@/app/admin/sessions/game-session-link";
 import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { Button } from "@/components/ui/button";
@@ -607,6 +608,8 @@ export default async function TeacherPortalPage({
   const today = getTodayJakarta();
   const db = await getMongoDb();
   const engagement = await db.collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).findOne({ teacherId: teacher.id });
+  const needsAvatarSetup = !engagement?.avatarPresentation;
+  const needsDailyMood = engagement?.moodDate !== today;
   const pendingGroupSessions = await db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName())
     .find({ teacherId: teacher.id, status: "Scheduled", attendanceMarked: { $ne: true } })
     .sort({ sessionDate: 1, startTime: 1, meetingNumber: 1 }).toArray();
@@ -653,6 +656,7 @@ export default async function TeacherPortalPage({
   return (
     <main className="min-h-screen bg-lead-soft">
       <FlowerCelebration teacherId={teacher.id} attendanceCount={attendanceNeededCount} journalCount={data.journalMissingCount} />
+      {needsAvatarSetup || needsDailyMood ? <TeacherAvatarOnboarding teacherName={teacher.name} profile={engagement} needsAvatar={needsAvatarSetup} needsMood={needsDailyMood} /> : null}
       <header className="border-b border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#fff7d6_100%)]">
         <div className="container-shell flex flex-col gap-4 py-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-4">

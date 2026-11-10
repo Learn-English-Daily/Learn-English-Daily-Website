@@ -321,6 +321,36 @@ export async function saveTeacherMood(formData: FormData) {
   return { success: true };
 }
 
+export async function beginTeacherAvatarOnboarding(formData: FormData) {
+  const teacher = await assertTeacher();
+  const mood = clean(formData.get("mood"));
+  const now = new Date();
+  const moodUpdate = teacherMoodOptions.some((option) => option.value === mood) ? { mood, moodDate: getJakartaToday(), moodUpdatedAt: now } : {};
+  await (await getMongoDb()).collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).updateOne(
+    { teacherId: teacher.id },
+    { $set: { teacherName: teacher.name, ...moodUpdate, updatedAt: now }, $setOnInsert: { teacherId: teacher.id, createdAt: now } },
+    { upsert: true }
+  );
+  revalidatePath("/teacher");
+  revalidatePath("/admin/teachers");
+  redirect("/teacher/classroom?setup=1");
+}
+
+export async function saveTeacherDailyMoodPrompt(formData: FormData) {
+  const teacher = await assertTeacher();
+  const mood = clean(formData.get("mood"));
+  if (!teacherMoodOptions.some((option) => option.value === mood)) return;
+  const now = new Date();
+  await (await getMongoDb()).collection<TeacherEngagementDocument>(getTeacherEngagementCollectionName()).updateOne(
+    { teacherId: teacher.id },
+    { $set: { teacherName: teacher.name, mood, moodDate: getJakartaToday(), moodUpdatedAt: now, updatedAt: now }, $setOnInsert: { teacherId: teacher.id, createdAt: now } },
+    { upsert: true }
+  );
+  revalidatePath("/teacher");
+  revalidatePath("/admin/teachers");
+  redirect("/teacher");
+}
+
 export async function saveTeacherClassroomProfile(formData: FormData) {
   const teacher = await assertTeacher();
   const avatarPresentation = clean(formData.get("avatarPresentation"));
