@@ -29,7 +29,7 @@ export function avatarSettings(profile?: TeacherEngagementDocument | null) {
 
 export type TeacherAvatarSettings = ReturnType<typeof avatarSettings>;
 
-export function TeacherAvatar({ settings, className = "h-60 w-52" }: { settings: TeacherAvatarSettings; className?: string }) {
+export function TeacherAvatar({ settings, className = "h-60 w-52", viewBox = "0 0 240 280" }: { settings: TeacherAvatarSettings; className?: string; viewBox?: string }) {
   const skin = skinColors[settings.avatarSkinTone] || skinColors.golden;
   const hair = hairColors[settings.avatarHairColor] || hairColors.espresso;
   const hijabColor = hijabColors[settings.avatarHijabColor] || hijabColors["hijab-navy"];
@@ -41,7 +41,7 @@ export function TeacherAvatar({ settings, className = "h-60 w-52" }: { settings:
   const glasses = settings.avatarAccessory === "glasses" || settings.avatarAccessory === "round-glasses";
   const male = settings.avatarPresentation === "male";
   const female = settings.avatarPresentation === "female";
-  return <svg viewBox="0 0 240 280" className={className} role="img" aria-label={`Custom ${settings.avatarPresentation} teacher avatar`}>
+  return <svg viewBox={viewBox} className={className} role="img" aria-label={`Custom ${settings.avatarPresentation} teacher avatar`}>
     <ellipse cx="120" cy="264" rx="92" ry="12" fill="#172554" opacity=".12" />
     {["ponytail", "long", "medium-flow"].includes(settings.avatarHairStyle) ? <ellipse cx="188" cy="116" rx="28" ry="46" fill={hair} /> : null}
     {settings.avatarHairStyle === "bun" ? <circle cx="120" cy="39" r="29" fill={hair} /> : null}

@@ -5,7 +5,7 @@ import { ActionFeedbackForm } from "@/components/admin/action-feedback-form";
 import { getJakartaToday, moodDetails, teacherMoodOptions, type TeacherEngagementDocument } from "@/lib/teacher-engagement";
 
 export function TeacherHeaderAvatar({ teacherName, profile }: { teacherName: string; profile: TeacherEngagementDocument | null }) {
-  return <a href="/teacher/classroom" title="Visit My Classroom" aria-label={`Open ${teacherName}'s classroom`} className="focus-ring group grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-violet-100 shadow-md transition hover:-translate-y-1 hover:border-lead-blue hover:shadow-lg"><TeacherAvatar settings={avatarSettings(profile)} className="mt-8 h-32 w-28 drop-shadow-lg transition group-hover:scale-105" /></a>;
+  return <a href="/teacher/classroom" title="Visit My Classroom" aria-label={`Open ${teacherName}'s classroom`} className="focus-ring group grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-[2rem] border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-violet-100 shadow-md transition hover:-translate-y-1 hover:border-lead-blue hover:shadow-lg"><TeacherAvatar settings={avatarSettings(profile)} viewBox="38 18 164 222" className="h-full w-full p-1 drop-shadow-lg transition group-hover:scale-105" /></a>;
 }
 
 export function TeacherMoodControl({ profile }: { profile: TeacherEngagementDocument | null }) {
