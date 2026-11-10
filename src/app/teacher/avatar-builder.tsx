@@ -15,7 +15,7 @@ const labels: Record<string, string> = {
   female: "Woman", male: "Man", neutral: "Neutral", porcelain: "Porcelain", warm: "Warm", golden: "Golden", brown: "Brown", deep: "Deep",
   round: "Round", oval: "Oval", square: "Square", friendly: "Friendly", bright: "Bright", calm: "Calm", wink: "Wink",
   short: "Short", side: "Side sweep", waves: "Waves", curls: "Curls", bun: "Bun", ponytail: "Ponytail", hijab: "Hijab", bald: "Bald", bob: "Bob", pixie: "Pixie", braids: "Braids",
-  crop: "Crop", fade: "Fade", quiff: "Quiff", long: "Long", "cap-hair": "Cap style", "small-moustache": "Small moustache", moustache: "Moustache", "small-beard": "Small beard", "full-beard": "Full beard", "long-beard": "Long beard",
+  crop: "Crop", fade: "Clean fade", quiff: "Modern quiff", long: "Long", "cap-hair": "Cap style", "buzz-cut": "Buzz cut", "crew-cut": "Crew cut", "textured-crop": "Textured crop", "classic-part": "Classic side part", pompadour: "Pompadour", "slick-back": "Slick back", "curly-top": "Curly top", "medium-flow": "Medium flow", "small-moustache": "Small moustache", moustache: "Moustache", "small-beard": "Small beard", "full-beard": "Full beard", "long-beard": "Long beard",
   black: "Black", espresso: "Espresso", chestnut: "Chestnut", blonde: "Blonde", violet: "Violet", rose: "Rose",
   blazer: "Blazer", sweater: "Sweater", shirt: "Shirt", dress: "Dress", hoodie: "Hoodie", none: "None", glasses: "Glasses",
   "round-glasses": "Round glasses", headphones: "Headphones", earrings: "Earrings", cap: "Cap", "lead-blue": "LEAD blue", navy: "Navy", teal: "Teal", amber: "Amber",
@@ -33,7 +33,7 @@ export function AvatarBuilder({ profile }: { profile: TeacherEngagementDocument 
   const [theme, setTheme] = useState(profile?.classroomTheme || "garden");
   const change = (key: keyof TeacherAvatarSettings, value: string) => setSettings((current) => ({ ...current, [key]: value }));
   const hairStyles = settings.avatarPresentation === "female" ? teacherAvatarFemaleHairStyles : settings.avatarPresentation === "male" ? teacherAvatarMaleHairStyles : teacherAvatarNeutralHairStyles;
-  const changePresentation = (value: string) => setSettings((current) => ({ ...current, avatarPresentation: value, avatarHairStyle: value === "female" ? "bob" : value === "male" ? "crop" : "short", avatarFacialHair: "none" }));
+  const changePresentation = (value: string) => setSettings((current) => ({ ...current, avatarPresentation: value, avatarHairStyle: value === "female" ? "bob" : value === "male" ? "textured-crop" : "short", avatarFacialHair: "none" }));
   return <ActionFeedbackForm action={saveTeacherClassroomProfile} successMessage="Your avatar and classroom have been saved." preserveValuesAfterSubmit className="mt-5 grid gap-6">
     <div className="sticky top-3 z-10 grid place-items-center rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-3 shadow-sm"><TeacherAvatar settings={settings} className="h-56 w-48 drop-shadow-lg" /><p className="-mt-2 rounded-full bg-white px-4 py-1 text-xs font-black text-lead-blue shadow-sm">LIVE PREVIEW</p></div>
     <OptionGroup title="Character" name="avatarPresentation" values={teacherAvatarPresentations} selected={settings.avatarPresentation} onChange={changePresentation} />

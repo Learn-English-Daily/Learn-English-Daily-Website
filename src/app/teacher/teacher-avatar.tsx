@@ -14,7 +14,7 @@ export function avatarSettings(profile?: TeacherEngagementDocument | null) {
     avatarSkinTone: profile?.avatarSkinTone || defaultTeacherAvatar.avatarSkinTone,
     avatarFaceShape: profile?.avatarFaceShape || defaultTeacherAvatar.avatarFaceShape,
     avatarEyeStyle: profile?.avatarEyeStyle || defaultTeacherAvatar.avatarEyeStyle,
-    avatarHairStyle: compatibleHair.includes(savedHair as never) ? savedHair : presentation === "female" ? "bob" : presentation === "male" ? "crop" : defaultTeacherAvatar.avatarHairStyle,
+    avatarHairStyle: compatibleHair.includes(savedHair as never) ? savedHair : presentation === "female" ? "bob" : presentation === "male" ? "textured-crop" : defaultTeacherAvatar.avatarHairStyle,
     avatarHairColor: profile?.avatarHairColor || defaultTeacherAvatar.avatarHairColor,
     avatarHijabColor: profile?.avatarHijabColor || defaultTeacherAvatar.avatarHijabColor,
     avatarFacialHair: profile?.avatarFacialHair || defaultTeacherAvatar.avatarFacialHair,
@@ -40,7 +40,7 @@ export function TeacherAvatar({ settings, className = "h-60 w-52" }: { settings:
   const female = settings.avatarPresentation === "female";
   return <svg viewBox="0 0 240 280" className={className} role="img" aria-label={`Custom ${settings.avatarPresentation} teacher avatar`}>
     <ellipse cx="120" cy="264" rx="92" ry="12" fill="#172554" opacity=".12" />
-    {["ponytail", "long"].includes(settings.avatarHairStyle) ? <ellipse cx="188" cy="116" rx="28" ry="46" fill={hair} /> : null}
+    {["ponytail", "long", "medium-flow"].includes(settings.avatarHairStyle) ? <ellipse cx="188" cy="116" rx="28" ry="46" fill={hair} /> : null}
     {settings.avatarHairStyle === "bun" ? <circle cx="120" cy="39" r="29" fill={hair} /> : null}
     <path d={settings.avatarOutfit === "hoodie" ? "M38 272c4-71 34-90 82-90s78 19 82 90z" : "M29 272c7-69 41-88 91-88s84 19 91 88z"} fill={outfit} />
     {settings.avatarOutfit === "blazer" ? <><path d="M52 205l46 67H39c1-31 5-52 13-67zm136 0l-46 67h59c-1-31-5-52-13-67z" fill="#fff" opacity=".22"/><path d="M98 190l22 26 22-26-6 82h-32z" fill="#fff"/></> : null}
@@ -67,6 +67,14 @@ export function TeacherAvatar({ settings, className = "h-60 w-52" }: { settings:
     {settings.avatarHairStyle === "quiff" ? <path d="M63 91q0-54 42-62 38-26 72 12-21 2-34 18 25 4 34 30-31-18-57-18-28 1-57 20z" fill={hair} /> : null}
     {settings.avatarHairStyle === "long" ? <path d="M60 108q-5-80 60-80t60 80q-27-12-52-51-25 33-68 51z" fill={hair} /> : null}
     {settings.avatarHairStyle === "cap-hair" ? <path d="M63 91q4-62 57-62t57 62q-57-20-114 0z" fill={hair} /> : null}
+    {settings.avatarHairStyle === "buzz-cut" ? <><path d="M68 78q8-48 52-48t52 48q-52-15-104 0z" fill={hair}/><path d="M73 65q47-24 94 0" fill="none" stroke="#fff" strokeWidth="2" opacity=".12" strokeDasharray="3 5"/></> : null}
+    {settings.avatarHairStyle === "crew-cut" ? <path d="M66 84q5-52 54-55 43 2 53 46-27-11-53-9-29 0-54 18z" fill={hair} /> : null}
+    {settings.avatarHairStyle === "textured-crop" ? <><path d="M64 88q2-57 56-61 46 2 57 51-22-10-37-9-10 14-23 1-10 13-24 1-13 11-29 17z" fill={hair}/><path d="M85 54l11 16 10-20 13 18 14-22 12 22" fill="none" stroke="#fff" strokeWidth="3" opacity=".13" strokeLinecap="round"/></> : null}
+    {settings.avatarHairStyle === "classic-part" ? <><path d="M63 93q0-64 55-66 48 0 60 52-29-14-52-25-20 26-63 39z" fill={hair}/><path d="M125 52q8-15 26-18" fill="none" stroke="#fff" strokeWidth="3" opacity=".25"/></> : null}
+    {settings.avatarHairStyle === "pompadour" ? <path d="M61 91q0-45 31-54 8-31 40-25 35 5 46 40-20-10-38 6 28 3 38 29-34-18-58-17-29 0-59 21z" fill={hair} /> : null}
+    {settings.avatarHairStyle === "slick-back" ? <><path d="M62 91q1-57 47-68 43-9 69 31-30-13-57 10-24 17-59 27z" fill={hair}/><path d="M83 63q31-30 69-25m-57 34q28-25 63-22" fill="none" stroke="#fff" strokeWidth="3" opacity=".14" strokeLinecap="round"/></> : null}
+    {settings.avatarHairStyle === "curly-top" ? <g fill={hair}>{[75,92,111,131,150,166].map((x, index) => <circle key={x} cx={x} cy={index % 2 ? 49 : 57} r="18"/>)}<circle cx="69" cy="76" r="15"/><circle cx="171" cy="76" r="15"/></g> : null}
+    {settings.avatarHairStyle === "medium-flow" ? <path d="M59 104q-2-77 61-79 62 2 61 79-28-8-52-48-25 34-70 48zm4 0v45l17-15V92zm114 0v45l-17-15V92z" fill={hair} /> : null}
     {settings.avatarEyeStyle === "calm" ? <><path d="M82 119q13 12 26 0" fill="none" stroke="#34251F" strokeWidth="5" strokeLinecap="round"/><path d="M132 119q13 12 26 0" fill="none" stroke="#34251F" strokeWidth="5" strokeLinecap="round"/></> : <><ellipse cx="95" cy="121" rx={settings.avatarEyeStyle === "bright" ? 8 : 6} ry={settings.avatarEyeStyle === "bright" ? 10 : 8} fill="#34251F"/><ellipse cx="145" cy="121" rx={settings.avatarEyeStyle === "bright" ? 8 : 6} ry={settings.avatarEyeStyle === "bright" ? 10 : 8} fill="#34251F"/>{settings.avatarEyeStyle === "wink" ? <path d="M134 120q11 10 22 0" fill="none" stroke={skin} strokeWidth="14"/> : null}</>}
     {female ? <><path d="M79 108q16-10 31 0M130 108q16-10 31 0" fill="none" stroke={hair} strokeWidth="3" strokeLinecap="round"/><path d="M87 116l-6-5m72 5l6-5" stroke="#34251F" strokeWidth="2"/></> : <path d="M80 108q15-7 29 0M131 108q15-7 29 0" fill="none" stroke={hair} strokeWidth="5" strokeLinecap="round"/>}
     <path d={male ? "M110 142q10 8 20 0" : "M113 143q7 5 14 0"} fill="none" stroke="#9B6049" strokeWidth={male ? 4 : 3} strokeLinecap="round"/><path d={female ? "M98 157q22 18 44 0-22 28-44 0z" : "M96 156q24 24 48 0"} fill={female ? "#C95F70" : "#fff"} stroke="#9B4D55" strokeWidth="3" strokeLinejoin="round"/>
