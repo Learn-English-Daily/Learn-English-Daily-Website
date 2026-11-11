@@ -8,6 +8,7 @@ import { TeacherLoginForm } from "@/app/teacher/login-form";
 import { TeacherPortalTabs } from "@/app/teacher/teacher-tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { JournalArchiveFilters } from "@/components/journal-archive-filters";
 import { getStudentAttendanceCollectionName, type AttendanceStatus } from "@/lib/attendance";
 import { ensureTeacherJournalIndex } from "@/lib/journal-indexes";
 import { getMongoDb } from "@/lib/mongodb";
@@ -152,22 +153,13 @@ export default async function AllTeacherJournalsPage({ searchParams }: { searchP
         <Card className="p-5 lg:sticky lg:top-5">
           <div className="flex items-center gap-3"><UserRound className="h-5 w-5 text-lead-blue" /><h2 className="font-heading text-xl font-bold text-lead-navy">Select Student</h2></div>
           <p className="mt-2 text-sm leading-6 text-lead-gray">Only students with journals written by you are listed.</p>
-          <form action="/teacher/journals/all" className="mt-4 grid gap-3">
-            <label className="grid gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
-              Student
-            <select name="studentId" defaultValue={selectedStudentId} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-lead-navy">
-              {studentSummaries.map((student) => <option key={student._id} value={student._id}>{student.studentName} ({student.journalCount})</option>)}
-            </select>
-            </label>
-            <label className="grid gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
-              Month
-              <select name="month" defaultValue={selectedMonth} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold normal-case tracking-normal text-lead-navy">
-                <option value="">All months</option>
-                {availableMonths.map((month) => <option key={month} value={month}>{formatMonth(month)}</option>)}
-              </select>
-            </label>
-            <Button type="submit">Apply Filters</Button>
-          </form>
+          <JournalArchiveFilters
+            action="/teacher/journals/all"
+            students={studentSummaries.map((student) => ({ id: student._id, label: `${student.studentName} (${student.journalCount})` }))}
+            months={availableMonths.map((month) => ({ value: month, label: formatMonth(month) }))}
+            selectedStudentId={selectedStudentId}
+            selectedMonth={selectedMonth}
+          />
           <div className="mt-5 rounded-xl bg-blue-50 p-4"><p className="font-heading text-2xl font-extrabold text-lead-blue">{filteredJournalCount}</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-lead-gray">{selectedMonth ? `Journals in ${formatMonth(selectedMonth)}` : "Total journals"}</p></div>
         </Card>
 
