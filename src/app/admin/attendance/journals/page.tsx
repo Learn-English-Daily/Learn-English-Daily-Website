@@ -45,6 +45,19 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "Asia/Jakarta" }).format(new Date(value));
 }
 
+function formatMonth(value: string) {
+  if (!/^\d{4}-\d{2}$/.test(value)) return value;
+  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "Asia/Jakarta" })
+    .format(new Date(`${value}-01T00:00:00+07:00`));
+}
+
+function nextMonth(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month) return "";
+  const next = new Date(Date.UTC(year, month, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 function statusColor(status: AttendanceStatus | undefined) {
   if (status === "Present") return "bg-emerald-50 text-emerald-700";
   if (status === "Late") return "bg-amber-50 text-amber-800";
@@ -52,9 +65,10 @@ function statusColor(status: AttendanceStatus | undefined) {
   return "bg-slate-100 text-slate-600";
 }
 
-function archiveHref(studentId: string, beforeDate?: string, beforeId?: string) {
+function archiveHref(studentId: string, month?: string, beforeDate?: string, beforeId?: string) {
   const params = new URLSearchParams();
   if (studentId) params.set("studentId", studentId);
+  if (month) params.set("month", month);
   if (beforeDate && beforeId) {
     params.set("beforeDate", beforeDate);
     params.set("beforeId", beforeId);
@@ -65,7 +79,7 @@ function archiveHref(studentId: string, beforeDate?: string, beforeId?: string) 
 export default async function AllAdminJournalsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ studentId?: string | string[]; beforeDate?: string | string[]; beforeId?: string | string[] }>;
+  searchParams?: Promise<{ studentId?: string | string[]; month?: string | string[]; beforeDate?: string | string[]; beforeId?: string | string[] }>;
 }) {
   noStore();
   const cookieStore = await cookies();
@@ -81,6 +95,7 @@ export default async function AllAdminJournalsPage({
 
   const params = await searchParams;
   const requestedStudentId = first(params?.studentId);
+  const requestedMonth = first(params?.month);
   const beforeDate = first(params?.beforeDate);
   const beforeId = first(params?.beforeId);
   const admin = await getAuthenticatedAdmin();
@@ -108,7 +123,22 @@ export default async function AllAdminJournalsPage({
   const selectedStudentId = studentSummaries.some((student) => student._id === requestedStudentId) ? requestedStudentId : studentSummaries[0]?._id || "";
   const selectedStudent = studentSummaries.find((student) => student._id === selectedStudentId);
 
-  const baseFilter: Record<string, unknown> = { studentId: selectedStudentId, notes: { $type: "string", $ne: "" } };
+  const journalDates = selectedStudentId ? await collection.distinct("meetingDate", {
+    studentId: selectedStudentId,
+    meetingDate: { $type: "string", $ne: "" },
+    notes: { $type: "string", $ne: "" }
+  }) : [];
+  const availableMonths = [...new Set(journalDates
+    .filter((date): date is string => typeof date === "string")
+    .map((date) => date.slice(0, 7))
+    .filter((month) => /^\d{4}-\d{2}$/.test(month)))].sort().reverse();
+  const selectedMonth = availableMonths.includes(requestedMonth) ? requestedMonth : "";
+
+  const baseFilter: Record<string, unknown> = {
+    studentId: selectedStudentId,
+    notes: { $type: "string", $ne: "" },
+    ...(selectedMonth ? { meetingDate: { $gte: `${selectedMonth}-01`, $lt: `${nextMonth(selectedMonth)}-01` } } : {})
+  };
   let filter: Record<string, unknown> = baseFilter;
   if (beforeDate && ObjectId.isValid(beforeId)) {
     filter = { $and: [baseFilter, { $or: [{ meetingDate: { $lt: beforeDate } }, { meetingDate: beforeDate, _id: { $lt: new ObjectId(beforeId) } }] }] };
@@ -119,6 +149,7 @@ export default async function AllAdminJournalsPage({
   const hasMore = journals.length > PAGE_SIZE;
   const visibleJournals = journals.slice(0, PAGE_SIZE);
   const lastJournal = visibleJournals.at(-1);
+  const filteredJournalCount = selectedStudentId ? await collection.countDocuments(baseFilter) : 0;
 
   return (
     <main className="min-h-screen bg-lead-soft">
@@ -138,25 +169,35 @@ export default async function AllAdminJournalsPage({
           <p className="mt-2 text-sm leading-6 text-lead-gray">Only students with completed journals are listed.</p>
           {studentSummaries.length ? (
             <form action="/admin/attendance/journals" className="mt-4 grid gap-3">
+              <label className="grid gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
+                Student
               <select name="studentId" defaultValue={selectedStudentId} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-lead-navy">
                 {studentSummaries.map((student) => <option key={student._id} value={student._id}>{student.studentName || student._id} ({student.journalCount})</option>)}
               </select>
-              <Button type="submit">Open Journals</Button>
+              </label>
+              <label className="grid gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-lead-gray">
+                Month
+                <select name="month" defaultValue={selectedMonth} className="focus-ring w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold normal-case tracking-normal text-lead-navy">
+                  <option value="">All months</option>
+                  {availableMonths.map((month) => <option key={month} value={month}>{formatMonth(month)}</option>)}
+                </select>
+              </label>
+              <Button type="submit">Apply Filters</Button>
             </form>
           ) : null}
-          <div className="mt-5 rounded-xl bg-blue-50 p-4"><p className="font-heading text-2xl font-extrabold text-lead-blue">{selectedStudent?.journalCount || 0}</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-lead-gray">Total journals</p></div>
+          <div className="mt-5 rounded-xl bg-blue-50 p-4"><p className="font-heading text-2xl font-extrabold text-lead-blue">{filteredJournalCount}</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-lead-gray">{selectedMonth ? `Journals in ${formatMonth(selectedMonth)}` : "Total journals"}</p></div>
         </Card>
 
         <div className="grid gap-4">
-          <Card className="flex items-start gap-3 p-5"><BookOpenText className="mt-1 h-5 w-5 text-lead-blue" /><div><h2 className="font-heading text-xl font-extrabold text-lead-navy">{selectedStudent?.studentName || "No journals found"}</h2><p className="mt-1 text-sm text-lead-gray">Newest journals are shown first. Older records load 12 at a time.</p></div></Card>
+          <Card className="flex items-start gap-3 p-5"><BookOpenText className="mt-1 h-5 w-5 text-lead-blue" /><div><h2 className="font-heading text-xl font-extrabold text-lead-navy">{selectedStudent?.studentName || "No journals found"}</h2><p className="mt-1 text-sm text-lead-gray">{selectedMonth ? `${formatMonth(selectedMonth)} journals` : "All journal months"} · Newest journals are shown first. Older records load 12 at a time.</p></div></Card>
           {visibleJournals.map((journal) => (
             <Card key={journal._id.toString()} className="p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="font-heading text-lg font-bold text-lead-navy">Meeting {journal.meetingNumber || "-"}</h3><p className="mt-1 text-sm font-semibold text-lead-gray">{formatDate(journal.meetingDate || "")} / {journal.courseJoined || "Course not set"} / {journal.classMode || "Mode not set"}</p><p className="mt-1 text-xs font-semibold text-lead-gray">Teacher: {journal.teacherNames?.join(", ") || "Not assigned"}</p></div><span className={`w-fit rounded-full px-3 py-1 text-xs font-bold uppercase ${statusColor(journal.status)}`}>{journal.status || "Recorded"}</span></div>
               <div className="mt-4 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-7 text-lead-navy">{journal.notes}</div>
             </Card>
           ))}
-          {!visibleJournals.length ? <Card className="p-8 text-center text-sm text-lead-gray">No completed journals are available yet.</Card> : null}
-          {hasMore && lastJournal ? <Button asChild variant="secondary" className="mx-auto"><Link href={archiveHref(selectedStudentId, lastJournal.meetingDate || "", lastJournal._id.toString())}><ChevronDown className="h-4 w-4" /> Load Older Journals</Link></Button> : null}
+          {!visibleJournals.length ? <Card className="p-8 text-center text-sm text-lead-gray">{selectedMonth ? `No journals found for ${formatMonth(selectedMonth)}.` : "No completed journals are available yet."}</Card> : null}
+          {hasMore && lastJournal ? <Button asChild variant="secondary" className="mx-auto"><Link href={archiveHref(selectedStudentId, selectedMonth, lastJournal.meetingDate || "", lastJournal._id.toString())}><ChevronDown className="h-4 w-4" /> Load Older Journals</Link></Button> : null}
         </div>
       </section>
     </main>
