@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "LEAD Celebration Quest", description: "Race through a parade, blast grammar fireworks, build party scenes, match world traditions, and present a celebration plan live.", status: "New", icon: PartyPopper, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/celebration-planner" },
   { title: "LEAD What Happened?", description: "Run through yesterday, deliver last-week memories, blast time words, investigate visual clues, and solve a speaking case.", status: "New", icon: Search, accent: "border-cyan-100 bg-cyan-50 text-cyan-700", available: true, href: "/games/what-happened" },
   { title: "LEAD Past Activities Arcade", description: "Bowl verb pins, transform spoken future sentences into the past, play Bingo, repair story trains, and master a memory movie.", status: "New", icon: History, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/past-activities" },
   { title: "LEAD Likes & Dislikes", description: "Play preference pinball, catch your likes, stack reason towers, win Would You Rather tug-of-war, and speak live opinions.", status: "New", icon: Heart, accent: "border-orange-100 bg-orange-50 text-orange-700", available: true, href: "/games/likes-dislikes" },
