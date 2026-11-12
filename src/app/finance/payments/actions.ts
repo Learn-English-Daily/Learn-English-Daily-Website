@@ -249,8 +249,11 @@ export async function closeMonthlyBalance(formData: FormData) {
     courseJoined?: string;
     classType?: string;
     classMode?: string;
+    studentStatus?: string;
+    statusEffectiveDate?: string;
   }>(getStudentRegistrationCollectionName()).find(getCourseStudentFilter()).limit(50000).toArray();
   const studentsById = new Map(students.filter((student) => student.studentId).map((student) => [student.studentId || "", student]));
+  const withdrawnStudentIds = new Set(students.filter((student) => student.studentStatus === "Withdrawn" && student.studentId).map((student) => student.studentId || ""));
 
   const monthPayments = payments.filter((payment) => {
     const paymentPeriod = payment.billingMonth && payment.billingYear
@@ -297,9 +300,10 @@ export async function closeMonthlyBalance(formData: FormData) {
   const attendanceKeys = new Set(
     monthAttendance.map((record) => `${record.studentId || ""}:${record.meetingNumber || 0}:${record.meetingDate || ""}`)
   );
-  const sessionsMissingAttendance = monthSessions.filter(
-    (session) => !attendanceKeys.has(`${session.studentId || ""}:${session.meetingNumber || 0}:${session.sessionDate || ""}`)
-  );
+  const sessionsMissingAttendance = monthSessions.filter((session) => {
+    if (session.studentLifecycleClosed === true || withdrawnStudentIds.has(session.studentId || "")) return false;
+    return !attendanceKeys.has(`${session.studentId || ""}:${session.meetingNumber || 0}:${session.sessionDate || ""}`);
+  });
   const missingJournals = monthAttendance.filter(
     (record) => (record.status === "Present" || record.status === "Late") && !record.notes?.trim()
   );
@@ -309,7 +313,14 @@ export async function closeMonthlyBalance(formData: FormData) {
     reasons.push(`This month can only be closed on or after ${closeAvailableDate} (Indonesia time).`);
   }
   if (unpaidPayments.length) {
-    reasons.push(`${unpaidPayments.length} meeting payment${unpaidPayments.length === 1 ? " is" : "s are"} still unpaid.`);
+    const unpaidByStudent = new Map<string, number>();
+    unpaidPayments.forEach((payment) => {
+      const student = studentsById.get(payment.studentId || "");
+      const label = payment.studentName || student?.studentName || payment.studentId || "Unknown student";
+      unpaidByStudent.set(label, (unpaidByStudent.get(label) || 0) + 1);
+    });
+    const unpaidSummary = [...unpaidByStudent.entries()].map(([name, count]) => `${name}: ${count}`).join(", ");
+    reasons.push(`${unpaidPayments.length} meeting payment${unpaidPayments.length === 1 ? " is" : "s are"} still unpaid (${unpaidSummary}). Open Finance → Payments and select these students to review the ${period.billingPeriod} records.`);
   }
   if (receiptsPending.length) {
     reasons.push(`${receiptsPending.length} paid receipt${receiptsPending.length === 1 ? " has" : "s have"} not been marked uploaded to Google Drive.`);
