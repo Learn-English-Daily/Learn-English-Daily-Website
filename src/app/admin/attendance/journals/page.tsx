@@ -35,7 +35,7 @@ type JournalDocument = {
   updatedAt?: Date;
 };
 
-type StudentSummary = { _id: string; studentName: string; journalCount: number; latestJournalDate: string };
+type StudentSummary = { _id: string; studentName: string; journalCount: number; latestJournalDate: string; earliestJournalDate: string };
 
 function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || "" : value || "";
@@ -57,6 +57,20 @@ function nextMonth(value: string) {
   if (!year || !month) return "";
   const next = new Date(Date.UTC(year, month, 1));
   return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthsFromFirstJournal(firstDate: string) {
+  const firstMonth = firstDate.slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(firstMonth)) return [];
+  const nowParts = Object.fromEntries(new Intl.DateTimeFormat("en", { year: "numeric", month: "2-digit", timeZone: "Asia/Jakarta" }).formatToParts(new Date()).map((part) => [part.type, part.value]));
+  const currentMonth = `${nowParts.year}-${nowParts.month}`;
+  const months: string[] = [];
+  let cursor = firstMonth;
+  while (cursor <= currentMonth && months.length < 240) {
+    months.push(cursor);
+    cursor = nextMonth(cursor);
+  }
+  return months.reverse();
 }
 
 function statusColor(status: AttendanceStatus | undefined) {
@@ -117,22 +131,15 @@ export default async function AllAdminJournalsPage({
   };
   const studentSummaries = await collection.aggregate<StudentSummary>([
     { $match: summaryFilter },
-    { $group: { _id: "$studentId", studentName: { $last: "$studentName" }, journalCount: { $sum: 1 }, latestJournalDate: { $max: "$meetingDate" } } },
+    { $group: { _id: "$studentId", studentName: { $last: "$studentName" }, journalCount: { $sum: 1 }, latestJournalDate: { $max: "$meetingDate" }, earliestJournalDate: { $min: "$meetingDate" } } },
     { $sort: { studentName: 1 } },
     { $limit: 1000 }
   ]).toArray();
   const selectedStudentId = studentSummaries.some((student) => student._id === requestedStudentId) ? requestedStudentId : studentSummaries[0]?._id || "";
   const selectedStudent = studentSummaries.find((student) => student._id === selectedStudentId);
 
-  const journalDates = selectedStudentId ? await collection.distinct("meetingDate", {
-    studentId: selectedStudentId,
-    meetingDate: { $type: "string", $ne: "" },
-    notes: { $type: "string", $ne: "" }
-  }) : [];
-  const availableMonths = [...new Set(journalDates
-    .filter((date): date is string => typeof date === "string")
-    .map((date) => date.slice(0, 7))
-    .filter((month) => /^\d{4}-\d{2}$/.test(month)))].sort().reverse();
+  const firstJournalDate = studentSummaries.map((student) => student.earliestJournalDate).filter(Boolean).sort()[0] || "";
+  const availableMonths = monthsFromFirstJournal(firstJournalDate);
   const selectedMonth = availableMonths.includes(requestedMonth) ? requestedMonth : "";
 
   const baseFilter: Record<string, unknown> = {
