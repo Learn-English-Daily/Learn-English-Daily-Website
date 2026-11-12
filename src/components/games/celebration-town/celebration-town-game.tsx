@@ -25,11 +25,24 @@ function DirectionButton({ direction, children, game }: { direction: TownDirecti
 
 function ConversationRoom({ snapshot, celebration, answer }: { snapshot: TownSnapshot; celebration: string; answer: (correct: boolean, sentence: string) => void }) {
   const chat = snapshot.conversation!;
-  const steps = [
-    { speaker: chat.name, line: "Hello! Why are you here?", answers: [`Hello! I want to invite you to our ${celebration} celebration.`, "Give me food now.", "I don't know. Goodbye."], correct: 0 },
-    { speaker: chat.name, line: "That sounds exciting. When is it?", answers: ["It is a blue chair.", "It is on Saturday at three o'clock.", "Yesterday will be Monday."], correct: 1 },
-    { speaker: chat.name, line: "What will we do there?", answers: ["We celebrated it tomorrow.", "You cannot come.", "We will eat, play games, and celebrate together."], correct: 2 }
+  const dialogues = [
+    [
+      { line: "Hello! What brings you to my house?", answers: [`I came to invite you to our ${celebration} celebration.`, "I am a celebration yesterday.", "Open the door because blue."], correct: 0 },
+      { line: "Thank you! May I bring something?", answers: ["It starts beside the table.", "Yes, please bring your favorite snack to share.", "You brought tomorrow."], correct: 1 },
+      { line: "Who else is coming to the celebration?", answers: ["It is at three o'clock.", "We are coming last week.", "Our classmates, families, and neighbors are coming."], correct: 2 }
+    ],
+    [
+      { line: "Hi! What day is the celebration?", answers: ["It is on Saturday afternoon.", "It is a yellow invitation.", "It was next tomorrow."], correct: 0 },
+      { line: "Where will everyone meet?", answers: ["We meet because it is delicious.", "We will meet at the Celebration Town hall.", "The town hall meet us."], correct: 1 },
+      { line: "Which activity should I try first?", answers: ["You tried it tomorrow.", "The activity is under Saturday.", `Try the games and the special ${celebration} activities first.`], correct: 2 }
+    ],
+    [
+      { line: `What are you celebrating?`, answers: [`We are celebrating ${celebration} with our community.`, "We celebrate a blue quickly.", "We celebrating yesterday tomorrow."], correct: 0 },
+      { line: "Why is this celebration special?", answers: ["It special because table.", "It brings people together to share happy traditions.", "It was special next week ago."], correct: 1 },
+      { line: "How can I help before the guests arrive?", answers: ["You helped after tomorrow.", "Please arriving the guests.", "You can help us decorate the venue and welcome the guests."], correct: 2 }
+    ]
   ];
+  const steps = dialogues[chat.npcIndex] || dialogues[0];
   const turn = steps[chat.step];
   return <div className="absolute inset-0 z-50 grid place-items-center bg-[#071b4a]/80 p-3"><div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border-4 border-[#ffdf3e] bg-[#fff8e8] shadow-2xl"><div className="relative h-48 overflow-hidden bg-[linear-gradient(#c9efff_0_55%,#d69b62_55%)] sm:h-56"><div className="absolute left-5 top-5 rounded-lg border-4 border-white bg-[#8fda75] p-4 text-3xl shadow">🏡</div><div className="absolute bottom-5 left-[20%] text-center"><div className="text-6xl">🧒</div><div className="rounded-xl bg-[#1e5eff] px-3 py-1 text-xs font-black text-white">YOU</div></div><div className="absolute bottom-5 right-[20%] text-center"><div className="text-6xl">{chat.name === "Ayu" ? "👧" : chat.name === "Bima" ? "👦" : "🧕"}</div><div className="rounded-xl bg-[#ff4e93] px-3 py-1 text-xs font-black text-white">{chat.name}</div></div><div className="absolute left-1/2 top-6 w-[55%] -translate-x-1/2 rounded-2xl border-2 border-[#071b4a] bg-white p-3 text-center font-black text-[#071b4a] shadow-lg">{turn.line}</div><div className="absolute bottom-2 left-1/2 h-10 w-36 -translate-x-1/2 rounded-t-full bg-[#9a5b32]" /></div><div className="p-4 sm:p-6"><p className="text-center text-xs font-black uppercase tracking-[.2em] text-[#1e5eff]">Conversation {chat.step + 1} of 3 · Choose what you should say</p><div className="mt-3 grid gap-2">{turn.answers.map((option, index) => <button type="button" key={option} onClick={() => answer(index === turn.correct, option)} className="rounded-xl border-2 border-slate-200 bg-white p-3 text-left text-sm font-black text-[#071b4a] shadow-sm transition hover:-translate-y-0.5 hover:border-[#1e5eff] hover:bg-blue-50 sm:text-base"><span className="mr-2 inline-grid h-7 w-7 place-items-center rounded-full bg-[#ffdf3e]">{String.fromCharCode(65 + index)}</span>{option}</button>)}</div></div></div></div>;
 }
