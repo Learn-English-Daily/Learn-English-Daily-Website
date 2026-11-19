@@ -155,11 +155,19 @@ export function MysteryDetectiveMode({ level, paused, sound, hints: helpEnabled,
 
     {solved && <section className="space-y-3 rounded-3xl border-2 border-yellow-400 bg-yellow-50 p-5">
       <h3 className="font-heading text-2xl font-black">🎉 Case solved: {mystery.name}</h3>
+      <p className="rounded-xl bg-white p-3 font-bold text-lead-blue">Final step · Complete one language challenge to finish this stage. You only need to solve one mystery.</p>
       <p>{mystery.hints.join(" ")}</p>
       <label className="grid gap-2 font-bold">{level === 2 ? "Write a detailed description (at least 18 words). Explain the atmosphere and why this place could be meaningful." : "Complete the final challenge: I like this place because…"}<textarea className="focus-ring min-h-28 rounded-xl border border-blue-200 bg-white p-3 font-normal" value={finalText} onChange={(event) => setFinalText(event.target.value)} placeholder="I like this place because…" /></label>
+      {level < 2 && !finalText.trim().toLowerCase().startsWith("i like this place because") && <button className={chip} disabled={paused} onClick={() => setFinalText("I like this place because ")}>Use sentence starter</button>}
       {level < 2 && <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={spoken} onChange={(event) => setSpoken(event.target.checked)} /> I also said my sentence aloud (optional).</label>}
-      {level === 2 && <p className="text-sm font-bold">{finalText.trim().split(/\s+/).filter(Boolean).length}/18 words</p>}
-      <div className="flex flex-wrap gap-2"><button className={playButton} disabled={paused || !challengeReady} onClick={() => finish(Math.max(1, 3 - Number(wrongGuesses > 0) - Number(remaining === 0)))}>Complete detective mode</button><button className={chip} disabled={paused} onClick={replay}>Solve another mystery</button></div>
+      <p className={`text-sm font-bold ${challengeReady ? "text-emerald-700" : "text-amber-800"}`}>{level === 2 ? `${finalText.trim().split(/\s+/).filter(Boolean).length}/18 words ${challengeReady ? "· Ready to finish!" : "· Keep writing."}` : challengeReady ? "Sentence ready · You can finish the stage." : "Write at least seven words beginning with “I like this place because…”"}</p>
+      <div className="flex flex-wrap gap-2"><button className={playButton} disabled={paused} onClick={() => {
+        if (!challengeReady) {
+          setMessage(level === 2 ? "Write at least 18 words before finishing." : "Finish a seven-word sentence beginning with “I like this place because…”");
+          return;
+        }
+        finish(Math.max(1, 3 - Number(wrongGuesses > 0) - Number(remaining === 0)));
+      }}>Finish stage · Submit sentence</button><button className={chip} disabled={paused} onClick={replay}>Optional: solve another mystery</button></div>
     </section>}
     <p role="status" className="font-bold text-blue-800">{message}</p>
   </div>;
