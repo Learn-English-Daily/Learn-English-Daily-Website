@@ -1,3 +1,4 @@
+import { LiveSearchInput } from "@/components/live-search-input";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
@@ -515,7 +516,7 @@ export default async function AdminSessionsPage({ searchParams }: { searchParams
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lead-gray" />
-                <input id="session-student-search" name="q" defaultValue={sessionSearch} placeholder="Search student name or ID, e.g. STU002" className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-lead-navy" />
+                <LiveSearchInput id="session-student-search" name="q" defaultValue={sessionSearch} placeholder="Search student name or ID, e.g. STU002" className="focus-ring h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-lead-navy" />
               </div>
               <Button type="submit"><Search className="h-4 w-4" /> Search</Button>
               {sessionSearch ? <Button asChild type="button" variant="secondary"><Link href="/admin/sessions?type=private">Clear</Link></Button> : null}

@@ -1,3 +1,4 @@
+import { LiveSearchInput } from "@/components/live-search-input";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
@@ -622,7 +623,7 @@ export default async function AdminAttendancePage({
             <label className="relative md:col-span-2">
               <span className="sr-only">Search students</span>
               <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
-              <input name="q" defaultValue={query} placeholder="Student ID, name, parent..." className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy" />
+              <LiveSearchInput name="q" defaultValue={query} placeholder="Student ID, name, parent..." className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy" />
             </label>
             <input type="hidden" name="studentId" value={studentId} />
             <input type="hidden" name="view" value={showArchived ? "history" : "active"} />
@@ -766,7 +767,7 @@ function GroupAttendanceAdminPage({
             <label className="relative md:col-span-2">
               <span className="sr-only">Search group students</span>
               <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
-              <input name="q" defaultValue={filters.query} placeholder="Student ID, name, parent..." className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy" />
+              <LiveSearchInput name="q" defaultValue={filters.query} placeholder="Student ID, name, parent..." className="focus-ring h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-sm text-lead-navy" />
             </label>
             <input type="hidden" name="studentId" value={filters.studentId} />
             <select name="status" defaultValue={filters.status} aria-label="Group attendance status" className="focus-ring h-12 rounded-lg border border-slate-200 bg-white px-3 text-sm text-lead-navy">

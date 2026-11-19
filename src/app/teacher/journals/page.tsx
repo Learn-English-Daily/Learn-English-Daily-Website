@@ -1,3 +1,4 @@
+import { LiveSearchInput } from "@/components/live-search-input";
 import { unstable_noStore as noStore } from "next/cache";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
@@ -343,7 +344,7 @@ export default async function TeacherJournalPage({
                 Search student or notes
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lead-gray" />
-                  <input
+                  <LiveSearchInput
                     name="search"
                     defaultValue={search}
                     placeholder="Student name, ID, course, keyword..."

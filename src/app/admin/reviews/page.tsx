@@ -1,3 +1,4 @@
+import { LiveSearchInput } from "@/components/live-search-input";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
@@ -165,7 +166,7 @@ export default async function AdminReviewsPage({
             <label className="relative flex-1">
               <span className="sr-only">Search reviews</span>
               <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-lead-gray" />
-              <input
+              <LiveSearchInput
                 name="q"
                 defaultValue={searchQuery}
                 placeholder="Search by name, role, course, feedback, status..."
