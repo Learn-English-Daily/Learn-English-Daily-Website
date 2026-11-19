@@ -45,7 +45,7 @@ export function Detective({ level, paused, sound, hints, finish }: StageProps) {
   </div>;
 }
 
-const decorations = ["🌳", "🌷", "🪑", "💧", "📚", "☕", "🦋", "🪁"];
+const decorations = [["🌳", "Tree"], ["🌷", "Flowers"], ["🪑", "Bench"], ["💧", "Pond"], ["📚", "Books"], ["☕", "Coffee"], ["🦋", "Butterfly"], ["🪁", "Kite"]];
 export const checklist = ["Task completed", "Descriptive vocabulary", "Sentence patterns", "Fluency and confidence"];
 
 export function DreamBuilder({ level, paused, hints, finish, review, onReview }: StageProps & { review: boolean[]; onReview: (value: boolean[]) => void }) {
@@ -56,13 +56,22 @@ export function DreamBuilder({ level, paused, hints, finish, review, onReview }:
   const [ready, setReady] = useState(false);
   const [spoken, setSpoken] = useState(false);
   return <div className="space-y-4">
-    <p>Pick a setting. Add at least two details to make it yours, then give your teacher a tour.</p>
-    <div className="flex flex-wrap gap-2">{places.map((place, index) => <button key={place.name} className={tile} aria-pressed={setting === index} disabled={paused} onClick={() => setSetting(index)}>{place.icon} {place.name}</button>)}</div>
-    <div className={`relative grid min-h-48 place-items-center overflow-hidden rounded-2xl border border-blue-200 ${weather ? "bg-gradient-to-b from-orange-200 via-rose-100 to-emerald-200" : "bg-gradient-to-b from-sky-300 via-blue-50 to-emerald-200"}`}>
-      <span className="absolute right-4 top-3 text-3xl">{weather ? "🌅" : "☀️"}</span><span className="text-7xl">{places[setting].icon}</span>
-      <div className="flex flex-wrap justify-center gap-3 text-3xl">{items.map((item, index) => <button key={index} aria-label={`Remove decoration ${index + 1}`} className="focus-ring rounded" disabled={paused} onClick={() => setItems(items.filter((_, i) => i !== index))}>{item}</button>)}</div>
+    <p>Choose a setting and add at least two details. Tap an item in your scene to remove it, then give your teacher a tour.</p>
+    <div className="grid items-start gap-4 md:grid-cols-[1fr_17rem]">
+      <div className={`relative grid min-h-64 place-items-center overflow-hidden rounded-2xl border border-blue-200 ${weather ? "bg-gradient-to-b from-orange-300 via-rose-100 to-emerald-300" : "bg-gradient-to-b from-sky-300 via-cyan-50 to-emerald-300"}`}>
+        <div className="absolute inset-x-0 bottom-0 h-20 rounded-t-[45%] bg-emerald-400/60" />
+        <span className="absolute right-4 top-3 text-3xl">{weather ? "🌅" : "☀️"}</span>
+        <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 font-bold">{places[setting].name}</span>
+        <span className="self-center text-7xl drop-shadow-lg">{places[setting].icon}</span>
+        <div className="z-10 grid w-full grid-cols-4 gap-1 self-end p-3 text-3xl">{items.map((item, index) => <button key={index} aria-label={`Remove ${decorations.find(([icon]) => icon === item)?.[1]}`} className="focus-ring rounded-lg py-1 transition hover:bg-white/60" disabled={paused} onClick={() => setItems(items.filter((_, i) => i !== index))}>{item}</button>)}</div>
+      </div>
+      <aside className="space-y-3 rounded-2xl bg-blue-50 p-3">
+        <label className="grid gap-1 font-bold">Setting<select className={tile} disabled={paused} value={setting} onChange={(event) => setSetting(Number(event.target.value))}>{places.map((place, index) => <option key={place.name} value={index}>{place.icon} {place.name}</option>)}</select></label>
+        <div className="grid grid-cols-2 gap-2">{decorations.map(([item, label]) => <button key={item} className={tile} aria-label={`Add ${label.toLowerCase()}`} disabled={paused || items.length >= 8} onClick={() => setItems([...items, item])}>{item} {label}</button>)}</div>
+        <div className="flex flex-wrap gap-2"><button className={tile} disabled={paused} onClick={() => setWeather(!weather)}>{weather ? "Morning" : "Sunset"}</button><button className={tile} disabled={paused || !items.length} onClick={() => setItems(items.slice(0, -1))}>Undo</button></div>
+        <p aria-live="polite">{items.length}/8 details added</p>
+      </aside>
     </div>
-    <div className="flex flex-wrap gap-2">{decorations.map((item, index) => <button key={item} className={tile} aria-label={`Add ${["tree", "flowers", "bench", "pond", "books", "coffee", "butterfly", "kite"][index]}`} disabled={paused || items.length >= 8} onClick={() => setItems([...items, item])}>{item}</button>)}<button className={tile} disabled={paused} onClick={() => setWeather(!weather)}>{weather ? "Switch to morning" : "Switch to sunset"}</button></div>
     {!ready ? <button className={playButton} disabled={paused || items.length < 2} onClick={() => setReady(true)}>Start my tour</button> : <>
       <p className="font-bold">{speaking[level][0]} {speaking[level][1]}</p>
       {!hints && <button className={tile} onClick={() => setStarters(!starters)}>{starters ? "Hide" : "Show"} sentence starters</button>}
@@ -78,7 +87,9 @@ export function MysteryPortal({ level, paused, sound, hints, finish }: StageProp
   const [answer] = useState(() => [1, 3, 4][Math.floor(Math.random() * 3)]);
   const place = places[answer];
   const clues = level === 2 ? [...place.clues].reverse() : place.clues;
-  const [visible, setVisible] = useState(1);
+  const [collected, setCollected] = useState<number[]>([]);
+  const [position, setPosition] = useState(12);
+  const [turn, setTurn] = useState(0);
   const [timer, setTimer] = useState(false);
   const [seconds, setSeconds] = useState(45);
   const [misses, setMisses] = useState(0);
@@ -86,6 +97,44 @@ export function MysteryPortal({ level, paused, sound, hints, finish }: StageProp
   const [message, setMessage] = useState("");
   const [assembled, setAssembled] = useState<string[]>([]);
   const chunks = ["I like this place", "because", "it is special to me."];
+  const field = ["p", ".", "p", ".", "p", ".", "c", ".", "c", ".", "p", ".", ".", ".", "p", ".", "#", "c", "#", ".", "p", ".", "p", ".", "p"];
+  const relics = [6, 8, 17];
+  function move(dx: number, dy: number) {
+    if (paused || solved) return;
+    const x = position % 5 + dx, y = Math.floor(position / 5) + dy;
+    if (x < 0 || x > 4 || y < 0 || y > 4 || field[y * 5 + x] === "#") return;
+    const next = y * 5 + x;
+    const nextTurn = turn + 1;
+    setTurn(nextTurn);
+    if ([11, 12, 13, 12][nextTurn % 4] === next) {
+      setMisses(misses + 1);
+      setMessage("The guardian blocked that tile. Your clues are safe.");
+      return;
+    }
+    setPosition(next);
+    const clue = relics.indexOf(next);
+    if (clue >= 0 && !collected.includes(clue)) {
+      setCollected([...collected, clue]);
+      arcadeSound("correct", sound);
+    }
+    if (field[next] === "p") {
+      if (collected.length < 3) { setMessage("Gather three clue lanterns before entering a portal."); return; }
+      const id = field.slice(0, next).filter((value) => value === "p").length;
+      if (id === answer) { setSolved(true); setMessage(""); arcadeSound("complete", sound); }
+      else { setMisses(misses + 1); setMessage("That destination doesn’t fit. Compare the clues again."); }
+    } else setMessage("");
+  }
+  useEffect(() => {
+    function keydown(event: KeyboardEvent) {
+      if (paused || solved || (event.target as HTMLElement | null)?.closest("input,select,textarea")) return;
+      const key = event.key;
+      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) return;
+      event.preventDefault();
+      move(Number(key === "ArrowRight") - Number(key === "ArrowLeft"), Number(key === "ArrowDown") - Number(key === "ArrowUp"));
+    }
+    window.addEventListener("keydown", keydown);
+    return () => window.removeEventListener("keydown", keydown);
+  });
   useEffect(() => {
     if (!timer || paused || solved || !seconds) return;
     const tick = setTimeout(() => setSeconds(seconds - 1), 1000);
@@ -95,12 +144,19 @@ export function MysteryPortal({ level, paused, sound, hints, finish }: StageProp
     {!solved ? <>
       <div className="flex flex-wrap items-center gap-3"><button className={tile} aria-pressed={timer} onClick={() => { setTimer(!timer); setSeconds(45); }}>{timer ? "Switch to untimed" : "Try a 45-second countdown"}</button>
       {timer && <p>{seconds ? `${seconds}s for the bonus` : "Bonus time ended. Keep exploring!"}</p>}</div>
-      <ol className="space-y-2">{clues.slice(0, hints ? 3 : visible).map((clue) => <li key={clue} className="rounded-xl bg-blue-50 p-3">{clue}</li>)}</ol>
-      <div className="flex flex-wrap gap-2"><button className={tile} disabled={paused || !sound} onClick={() => speakArcade(clues.slice(0, hints ? 3 : visible).join(" "), sound)}>Listen to clues</button><button className={tile} disabled={paused || visible >= 3 || hints} onClick={() => setVisible(visible + 1)}>Reveal next clue</button></div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{places.map((item, index) => <button key={item.name} disabled={paused} className="focus-ring rounded-[45%] border-4 border-yellow-300 bg-gradient-to-b from-blue-200 to-violet-100 py-4 font-bold text-lead-navy shadow hover:border-lead-blue" onClick={() => {
-        if (index === answer) { setSolved(true); setMessage(""); arcadeSound("complete", sound); }
-        else { setMisses(misses + 1); setVisible(Math.min(3, visible + 1)); setMessage("That portal didn’t match. Look at the next clue."); }
-      }}><span className="block text-3xl">{item.icon}</span>{item.name}</button>)}</div>
+      <p>Move with the arrow keys or the buttons. Collect the three lanterns, dodge the guardian’s highlighted next tile, then step into the matching portal.</p>
+      <div className="grid max-w-lg grid-cols-5 gap-1 rounded-2xl bg-sky-200 p-2">
+        {field.map((value, index) => {
+          const portal = value === "p" ? places[field.slice(0, index).filter((entry) => entry === "p").length] : undefined;
+          const guard = [11, 12, 13, 12][turn % 4] === index;
+          const danger = [11, 12, 13, 12][(turn + 1) % 4] === index;
+          return <div key={index} className={`grid aspect-square place-content-center rounded-lg text-center ${danger ? "bg-amber-200 ring-2 ring-amber-500" : portal ? "bg-violet-100" : value === "#" ? "bg-blue-400" : "bg-white"}`}><span className="text-xl sm:text-3xl">{index === position ? "🧑‍🚀" : guard ? "🤖" : portal?.icon ?? (relics.includes(index) && !collected.includes(relics.indexOf(index)) ? "🏮" : "")}</span>{portal && <span className="text-[10px] font-bold sm:text-sm">{portal.name}</span>}</div>;
+        })}
+      </div>
+      <div className="flex flex-wrap gap-2">{([["Up", 0, -1], ["Left", -1, 0], ["Down", 0, 1], ["Right", 1, 0]] as const).map(([label, dx, dy]) => <button className={tile} disabled={paused} key={label} onClick={() => move(dx, dy)}>{label}</button>)}</div>
+      <p className="font-bold">Clue lanterns {collected.length}/3</p>
+      <ol className="space-y-2">{(hints ? clues : collected.map((index) => clues[index])).map((clue) => <li key={clue} className="rounded-xl bg-blue-50 p-3">{clue}</li>)}</ol>
+      <button className={tile} disabled={paused || !sound || (!hints && !collected.length)} onClick={() => speakArcade((hints ? clues : collected.map((index) => clues[index])).join(" "), sound)}>Listen to clues</button>
     </> : <>
       <p className="text-xl font-bold">{place.icon} Destination restored · {place.name}</p>
       <p>Put the reason together, then say your own version aloud.</p>

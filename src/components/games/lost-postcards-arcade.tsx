@@ -114,8 +114,11 @@ export function SkyIslands({ level, paused, sound, hints, finish }: StageProps) 
   const motion = useRef(50);
   const lock = useRef(false);
   const target = words[step];
-  const wrong = target === "is" ? "are" : target === "are" ? "is" : target === "because" ? "but" : target === "There" ? "This" : ["above", "noisy", "boats"].find((word) => word !== target)!;
-  const choices = step % 2 ? [wrong, target] : [target, wrong];
+  const alternatives = [words[step + 2], words[step + 1], "is", "are", "noisy", "but"]
+    .filter((word): word is string => Boolean(word) && word !== target);
+  const choices = [...new Set(alternatives)].slice(0, 2);
+  choices.splice((step * 7 + Math.floor(step / 3) + level) % 3, 0, target);
+  const centers = [18, 50, 82];
   useEffect(() => {
     if (paused || !target) return;
     let frame = 0;
@@ -135,8 +138,8 @@ export function SkyIslands({ level, paused, sound, hints, finish }: StageProps) 
   useEffect(() => {
     if (!leaping || paused) return;
     const timer = setTimeout(() => {
-      const landing = motion.current < 50 ? 0 : 1;
-      const safe = Math.abs(motion.current - (landing ? 74 : 26)) < (level === 0 ? 24 : 18);
+      const landing = motion.current < 34 ? 0 : motion.current > 66 ? 2 : 1;
+      const safe = Math.abs(motion.current - centers[landing]) < (level === 0 ? 15 : 12);
       const correct = safe && choices[landing] === target;
       if (correct) setStep((value) => value + 1);
       else setMisses((value) => value + 1);
@@ -152,9 +155,10 @@ export function SkyIslands({ level, paused, sound, hints, finish }: StageProps) 
 
   return <div className="space-y-4">
     <p>Time your jump from the moving cloud to the island holding the next word. Read your finished sentence aloud.</p>
-    <p className="rounded-xl bg-blue-50 p-3 font-bold">{hints || level === 0 ? words.join(" ") : words.map((word, i) => i <= step ? word : "___").join(" ")}</p>
+    <p className="rounded-xl bg-blue-50 p-3 font-bold">{["🌳 🌳 Describe what you see in the park.", "🏡 🌷 Describe the garden near your house.", "⛰️ 🥾 Explain how the mountains help you unwind."][level]} · {step}/{words.length} words</p>
+    {hints && target && <p>Hint: The next word starts with “{target[0]}”.</p>}
     <div className="relative h-52 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-300 to-indigo-100">
-      {target && choices.map((word, i) => <div key={word} className="absolute top-8 -translate-x-1/2 rounded-b-[40%] border-t-8 border-green-400 bg-amber-200 px-6 py-4 font-bold shadow-lg" style={{ left: i ? "74%" : "26%" }}>{word}</div>)}
+      {target && choices.map((word, i) => <div key={word} className="absolute top-8 -translate-x-1/2 rounded-b-[40%] border-t-8 border-green-400 bg-amber-200 px-2 py-4 font-bold shadow-lg sm:px-6" style={{ left: `${centers[i]}%` }}>{word}</div>)}
       <div className="absolute -translate-x-1/2 text-center transition-[bottom] duration-300" style={{ left: `${position}%`, bottom: leaping ? 110 : 16 }}><div className="text-3xl">🧑‍🚀</div><div className="rounded-full bg-white px-4">☁️</div></div>
     </div>
     <p className="font-bold text-lead-blue">{words.slice(0, step).join(" ") || "Your sentence starts here."}</p>

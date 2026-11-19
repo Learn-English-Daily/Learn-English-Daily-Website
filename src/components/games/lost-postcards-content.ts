@@ -18,9 +18,9 @@ export const rush = [
   { word: "lively", ids: [2, 7, 3], answer: 7, clue: "Find a place full of movement and children’s laughter." },
 ];
 export const sentences = [
-  ["There", "are", "two", "trees."],
-  ["There", "is", "a", "peaceful", "garden", "near", "my", "house."],
-  ["I", "like", "the", "mountains", "because", "the", "quiet", "trails", "help", "me", "relax."],
+  ["There", "are", "two", "tall", "trees", "in", "the", "park."],
+  ["There", "is", "a", "peaceful", "garden", "with", "colorful", "flowers", "near", "my", "house."],
+  ["I", "like", "the", "mountains", "because", "the", "quiet", "trails", "help", "me", "relax", "after", "a", "busy", "day."],
 ];
 export const speaking = [
   ["What can you see?", "How does it look?", "My favorite place is… · There is… · There are…"],
