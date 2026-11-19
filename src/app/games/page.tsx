@@ -4,6 +4,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
 import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, Clock3, CloudSun, Footprints, Gift, Heart, History, KeyRound, Lock, MapPinned, Medal, Mic, Palette, PartyPopper, PawPrint, Puzzle, ScanFace, Search, Shirt, ShoppingBasket, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
+import { CatalogSearch } from "@/app/games/catalog-search";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GAMES_SESSION_COOKIE, isGamesPasswordConfigured, isValidGamesSession } from "@/lib/games-auth";
@@ -196,10 +197,12 @@ export default async function GamesPage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {games.map((game) => {
+          <CatalogSearch entries={games.map((game) => {
               const Icon = game.icon;
-              return (
+              return {
+                title: game.title,
+                keywords: `${game.title} ${game.description} ${game.href?.replaceAll("-", " ") ?? ""}`.toLowerCase(),
+                card: (
                 <Card key={game.title} className="flex h-full flex-col overflow-hidden p-0 transition hover:-translate-y-1 hover:shadow-soft">
                   <div className={`h-2 ${game.available ? "bg-lead-blue" : "bg-slate-200"}`} />
                   <div className="flex flex-1 flex-col p-6">
@@ -228,9 +231,9 @@ export default async function GamesPage() {
                     )}
                   </div>
                 </Card>
-              );
-            })}
-          </div>
+                )
+              };
+            })} />
         </div>
       </section>
     </main>
