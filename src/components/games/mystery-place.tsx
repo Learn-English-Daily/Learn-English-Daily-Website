@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PlaceArcade } from "./place-arcade";
 
 const cases = [
   { answer: "Library", icon: "📚", clues: ["There is a quiet reading corner.", "There are tall shelves full of books.", "I like it because I can borrow stories."], blanks: ["There ___ a quiet reading corner.", "There ___ tall shelves full of books.", "I like it ___ I can borrow stories."] },
@@ -30,7 +31,7 @@ export function MysteryPlace() {
   const [hits, setHits] = useState(0);
   const [collected, setCollected] = useState<number[]>([]);
   const [clue, setClue] = useState<number | null>(null);
-  const [stage, setStage] = useState<"hunt" | "guess" | "speak" | "done">("hunt");
+  const [stage, setStage] = useState<"hunt" | "guess" | "speak" | "arcade" | "done">("hunt");
   const [message, setMessage] = useState("");
   const [tier, setTier] = useState(0);
   const [spoken, setSpoken] = useState(false);
@@ -90,12 +91,16 @@ export function MysteryPlace() {
     <p className="font-bold text-cyan-300">LEAD · Meeting 30 · My Favorite Place</p>
     <h1 className="mb-5 font-heading text-4xl font-extrabold sm:text-6xl">Mystery Place</h1>
     {!started ? <form className="max-w-md space-y-4 rounded-2xl bg-slate-900 p-6" onSubmit={(event) => { event.preventDefault(); if (name.trim()) { setName(name.trim()); setStarted(true); } }}>
-      <p>Outsmart the patrol, recover three English clues, and reveal the mystery place.</p>
+      <p>Solve a mystery, then take on Word Runner, Lantern Flight, and Reason Tic-Tac-Toe. Plan for 10–15 minutes.</p>
       <label className="block font-bold">Detective name<input required maxLength={40} value={name} onChange={(event) => setName(event.target.value)} className="focus-ring mt-2 w-full rounded-lg border border-slate-500 bg-slate-950 p-3" /></label>
       <button className={button} disabled={!name.trim()}>Start the hunt</button>
     </form> : <>
-      <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 font-bold text-cyan-200"><span>Detective {name}</span><span>Case {level + 1} / {cases.length}</span><span>Spotted {hits} times</span></div>
-      <div className="grid gap-5 md:grid-cols-[1.15fr_1fr]">
+      <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 font-bold text-cyan-200"><span>Detective {name}</span><span>Spotted {hits} times</span></div>
+      {stage === "arcade" ? <PlaceArcade onFinish={() => setStage("done")} /> : stage === "done" ? <div className="space-y-4 rounded-2xl bg-slate-900 p-5">
+        <h2 className="text-2xl font-bold">Mission complete, {name}!</h2>
+        <p>Bonus speaking challenge: Describe a favorite place you haven’t mentioned yet and tell someone why they should visit.</p>
+        <button className={button} onClick={() => { setHits(0); openCase((level + 1) % cases.length); }}>Replay with a different mystery</button>
+      </div> : <div className="grid gap-5 md:grid-cols-[1.15fr_1fr]">
         <div>
           <div aria-label="Clue hunt board" className="grid grid-cols-7 gap-1 rounded-2xl border border-indigo-400 bg-indigo-950 p-2">
             {map.flatMap((row, y) => [...row].map((tile, x) => {
@@ -132,12 +137,11 @@ export function MysteryPlace() {
             <div className="flex flex-wrap gap-2">{["Foundation", "Confident", "Fluent"].map((label, index) => <button key={label} aria-pressed={tier === index} onClick={() => { setTier(index); setSpoken(false); }} className={`rounded-lg px-3 py-2 font-bold ${tier === index ? "bg-cyan-300 text-slate-950" : "bg-slate-800"}`}>{label}</button>)}</div>
             <p>{["Say your favorite place and describe one thing you can see there. Try: ‘My favorite place is… There is a quiet…’", "Describe two things at your favorite place and explain why you like it. Try: ‘There are… I like it because…’", "Describe what your favorite place looks and sounds like. Share a memory there and explain why the place matters to you."][tier]}</p>
             <label className="flex items-start gap-2"><input className="mt-1 h-5 w-5" type="checkbox" checked={spoken} onChange={(event) => setSpoken(event.target.checked)} />I said my answer aloud.</label>
-            <button className={button} disabled={!spoken} onClick={() => level < cases.length - 1 ? openCase(level + 1) : setStage("done")}>{level < cases.length - 1 ? "Next case" : "Finish mission"}</button>
+            <button className={button} disabled={!spoken} onClick={() => setStage("arcade")}>Open the arcade</button>
           </>}
-          {stage === "done" && <><h3 className="text-xl font-bold">All three cases solved, {name}!</h3><p>Try again and see if you can finish with fewer patrol encounters.</p><button className={button} onClick={() => { setHits(0); openCase(0); }}>Play again</button></>}
           <p role="status" className="text-amber-200">{message}</p>
         </div>
-      </div>
+      </div>}
     </>}
   </section>;
 }
