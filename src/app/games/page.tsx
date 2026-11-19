@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
-  { title: "LEAD Mystery Place", description: "My Favorite Place: jump through a 2D vocabulary runner, take photos on a safari, and give a spoken mystery tour.", status: "New", icon: MapPinned, accent: "border-indigo-100 bg-indigo-50 text-indigo-700", available: true, href: "/games/mystery-place" },
+  { title: "Mystery Place: The Lost Postcards", description: "My Favorite Place: run, investigate, leap between islands, build a dream place, and describe it aloud.", status: "New", icon: MapPinned, accent: "border-blue-100 bg-blue-50 text-lead-blue", available: true, href: "/games/mystery-place" },
   { title: "LEAD Celebration Town", description: "Run through a colorful town, collect celebration items, deliver invitations, decorate the venue, rescue decorations, and celebrate.", status: "New", icon: PartyPopper, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/celebration-planner" },
   { title: "LEAD What Happened?", description: "Run through yesterday, deliver last-week memories, blast time words, investigate visual clues, and solve a speaking case.", status: "New", icon: Search, accent: "border-cyan-100 bg-cyan-50 text-cyan-700", available: true, href: "/games/what-happened" },
   { title: "LEAD Past Activities Arcade", description: "Bowl verb pins, transform spoken future sentences into the past, play Bingo, repair story trains, and master a memory movie.", status: "New", icon: History, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/past-activities" },
