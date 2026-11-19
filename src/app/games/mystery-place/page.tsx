@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { GamesPasswordGate } from "@/app/games/password-gate";
-import { MysteryPlace } from "@/components/games/mystery-place";
+import { MysteryPlace } from "@/components/games/mystery-place-adventure";
 import { GAMES_SESSION_COOKIE, isGamesPasswordConfigured, isValidGamesSession } from "@/lib/games-auth";
 
 export const metadata = { title: "Mystery Place | LEAD Games" };
