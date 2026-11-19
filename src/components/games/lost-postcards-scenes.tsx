@@ -45,41 +45,106 @@ export function Detective({ level, paused, sound, hints, finish }: StageProps) {
   </div>;
 }
 
-const decorations = [["🌳", "Tree"], ["🌷", "Flowers"], ["🪑", "Bench"], ["💧", "Pond"], ["📚", "Books"], ["☕", "Coffee"], ["🦋", "Butterfly"], ["🪁", "Kite"]];
 export const checklist = ["Task completed", "Descriptive vocabulary", "Sentence patterns", "Fluency and confidence"];
 
-export function DreamBuilder({ level, paused, hints, finish, review, onReview }: StageProps & { review: boolean[]; onReview: (value: boolean[]) => void }) {
-  const [setting, setSetting] = useState(0);
-  const [weather, setWeather] = useState(false);
-  const [items, setItems] = useState<string[]>([]);
-  const [starters, setStarters] = useState(level === 0);
-  const [ready, setReady] = useState(false);
+const deliveryCollectibles = [
+  { at: 8, icon: "🌳", word: "peaceful" },
+  { at: 19, icon: "🦋", word: "colorful" },
+  { at: 25, icon: "🪁", word: "breezy" },
+];
+const deliveryBlocks = [3, 10, 17, 22, 29];
+const deliveryPuddles = [6, 14, 23, 31];
+
+export function PostcardDelivery({ level, paused, sound, hints, finish, review, onReview }: StageProps & { review: boolean[]; onReview: (value: boolean[]) => void }) {
+  const [position, setPosition] = useState(0);
+  const [collected, setCollected] = useState<number[]>([]);
+  const [bumps, setBumps] = useState(0);
+  const [delivered, setDelivered] = useState(false);
   const [spoken, setSpoken] = useState(false);
+  const [message, setMessage] = useState("Collect three picture stamps, then deliver the postcard.");
+  const destination = places[[6, 0, 5][level]];
+
+  function move(dx: number, dy: number) {
+    if (paused || delivered) return;
+    const x = position % 7 + dx;
+    const y = Math.floor(position / 7) + dy;
+    if (x < 0 || x > 6 || y < 0 || y > 4) return;
+    const next = y * 7 + x;
+    if (deliveryBlocks.includes(next)) {
+      setBumps((value) => value + 1);
+      setMessage("Road closed! Find another route.");
+      arcadeSound("wrong", sound);
+      return;
+    }
+    setPosition(next);
+    const collectible = deliveryCollectibles.findIndex((item) => item.at === next);
+    if (collectible >= 0 && !collected.includes(collectible)) {
+      setCollected((value) => [...value, collectible]);
+      setMessage(`${deliveryCollectibles[collectible].word} stamp collected!`);
+      arcadeSound("correct", sound);
+    } else if (deliveryPuddles.includes(next)) {
+      setBumps((value) => value + 1);
+      setMessage("Splash! You kept the postcard safe, but lost a bonus point.");
+      arcadeSound("wrong", sound);
+    } else if (next === 34) {
+      if (collected.length < 3) setMessage("The postcard needs all three word stamps. Explore the other roads!");
+      else {
+        setDelivered(true);
+        setMessage("Delivery complete! Now tell the story inside your postcard.");
+        arcadeSound("complete", sound);
+      }
+    } else setMessage("Keep riding — look for the glowing picture stamps.");
+  }
+
+  useEffect(() => {
+    function keydown(event: KeyboardEvent) {
+      if ((event.target as HTMLElement | null)?.closest("input,select,textarea")) return;
+      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+      event.preventDefault();
+      move(Number(event.key === "ArrowRight") - Number(event.key === "ArrowLeft"), Number(event.key === "ArrowDown") - Number(event.key === "ArrowUp"));
+    }
+    window.addEventListener("keydown", keydown);
+    return () => window.removeEventListener("keydown", keydown);
+  });
+
   return <div className="space-y-4">
-    <p>Choose a setting and add at least two details. Tap an item in your scene to remove it, then give your teacher a tour.</p>
-    <div className="grid items-start gap-4 md:grid-cols-[1fr_17rem]">
-      <div className={`relative grid min-h-64 place-items-center overflow-hidden rounded-2xl border border-blue-200 ${weather ? "bg-gradient-to-b from-orange-300 via-rose-100 to-emerald-300" : "bg-gradient-to-b from-sky-300 via-cyan-50 to-emerald-300"}`}>
-        <div className="absolute inset-x-0 bottom-0 h-20 rounded-t-[45%] bg-emerald-400/60" />
-        <span className="absolute right-4 top-3 text-3xl">{weather ? "🌅" : "☀️"}</span>
-        <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 font-bold">{places[setting].name}</span>
-        <span className="self-center text-7xl drop-shadow-lg">{places[setting].icon}</span>
-        <div className="z-10 grid w-full grid-cols-4 gap-1 self-end p-3 text-3xl">{items.map((item, index) => <button key={index} aria-label={`Remove ${decorations.find(([icon]) => icon === item)?.[1]}`} className="focus-ring rounded-lg py-1 transition hover:bg-white/60" disabled={paused} onClick={() => setItems(items.filter((_, i) => i !== index))}>{item}</button>)}</div>
+    {!delivered ? <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-bold">Deliver to {destination.icon} {destination.name} · Stamps {collected.length}/3</p>
+        <p className="rounded-full bg-amber-100 px-3 py-1 font-bold">Careful rides: {Math.max(0, 3 - bumps)}/3</p>
       </div>
-      <aside className="space-y-3 rounded-2xl bg-blue-50 p-3">
-        <label className="grid gap-1 font-bold">Setting<select className={tile} disabled={paused} value={setting} onChange={(event) => setSetting(Number(event.target.value))}>{places.map((place, index) => <option key={place.name} value={index}>{place.icon} {place.name}</option>)}</select></label>
-        <div className="grid grid-cols-2 gap-2">{decorations.map(([item, label]) => <button key={item} className={tile} aria-label={`Add ${label.toLowerCase()}`} disabled={paused || items.length >= 8} onClick={() => setItems([...items, item])}>{item} {label}</button>)}</div>
-        <div className="flex flex-wrap gap-2"><button className={tile} disabled={paused} onClick={() => setWeather(!weather)}>{weather ? "Morning" : "Sunset"}</button><button className={tile} disabled={paused || !items.length} onClick={() => setItems(items.slice(0, -1))}>Undo</button></div>
-        <p aria-live="polite">{items.length}/8 details added</p>
-      </aside>
-    </div>
-    {!ready ? <button className={playButton} disabled={paused || items.length < 2} onClick={() => setReady(true)}>Start my tour</button> : <>
+      <p>Ride with the arrow keys or controls. Collect every picture stamp, dodge puddles and roadworks, then reach the red mailbox.</p>
+      <div className="grid max-w-2xl grid-cols-7 gap-1 rounded-2xl border-4 border-sky-200 bg-emerald-100 p-2 shadow-inner">
+        {Array.from({ length: 35 }, (_, index) => {
+          const collectible = deliveryCollectibles.findIndex((item) => item.at === index);
+          const isCollected = collected.includes(collectible);
+          const highlighted = hints && collectible >= 0 && !isCollected;
+          return <div key={index} className={`relative grid aspect-square place-items-center rounded-lg border border-white/70 text-xl sm:text-3xl ${deliveryBlocks.includes(index) ? "bg-orange-200" : deliveryPuddles.includes(index) ? "bg-sky-300" : "bg-amber-50"} ${highlighted ? "animate-pulse ring-4 ring-yellow-400" : ""}`}>
+            <span aria-hidden="true">{index === position ? "🚲" : deliveryBlocks.includes(index) ? "🚧" : deliveryPuddles.includes(index) ? "💦" : index === 34 ? "📮" : collectible >= 0 && !isCollected ? deliveryCollectibles[collectible].icon : index % 6 === 0 ? "🌼" : ""}</span>
+            {index === 34 && <span className="absolute bottom-0 text-[9px] font-black uppercase sm:text-xs">Finish</span>}
+          </div>;
+        })}
+      </div>
+      <div className="grid w-fit grid-cols-3 gap-2">
+        <span /><button className={tile} disabled={paused} onClick={() => move(0, -1)}>Up</button><span />
+        <button className={tile} disabled={paused} onClick={() => move(-1, 0)}>Left</button><button className={tile} disabled={paused} onClick={() => move(0, 1)}>Down</button><button className={tile} disabled={paused} onClick={() => move(1, 0)}>Right</button>
+      </div>
+      <div className="flex flex-wrap gap-2">{deliveryCollectibles.map((item, index) => <span key={item.word} className={`rounded-xl px-3 py-2 font-bold ${collected.includes(index) ? "bg-yellow-200" : "bg-slate-100 text-slate-400"}`}>{collected.includes(index) ? `${item.icon} ${item.word}` : "❔ mystery stamp"}</span>)}</div>
+    </> : <>
+      <div className="rounded-2xl bg-gradient-to-r from-sky-100 to-yellow-100 p-5">
+        <p className="text-xl font-black">📬 Postcard delivered to {destination.name}!</p>
+        <p className="mt-2">Use your three collected words to describe this place: <strong>{deliveryCollectibles.map((item) => item.word).join(" · ")}</strong></p>
+      </div>
       <p className="font-bold">{speaking[level][0]} {speaking[level][1]}</p>
-      {!hints && <button className={tile} onClick={() => setStarters(!starters)}>{starters ? "Hide" : "Show"} sentence starters</button>}
-      {(starters || hints) && <p>{speaking[level][2]}</p>}
-      <label className="flex items-center gap-2"><input type="checkbox" checked={spoken} onChange={(e) => setSpoken(e.target.checked)} /> I gave my tour aloud.</label>
-      <fieldset className="rounded-xl bg-blue-50 p-4"><legend className="font-bold">Teacher feedback · optional</legend>{checklist.map((label, i) => <label key={label} className="flex gap-2 py-1"><input type="checkbox" checked={review[i]} onChange={(e) => onReview(review.map((value, j) => i === j ? e.target.checked : value))} />{label}</label>)}<p className="mt-2">Follow-up: What would you show a visitor first?</p></fieldset>
-      <button className={playButton} disabled={paused || !spoken} onClick={() => finish(review.filter(Boolean).length >= 4 ? 3 : review.filter(Boolean).length >= 2 ? 2 : 1)}>Stamp postcard</button>
+      {hints && <p className="rounded-xl bg-blue-50 p-3">Starter: {speaking[level][2]}</p>}
+      <label className="flex items-center gap-2"><input type="checkbox" checked={spoken} onChange={(event) => setSpoken(event.target.checked)} /> I described the destination aloud using the stamps.</label>
+      <fieldset className="rounded-xl bg-blue-50 p-4"><legend className="font-bold">Teacher postcard check</legend>{checklist.map((label, index) => <label key={label} className="flex gap-2 py-1"><input type="checkbox" checked={review[index]} onChange={(event) => onReview(review.map((value, item) => index === item ? event.target.checked : value))} />{label}</label>)}</fieldset>
+      <button className={playButton} disabled={paused || !spoken} onClick={() => {
+        const checks = review.filter(Boolean).length;
+        finish(checks >= 4 && bumps === 0 ? 3 : checks >= 2 && bumps <= 2 ? 2 : 1);
+      }}>Stamp delivered postcard</button>
     </>}
+    <p role="status" className="font-bold text-blue-800">{message}</p>
   </div>;
 }
 

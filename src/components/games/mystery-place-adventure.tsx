@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { Maximize, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { arcadeSound } from "./lead-arcade/audio";
 import { PlaceRush, SkyIslands, playButton } from "./lost-postcards-arcade";
-import { Detective, DreamBuilder, MysteryPortal, checklist } from "./lost-postcards-scenes";
+import { Detective, MysteryPortal, PostcardDelivery, checklist } from "./lost-postcards-scenes";
 import { levels, rush, stages } from "./lost-postcards-content";
 
 const controls = "focus-ring inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 font-bold text-lead-navy hover:bg-blue-50";
@@ -95,7 +95,7 @@ export function MysteryPlace() {
           {active === 0 && <PlaceRush {...stageProps} />}
           {active === 1 && <Detective {...stageProps} />}
           {active === 2 && <SkyIslands {...stageProps} />}
-          {active === 3 && <DreamBuilder {...stageProps} review={review} onReview={setReview} />}
+          {active === 3 && <PostcardDelivery {...stageProps} review={review} onReview={setReview} />}
           {active === 4 && <MysteryPortal {...stageProps} />}
         </div>}
       </div>}

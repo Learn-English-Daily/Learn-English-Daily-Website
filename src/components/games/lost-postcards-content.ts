@@ -1,5 +1,5 @@
 export const levels = ["Foundation", "Confident", "Fluent"];
-export const stages = ["Place Rush", "Mystery Place Detective", "Sky Islands", "Dream Place Builder", "Mystery Portal"];
+export const stages = ["Place Rush", "Mystery Place Detective", "Sky Islands", "Postcard Delivery", "Mystery Portal"];
 export const places = [
   { name: "Beach", icon: "🏖️", objects: ["🐚", "🌊", "🪁"], clues: ["There is soft sand.", "There are rolling waves.", "A salty breeze drifts across the shore."] },
   { name: "Park", icon: "🌳", objects: ["🌳", "🦆", "🪑"], clues: ["There are many trees.", "There is a pond with ducks.", "People stroll along shaded paths to unwind."] },
