@@ -22,6 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getBatchesCollectionName } from "@/lib/assessments";
 import { getStudentAttendanceCollectionName, type AttendanceStatus } from "@/lib/attendance";
+import {
+  getBatchClassSessionsCollectionName,
+  hasBatchClassEnded,
+  type BatchClassSessionDocument
+} from "@/lib/batch-class-sessions";
 import { CEO_SESSION_COOKIE, isCeoConfigured, isValidCeoSession } from "@/lib/ceo-auth";
 import {
   getClassSessionsCollectionName,
@@ -184,13 +189,14 @@ async function getDashboardData(period: Period) {
   const range = getDateRange(period);
   const leadCollectionName = process.env.MONGODB_COLLECTION || "leads";
 
-  const [students, attendance, payments, leads, reviews, classSessions, activeStudentCount, activeTeachers, activeBatchCount] = await Promise.all([
+  const [students, attendance, payments, leads, reviews, classSessions, batchClassSessions, activeStudentCount, activeTeachers, activeBatchCount] = await Promise.all([
     db.collection<StudentDocument>(getStudentRegistrationCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<AttendanceDocument>(getStudentAttendanceCollectionName()).find({}).sort({ meetingDate: -1 }).limit(20000).toArray(),
     db.collection<PaymentDocument>(getStudentPaymentsCollectionName()).find({ financeExcluded: { $ne: true } }).sort({ meetingDate: -1 }).limit(20000).toArray(),
     db.collection<LeadDocument>(leadCollectionName).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<ReviewDocument>(getReviewCollectionName()).find({}).sort({ createdAt: -1 }).limit(5000).toArray(),
     db.collection<ClassSessionDocument>(getClassSessionsCollectionName()).find({}).sort({ scheduledAt: -1 }).limit(5000).toArray(),
+    db.collection<BatchClassSessionDocument>(getBatchClassSessionsCollectionName()).find({}).sort({ sessionDate: -1 }).limit(5000).toArray(),
     db.collection(getStudentRegistrationCollectionName()).countDocuments(getActiveStudentFilter()),
     getAvailableTeachers(db),
     db.collection(getBatchesCollectionName()).countDocuments({ status: { $ne: "archived" } })
@@ -291,6 +297,66 @@ async function getDashboardData(period: Period) {
         hasAttendance: attendanceKeys.has(`${session.studentId || ""}:${session.meetingNumber || 0}`)
       }) === "Needs Attendance"
   );
+
+  const groupClassesInPeriod = batchClassSessions.filter((session) => matchesRange(session.sessionDate || ""));
+  const groupClassesScheduled = groupClassesInPeriod.filter((session) => session.status !== "Cancelled");
+  const groupClassesCompleted = groupClassesInPeriod.filter(
+    (session) => session.status === "Completed" || session.attendanceMarked === true
+  );
+  const groupAttendanceEntries = groupClassesCompleted.flatMap((session) => session.attendance || []);
+  const groupPresent = groupAttendanceEntries.filter((entry) => entry.attendance === "Present").length;
+  const groupAbsent = groupAttendanceEntries.filter((entry) => entry.attendance === "Absent").length;
+  const groupExcused = groupAttendanceEntries.filter((entry) => entry.attendance === "Excused").length;
+  const groupAttendanceRate = percentage(groupPresent, groupPresent + groupAbsent);
+  const groupStudentsAttended = new Set(
+    groupAttendanceEntries.filter((entry) => entry.attendance === "Present").map((entry) => entry.studentId).filter(Boolean)
+  ).size;
+  const groupSessionsNeedingAttendance = groupClassesInPeriod.filter(
+    (session) => session.status === "Scheduled" && session.attendanceMarked !== true && hasBatchClassEnded(session)
+  ).length;
+  const groupBatchCounts = new Map<
+    string,
+    { batchId: string; batchName: string; scheduled: number; completed: number; present: number; absent: number; excused: number; students: Set<string> }
+  >();
+  for (const session of groupClassesInPeriod) {
+    if (session.status === "Cancelled") continue;
+    const key = session.batchId || session.batchName || "Unknown batch";
+    const current = groupBatchCounts.get(key) || {
+      batchId: session.batchId || "",
+      batchName: session.batchName || "Unknown batch",
+      scheduled: 0,
+      completed: 0,
+      present: 0,
+      absent: 0,
+      excused: 0,
+      students: new Set<string>()
+    };
+    current.scheduled += 1;
+    if (session.status === "Completed" || session.attendanceMarked === true) {
+      current.completed += 1;
+      for (const entry of session.attendance || []) {
+        if (entry.attendance === "Present") {
+          current.present += 1;
+          if (entry.studentId) current.students.add(entry.studentId);
+        } else if (entry.attendance === "Absent") current.absent += 1;
+        else if (entry.attendance === "Excused") current.excused += 1;
+      }
+    }
+    groupBatchCounts.set(key, current);
+  }
+  const groupBatches = [...groupBatchCounts.values()]
+    .map((batch) => ({
+      batchId: batch.batchId,
+      batchName: batch.batchName,
+      scheduled: batch.scheduled,
+      completed: batch.completed,
+      studentsAttended: batch.students.size,
+      present: batch.present,
+      absent: batch.absent,
+      excused: batch.excused,
+      attendanceRate: percentage(batch.present, batch.present + batch.absent)
+    }))
+    .sort((left, right) => right.completed - left.completed || left.batchName.localeCompare(right.batchName));
 
   const courseCounts = new Map<string, { course: string; classType: string; count: number }>();
   for (const student of periodStudents) {
@@ -410,6 +476,18 @@ async function getDashboardData(period: Period) {
       missingTeacherAssignments: missingTeacherAssignments.length,
       sessionsNeedingAttendance: sessionsNeedingAttendance.length
     },
+    groupClasses: {
+      scheduled: groupClassesScheduled.length,
+      completed: groupClassesCompleted.length,
+      attendanceRate: groupAttendanceRate,
+      present: groupPresent,
+      absent: groupAbsent,
+      excused: groupExcused,
+      studentsAttended: groupStudentsAttended,
+      batchesActiveInPeriod: groupBatches.length,
+      needsAttendance: groupSessionsNeedingAttendance,
+      batches: groupBatches
+    },
     periodSessions: periodSessions.slice(0, 20),
     courses,
     teachers,
@@ -528,13 +606,50 @@ export default async function CeoDashboardPage({
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Kpi icon={Users} label="Student registrations" value={String(data.kpis.registeredStudents)} detail={data.range.label} color="text-blue-600" />
           <Kpi icon={UserPlus} label="New inquiries" value={String(data.kpis.inquiries)} detail={data.range.label} color="text-violet-600" />
-          <Kpi icon={CalendarCheck} label="Classes recorded" value={String(data.kpis.classes)} detail={`${data.kpis.attendanceRate}% attendance rate`} color="text-emerald-600" />
-          <Kpi icon={Clock} label="Classes scheduled" value={String(data.kpis.scheduledClasses)} detail={`${data.actions.sessionsNeedingAttendance} need attendance`} color="text-blue-600" />
+          <Kpi icon={CalendarCheck} label="1-to-1 classes recorded" value={String(data.kpis.classes)} detail={`${data.kpis.attendanceRate}% attendance rate`} color="text-emerald-600" />
+          <Kpi icon={Clock} label="1-to-1 classes scheduled" value={String(data.kpis.scheduledClasses)} detail={`${data.actions.sessionsNeedingAttendance} need attendance`} color="text-blue-600" />
           <Kpi icon={WalletCards} label="Revenue collected" value={formatRupiah(data.kpis.revenue)} detail={data.range.label} color="text-emerald-600" />
           <Kpi icon={CircleDollarSign} label="Outstanding" value={formatRupiah(data.kpis.outstandingAmount)} detail="Current unpaid balance" color="text-yellow-700" />
           <Kpi icon={Star} label="Average rating" value={data.kpis.averageRating ? data.kpis.averageRating.toFixed(1) : "N/A"} detail="Approved reviews" color="text-yellow-600" />
           <Kpi icon={CheckCircle2} label="Present + late" value={String(data.kpis.attendedClasses)} detail={data.range.label} color="text-emerald-600" />
         </section>
+
+        <Card className="p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-lead-blue">Group-class performance</p>
+              <h2 className="mt-1 font-heading text-xl font-extrabold text-lead-navy">Batches in {data.range.label.toLowerCase()}</h2>
+              <p className="mt-1 text-sm text-lead-gray">Class delivery and student attendance follow the reporting-period filter above. Excused students are shown separately and excluded from the attendance-rate denominator.</p>
+            </div>
+            <Button asChild variant="secondary" size="sm"><Link href="/admin/batches">Open batches</Link></Button>
+          </div>
+          <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Kpi icon={CalendarCheck} label="Group classes held" value={String(data.groupClasses.completed)} detail={`${data.groupClasses.scheduled} scheduled in period`} color="text-emerald-600" />
+            <Kpi icon={Users} label="Students attended" value={String(data.groupClasses.studentsAttended)} detail={`${data.groupClasses.present} total present records`} color="text-blue-600" />
+            <Kpi icon={CheckCircle2} label="Group attendance" value={`${data.groupClasses.attendanceRate}%`} detail={`${data.groupClasses.absent} absent · ${data.groupClasses.excused} excused`} color="text-violet-600" />
+            <Kpi icon={Clock} label="Needs attendance" value={String(data.groupClasses.needsAttendance)} detail={`${plural(data.groupClasses.batchesActiveInPeriod, "batch", "batches")} with classes in period`} color="text-yellow-700" />
+          </section>
+          {data.groupClasses.batches.length ? (
+            <div className="mt-5 overflow-x-auto rounded-lg border border-slate-200">
+              <table className="min-w-[720px] w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-[0.08em] text-lead-gray">
+                  <tr><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Classes held</th><th className="px-4 py-3">Students attended</th><th className="px-4 py-3">Attendance</th><th className="px-4 py-3">Absent / excused</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.groupClasses.batches.map((batch) => (
+                    <tr key={batch.batchId || batch.batchName}>
+                      <td className="px-4 py-3 font-bold text-lead-navy">{batch.batchName}</td>
+                      <td className="px-4 py-3 text-lead-navy">{batch.completed}/{batch.scheduled}</td>
+                      <td className="px-4 py-3 text-lead-navy">{batch.studentsAttended}</td>
+                      <td className="px-4 py-3 font-bold text-emerald-700">{batch.attendanceRate}%</td>
+                      <td className="px-4 py-3 text-lead-gray">{batch.absent} / {batch.excused}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className="mt-5"><Empty text={`No group classes found in ${data.range.label.toLowerCase()}.`} /></div>}
+        </Card>
 
         <Card className="p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
