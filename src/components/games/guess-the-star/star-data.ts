@@ -34,8 +34,7 @@ export const stars: StarProfile[] = [
     category: "Sports",
     country: "Argentina",
     occupation: "footballer",
-    image:
-      "https://commons.wikimedia.org/wiki/Special:Redirect/file/Lionel-Messi-Argentina-2022-FIFA-World-Cup.jpg?width=700",
+    image: "/images/games/guess-the-star/portrait-s01.jpg",
     clues: [
       "He is a world-famous athlete.",
       "He is an Argentine footballer.",
@@ -62,8 +61,7 @@ export const stars: StarProfile[] = [
     category: "Sports",
     country: "Portugal",
     occupation: "footballer",
-    image:
-      "https://commons.wikimedia.org/wiki/Special:Redirect/file/Cristiano_Ronaldo_2018.jpg?width=700",
+    image: "/images/games/guess-the-star/portrait-s02.jpg",
     clues: [
       "He is a famous athlete.",
       "He is a Portuguese footballer.",
@@ -89,8 +87,7 @@ export const stars: StarProfile[] = [
     category: "Sports",
     country: "United States",
     occupation: "tennis player",
-    image:
-      "https://commons.wikimedia.org/wiki/Special:Redirect/file/Serena_williams.jpg?width=700",
+    image: "/images/games/guess-the-star/portrait-s03.jpg",
     clues: [
       "She is a celebrated athlete.",
       "She is an American tennis player.",
@@ -102,10 +99,10 @@ export const stars: StarProfile[] = [
     vocabulary: ["champion", "determined", "tournament"],
     factSource: "https://www.wtatennis.com/players/230234/serena-williams",
     credit: {
-      creator: "Wikigo",
-      license: "CC BY 3.0",
-      licenseUrl: "https://creativecommons.org/licenses/by/3.0/",
-      sourceUrl: "https://commons.wikimedia.org/wiki/File:Serena_williams.jpg",
+      creator: "Cdpache",
+      license: "CC BY-SA 3.0",
+      licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/",
+      sourceUrl: "https://commons.wikimedia.org/wiki/File:Serena_Williams.jpg",
     },
   },
   {
@@ -115,8 +112,7 @@ export const stars: StarProfile[] = [
     category: "Movies & Entertainment",
     country: "Hong Kong",
     occupation: "actor and filmmaker",
-    image:
-      "https://commons.wikimedia.org/wiki/Special:Redirect/file/Jackie_Chan_2002-portrait.jpg?width=700",
+    image: "/images/games/guess-the-star/portrait-s04.jpg",
     clues: [
       "He works in movies.",
       "He is an actor and filmmaker from Hong Kong.",
@@ -141,8 +137,7 @@ export const stars: StarProfile[] = [
     category: "Inspiring People",
     country: "Indonesia",
     occupation: "engineer and former president",
-    image:
-      "https://commons.wikimedia.org/wiki/Special:Redirect/file/B._J._Habibie,_President_of_Indonesia_portrait.jpg?width=700",
+    image: "/images/games/guess-the-star/portrait-s05.jpg",
     clues: [
       "He was an engineer and national leader.",
       "He was from Indonesia.",
@@ -169,8 +164,7 @@ export const stars: StarProfile[] = [
     category: "Indonesian Stars",
     country: "Indonesia",
     occupation: "singer and actress",
-    image:
-      "https://commons.wikimedia.org/wiki/Special:Redirect/file/Maudy_Ayunda_at_Sundance_Film_Festival_2026-6.jpg?width=700",
+    image: "/images/games/guess-the-star/portrait-s06.jpg",
     clues: [
       "She works in music and movies.",
       "She is an Indonesian singer and actress.",
