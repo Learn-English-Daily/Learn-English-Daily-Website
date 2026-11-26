@@ -9,6 +9,7 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Star,
   Trophy,
   Volume2,
   VolumeX,
@@ -35,6 +36,7 @@ const stageNames = [
   "Spotlight Rush",
   "Three Clues, One Star",
   "Star Magazine Studio",
+  "Favorite Person Spotlight",
   "Million Star Finale",
 ];
 const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
@@ -160,7 +162,7 @@ export function GuessTheStarGame() {
             Scoreboard
           </span>
           <p className="font-black text-yellow-300">
-            ★ {totalStars}/15 · {results.reduce((s, r) => s + r.score, 0)} pts
+            ★ {totalStars}/18 · {results.reduce((s, r) => s + r.score, 0)} pts
           </p>
         </div>
         <div className="flex gap-2">
@@ -176,16 +178,16 @@ export function GuessTheStarGame() {
         </div>
       </header>
       <div className="relative z-10 p-4 sm:p-7">
-        {stage < 5 && (
+        {stage < 6 && (
           <div className="mx-auto mb-5 max-w-5xl">
             <div className="flex justify-between text-xs font-black uppercase tracking-wider text-violet-200">
-              <span>Round {stage + 1} of 5</span>
+              <span>Round {stage + 1} of 6</span>
               <span>{stageNames[stage]}</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/15">
               <div
                 className="h-full bg-gradient-to-r from-cyan-400 to-yellow-300 transition-all"
-                style={{ width: `${(stage / 5) * 100}%` }}
+                style={{ width: `${(stage / 6) * 100}%` }}
               />
             </div>
           </div>
@@ -194,8 +196,9 @@ export function GuessTheStarGame() {
         {stage === 1 && <SpotlightRush {...common} />}{" "}
         {stage === 2 && <ThreeClues {...common} />}{" "}
         {stage === 3 && <MagazineStudio name={name} {...common} />}{" "}
-        {stage === 4 && <Finale name={name} {...common} />}{" "}
-        {stage >= 5 && (
+        {stage === 4 && <FavoritePersonSpotlight name={name} {...common} />} {" "}
+        {stage === 5 && <Finale name={name} {...common} />} {" "}
+        {stage >= 6 && (
           <FinalResult
             name={name}
             results={results}
@@ -318,7 +321,7 @@ function Opening({
             Guess the Famous Face. Discover Their Story.
           </p>
           <p className="mx-auto mt-4 max-w-xl text-base font-semibold text-violet-200 lg:mx-0">
-            Five original game-show rounds build recognition, description,
+            Six original game-show rounds build recognition, description,
             vocabulary, and confident speaking.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
@@ -961,6 +964,139 @@ function MagazineStudio({
   );
 }
 
+function FavoritePersonSpotlight({
+  name,
+  level,
+  sound,
+  onComplete,
+}: { name: string } & StageProps) {
+  const passages: Record<Level, string> = {
+    Foundation:
+      "A favorite person is someone we respect and enjoy learning from. This person does not need to be famous. A parent, teacher, friend, athlete, or artist can be a favorite person. Good qualities include kindness, honesty, courage, patience, creativity, and hard work. A favorite person inspires us by showing us how to improve, help others, or follow our dreams. We should admire what a person does, not only how famous they are.",
+    Confident:
+      "A favorite person is someone we respect for their qualities, choices, and actions. The person does not need to be a celebrity. A parent may inspire us through patience, a teacher through dedication, or an athlete through determination. Kindness, honesty, courage, creativity, responsibility, and hard work are meaningful qualities. Nobody is perfect, so admiration does not mean copying everything a person does. It means recognizing the positive example that helps us learn, improve, help others, or continue toward our goals.",
+    Fluent:
+      "Choosing a favorite person involves more than recognizing fame or success. We often admire someone whose values, decisions, and achievements have a positive influence on us. That person might demonstrate integrity, resilience, empathy, curiosity, creativity, or dedication. A meaningful role model does not need to be perfect; thoughtful admiration recognizes both human limitations and the actions worth learning from. The strongest reason for calling someone a favorite person is usually the positive example they provide—one that encourages us to grow, contribute to others, and pursue worthwhile goals.",
+  };
+  const questions = [
+    {
+      prompt: "Must a favorite person be famous?",
+      options: ["Yes, always", "No, anyone can inspire us", "Only athletes can"],
+      answer: "No, anyone can inspire us",
+    },
+    {
+      prompt: "Which is a positive quality from the passage?",
+      options: ["Patience", "Popularity", "Expensive clothes"],
+      answer: "Patience",
+    },
+    {
+      prompt: "How can a favorite person inspire us?",
+      options: [
+        "By setting a positive example",
+        "By being perfect",
+        "By appearing on television",
+      ],
+      answer: "By setting a positive example",
+    },
+    {
+      prompt: "What should thoughtful admiration focus on?",
+      options: [
+        "Positive qualities and actions",
+        "Fame only",
+        "Copying everything",
+      ],
+      answer: "Positive qualities and actions",
+    },
+  ];
+  const [readAloud, setReadAloud] = useState(false);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [qualities, setQualities] = useState<string[]>([]);
+  const [favoriteName, setFavoriteName] = useState("");
+  const [relationship, setRelationship] = useState("someone in my family");
+  const [explanation, setExplanation] = useState("");
+  const [speaking, setSpeaking] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!speaking) return;
+    const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, [speaking]);
+  const correct = questions.filter((question, index) => answers[index] === question.answer).length;
+  const minimum = level === "Foundation" ? 25 : level === "Confident" ? 45 : 70;
+  const ready = readAloud && Object.keys(answers).length === questions.length && favoriteName.trim().length >= 2 && explanation.trim().length >= minimum;
+  const keySentence = "A favorite person inspires us through their qualities, actions, and the positive example they set.";
+  function finish() {
+    const starsEarned = correct === 4 && speaking && qualities.length >= 2 ? 3 : correct >= 3 ? 2 : 1;
+    onComplete({
+      stars: starsEarned,
+      score: correct * 120 + qualities.length * 25 + (speaking ? 100 : 0),
+      label: "Favorite Person Spotlight",
+      practiced: speaking,
+    });
+  }
+  return (
+    <>
+      <StageTitle
+        number={5}
+        title="FAVORITE PERSON SPOTLIGHT"
+        subtitle="Read, understand, and explain what makes someone special to you."
+      />
+      <div className="mx-auto max-w-5xl space-y-5">
+        <section className="studio-card overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-400/20 to-violet-500/20 p-5 sm:p-7">
+            <p className="text-xs font-black uppercase tracking-[.24em] text-cyan-300">LEAD Reading Spotlight · {level}</p>
+            <h3 className="mt-2 text-2xl font-black text-yellow-300">What makes someone a favorite person?</h3>
+            <p className="mt-4 text-lg font-semibold leading-8 text-violet-50">{passages[level]}</p>
+          </div>
+          <div className="border-t border-white/10 p-5 sm:p-7">
+            <p className="text-sm font-black uppercase tracking-wider text-violet-200">Read this key sentence aloud</p>
+            <p className="mt-3 rounded-2xl border-2 border-yellow-300/40 bg-yellow-300/10 p-5 text-xl font-black leading-8 text-yellow-100">“{keySentence}”</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button className="game-choice" onClick={() => speakArcade(keySentence, sound)}>🔊 Hear the sentence</button>
+              <button className={`game-choice ${readAloud ? "border-emerald-300 bg-emerald-400/15 text-emerald-200" : ""}`} onClick={() => setReadAloud(true)}>{readAloud ? "✓ I read it aloud" : "🎤 I read it aloud"}</button>
+            </div>
+          </div>
+        </section>
+
+        <section className="studio-card p-5 sm:p-7">
+          <h3 className="text-2xl font-black text-yellow-300">Reading Challenge</h3>
+          <p className="mt-2 font-semibold text-violet-200">Answer from the paragraph—not from celebrity trivia.</p>
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            {questions.map((question, questionIndex) => (
+              <div key={question.prompt} className="rounded-2xl bg-white/5 p-4">
+                <p className="font-black"><span className="mr-2 text-cyan-300">{questionIndex + 1}.</span>{question.prompt}</p>
+                <div className="mt-3 grid gap-2">
+                  {question.options.map((option) => {
+                    const selected = answers[questionIndex] === option;
+                    return <button key={option} onClick={() => setAnswers((current) => ({ ...current, [questionIndex]: option }))} className={`game-choice text-left text-sm ${selected ? option === question.answer ? "border-emerald-300 bg-emerald-400/15 text-emerald-100" : "border-orange-300 bg-orange-400/15" : ""}`}>{selected ? option === question.answer ? "✓ " : "Try again · " : ""}{option}</button>;
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-center font-black text-cyan-200">Comprehension score: {correct}/{questions.length}</p>
+        </section>
+
+        <section className="studio-card p-5 sm:p-7">
+          <h3 className="text-2xl font-black text-yellow-300">My Favorite Person</h3>
+          <p className="mt-2 font-semibold text-violet-200">Now connect the reading to your own life, {name}.</p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="font-black">Their name<input value={favoriteName} onChange={(event) => setFavoriteName(event.target.value.slice(0, 40))} placeholder="Who is your favorite person?" className="mt-2 h-12 w-full rounded-xl bg-white px-3 font-semibold text-slate-900" /></label>
+            <label className="font-black">This person is<select value={relationship} onChange={(event) => setRelationship(event.target.value)} className="mt-2 h-12 w-full rounded-xl bg-white px-3 font-semibold text-slate-900"><option>someone in my family</option><option>my teacher</option><option>my friend</option><option>an athlete</option><option>an artist or entertainer</option><option>a community leader</option></select></label>
+          </div>
+          <p className="mt-5 font-black">Choose qualities that truly describe this person</p>
+          <div className="mt-3 flex flex-wrap gap-2">{["kind", "honest", "patient", "courageous", "creative", "hard-working", "responsible", "determined"].map((quality) => <button key={quality} onClick={() => setQualities((current) => current.includes(quality) ? current.filter((value) => value !== quality) : [...current, quality])} className={`game-choice text-sm ${qualities.includes(quality) ? "border-yellow-300 bg-yellow-300/15 text-yellow-200" : ""}`}>{qualities.includes(quality) ? "✓ " : ""}{quality}</button>)}</div>
+          <div className="mt-5 rounded-2xl bg-cyan-400/10 p-4 font-bold text-cyan-100">Sentence starter: My favorite person is {favoriteName || "..."}. This person is {qualities.slice(0, 2).join(" and ") || "..."}. I admire this person because...</div>
+          <label className="mt-5 block font-black">Explain why this person is your favorite<textarea value={explanation} onChange={(event) => setExplanation(event.target.value)} placeholder={level === "Foundation" ? "I admire this person because..." : "Describe their qualities, actions, and how they inspire you..."} className="mt-2 min-h-32 w-full rounded-xl bg-white p-4 font-semibold text-slate-900" /></label>
+          <p className="mt-2 text-right text-xs font-bold text-violet-300">{explanation.trim().length}/{minimum} minimum characters</p>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 p-4"><div><p className="font-black">Speak about your favorite person</p><p className="text-sm text-violet-200">Use your notes and speak in your own words. This is self-practice, not automatic pronunciation scoring.</p></div><button className={`game-choice ${speaking ? "border-emerald-300 text-emerald-200" : ""}`} onClick={() => setSpeaking((value) => !value)}>{speaking ? `⏱ Speaking · ${seconds}s` : "🎤 Start speaking timer"}</button></div>
+          <button disabled={!ready} onClick={finish} className="game-primary mt-6 w-full disabled:cursor-not-allowed disabled:opacity-40"><Star className="h-5 w-5" /> Complete Favorite Person Spotlight</button>
+        </section>
+      </div>
+    </>
+  );
+}
+
 function Finale({
   name,
   level,
@@ -1021,7 +1157,7 @@ function Finale({
   return (
     <>
       <StageTitle
-        number={5}
+        number={6}
         title="MILLION STAR FINALE"
         subtitle={`Mission ${mission + 1}/5 · Win the LEAD Star Champion trophy!`}
       />
@@ -1197,8 +1333,8 @@ function FinalResult({
         STAR CHAMPION
       </h2>
       <p className="mt-3 text-2xl font-black">Awarded to {name}</p>
-      <p className="mt-6 text-6xl font-black">{total}/15 ★</p>
-      <div className="mx-auto mt-7 grid max-w-2xl gap-3 sm:grid-cols-5">
+      <p className="mt-6 text-6xl font-black">{total}/18 ★</p>
+      <div className="mx-auto mt-7 grid max-w-3xl gap-3 sm:grid-cols-6">
         {results.map((r, i) => (
           <div key={r.label} className="studio-card p-3">
             <span className="text-xs font-black">R{i + 1}</span>

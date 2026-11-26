@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
-  { title: "Guess the Star!", description: "Reveal famous faces, catch moving spotlights, solve mystery clues, design a magazine cover, and win the TV-show finale.", status: "New", icon: Star, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/guess-the-star" },
+  { title: "Guess the Star!", description: "Reveal famous faces, solve clues, design a magazine cover, read about role models, present a favorite person, and win the TV-show finale.", status: "New", icon: Star, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/guess-the-star" },
   { title: "Calendar Quest: Race Against Time!", description: "Slice flying dates, race through calendar gates, build sentences, plan real events, and defeat Calendar Chaos.", status: "New", icon: CalendarDays, accent: "border-blue-100 bg-blue-50 text-blue-700", available: true, href: "/games/calendar-quest" },
   { title: "Mystery Place: The Lost Postcards", description: "My Favorite Place: run, investigate, leap between islands, build a dream place, and describe it aloud.", status: "New", icon: MapPinned, accent: "border-blue-100 bg-blue-50 text-lead-blue", available: true, href: "/games/mystery-place" },
   { title: "LEAD Celebration Town", description: "Run through a colorful town, collect celebration items, deliver invitations, decorate the venue, rescue decorations, and celebrate.", status: "New", icon: PartyPopper, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/celebration-planner" },
