@@ -260,6 +260,10 @@ export function GuessTheStarGame() {
           background: rgba(255, 255, 255, 0.09);
           backdrop-filter: blur(12px);
         }
+        @keyframes spotlightFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-12px); }
+        }
         @media (prefers-reduced-motion: reduce) {
           * {
             animation-duration: 0.01ms !important;
@@ -652,7 +656,8 @@ function SpotlightRush({ level, sound, onComplete }: StageProps) {
             <button
               key={s.id}
               onClick={() => hit(s)}
-              className={`group overflow-hidden rounded-[1.5rem] border-4 border-violet-400/40 bg-violet-900 shadow-xl transition hover:border-yellow-300 ${!relaxed ? (i % 2 ? "animate-[bounce_2.8s_ease-in-out_infinite]" : "animate-[pulse_2.4s_ease-in-out_infinite]") : ""}`}
+              className={`group overflow-hidden rounded-[1.5rem] border-4 border-violet-400/40 bg-violet-900 shadow-xl transition hover:border-yellow-300 ${!relaxed ? "animate-[spotlightFloat_3s_ease-in-out_infinite]" : ""}`}
+              style={{ animationDelay: `${i * 180}ms` }}
             >
               <Portrait star={s} className="h-48 w-full sm:h-64" />
               <span className="block bg-black/50 p-3 font-black group-hover:text-yellow-300">
@@ -786,6 +791,14 @@ function MagazineStudio({
   const [adjective, setAdjective] = useState("talented");
   const [reason, setReason] = useState("their achievements inspire me");
   const [placed, setPlaced] = useState<string[]>([]);
+  const sentenceTarget = useMemo(() => level === "Foundation"
+    ? ["I", "admire", "this", "person", "because", "they", "inspire", "me."]
+    : level === "Confident"
+      ? ["My", "favorite", "person", "inspires", "me", "through", "hard", "work."]
+      : ["I", "admire", "this", "person", "because", "their", "achievements", "encourage", "my", "goals."], [level]);
+  const sentenceTiles = useMemo(() => shuffle(sentenceTarget), [sentenceTarget]);
+  const [sentenceProgress, setSentenceProgress] = useState<string[]>([]);
+  const [sentenceMistakes, setSentenceMistakes] = useState(0);
   const [practice, setPractice] = useState(false);
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
@@ -801,10 +814,23 @@ function MagazineStudio({
       : level === "Confident"
         ? `I admire ${subject} because this person is ${adjective} and ${reason}.`
         : `The person I admire is ${subject}. ${pronoun} is ${adjective}; ${reason}, which encourages me to work toward my own goals.`;
+  const sentenceComplete = sentenceProgress.length === sentenceTarget.length;
+  const coverReady = sentenceComplete && placed.length >= 3 && practice;
+  function chooseSentenceWord(word: string) {
+    if (sentenceComplete || sentenceProgress.includes(word)) return;
+    if (word === sentenceTarget[sentenceProgress.length]) {
+      setSentenceProgress((current) => [...current, word]);
+      arcadeSound("correct", sound);
+    } else {
+      setSentenceMistakes((value) => value + 1);
+      arcadeSound("wrong", sound);
+    }
+  }
   function finish() {
+    if (!coverReady) return;
     onComplete({
-      stars: placed.length >= 3 && practice ? 3 : placed.length >= 2 ? 2 : 1,
-      score: 300 + placed.length * 80 + (practice ? 120 : 0),
+      stars: sentenceMistakes === 0 && placed.length === 4 ? 3 : sentenceMistakes <= 2 ? 2 : 1,
+      score: 420 + placed.length * 80 + Math.max(0, 120 - sentenceMistakes * 20),
       label: "Magazine Studio",
       practiced: practice,
     });
@@ -862,6 +888,25 @@ function MagazineStudio({
             <option>they encourage me to keep learning</option>
             <option>their work shows strong determination</option>
           </select>
+          <div className="mt-5 rounded-2xl border border-cyan-300/30 bg-cyan-400/10 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-black text-cyan-100">Sentence Builder Challenge</p>
+                <p className="text-xs font-bold text-cyan-200">Tap the word tiles in the correct order.</p>
+              </div>
+              <button onClick={() => { setSentenceProgress([]); setSentenceMistakes(0); }} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-black">Reset</button>
+            </div>
+            <div className="mt-3 min-h-14 rounded-xl border-2 border-dashed border-cyan-200/30 bg-slate-950/25 p-3 font-black leading-8">
+              {sentenceProgress.length ? sentenceProgress.join(" ") : "Build your sentence here..."}
+              {sentenceComplete && <span className="ml-2 text-emerald-300">✓</span>}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {sentenceTiles.map((word) => (
+                <button key={word} disabled={sentenceProgress.includes(word)} onClick={() => chooseSentenceWord(word)} className="rounded-xl bg-white px-3 py-2 text-sm font-black text-violet-900 shadow disabled:opacity-25">{word}</button>
+              ))}
+            </div>
+            <p className={`mt-2 text-xs font-bold ${sentenceMistakes ? "text-orange-200" : "text-cyan-200"}`}>{sentenceComplete ? "Excellent! Your cover sentence is complete." : sentenceMistakes ? `Not that word yet—look at the sentence order. Attempts: ${sentenceMistakes}` : "Start with the word that begins the sentence."}</p>
+          </div>
           <p className="mt-5 text-sm font-black text-cyan-200">
             Tap or drag at least 3 cover stickers:
           </p>
@@ -956,7 +1001,12 @@ function MagazineStudio({
           Speaking is self-practice. The game does not claim to assess
           pronunciation.
         </p>
-        <button className="game-primary mt-5" onClick={finish}>
+        <div className="mx-auto mt-4 grid max-w-2xl gap-2 text-left text-sm font-black sm:grid-cols-3">
+          <p className={sentenceComplete ? "text-emerald-300" : "text-violet-300"}>{sentenceComplete ? "✓" : "○"} Build the sentence</p>
+          <p className={placed.length >= 3 ? "text-emerald-300" : "text-violet-300"}>{placed.length >= 3 ? "✓" : "○"} Add 3 stickers</p>
+          <p className={practice ? "text-emerald-300" : "text-violet-300"}>{practice ? "✓" : "○"} Practice speaking</p>
+        </div>
+        <button disabled={!coverReady} className="game-primary mt-5 disabled:cursor-not-allowed disabled:opacity-40" onClick={finish}>
           <Trophy /> Finish my cover
         </button>
       </div>
