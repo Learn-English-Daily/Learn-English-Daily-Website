@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Metadata } from "next";
-import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, CalendarDays, Clock3, CloudSun, Footprints, Gift, Heart, History, KeyRound, Lock, MapPinned, Medal, Mic, Palette, PartyPopper, PawPrint, Puzzle, ScanFace, Search, Shirt, ShoppingBasket, Sparkles, Sunrise, Trophy, Users, Utensils } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, Bus, CalendarDays, Clock3, CloudSun, Footprints, Gift, Heart, History, KeyRound, Lock, MapPinned, Medal, Mic, Palette, PartyPopper, PawPrint, Puzzle, ScanFace, Search, Shirt, ShoppingBasket, Sparkles, Star, Sunrise, Trophy, Users, Utensils } from "lucide-react";
 import { GamesPasswordGate } from "@/app/games/password-gate";
 import { CatalogSearch } from "@/app/games/catalog-search";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const games: GameCard[] = [
+  { title: "Guess the Star!", description: "Reveal famous faces, catch moving spotlights, solve mystery clues, design a magazine cover, and win the TV-show finale.", status: "New", icon: Star, accent: "border-violet-100 bg-violet-50 text-violet-700", available: true, href: "/games/guess-the-star" },
   { title: "Calendar Quest: Race Against Time!", description: "Slice flying dates, race through calendar gates, build sentences, plan real events, and defeat Calendar Chaos.", status: "New", icon: CalendarDays, accent: "border-blue-100 bg-blue-50 text-blue-700", available: true, href: "/games/calendar-quest" },
   { title: "Mystery Place: The Lost Postcards", description: "My Favorite Place: run, investigate, leap between islands, build a dream place, and describe it aloud.", status: "New", icon: MapPinned, accent: "border-blue-100 bg-blue-50 text-lead-blue", available: true, href: "/games/mystery-place" },
   { title: "LEAD Celebration Town", description: "Run through a colorful town, collect celebration items, deliver invitations, decorate the venue, rescue decorations, and celebrate.", status: "New", icon: PartyPopper, accent: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700", available: true, href: "/games/celebration-planner" },
