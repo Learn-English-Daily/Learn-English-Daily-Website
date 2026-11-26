@@ -14,6 +14,7 @@ import {
   Star,
   UserPlus,
   Users,
+  Video,
   WalletCards
 } from "lucide-react";
 import { logoutCeo } from "@/app/ceo/actions";
@@ -563,6 +564,9 @@ export default async function CeoDashboardPage({
             <p className="mt-2 text-sm text-lead-gray">Performance snapshot for {data.range.label.toLowerCase()}.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button asChild variant="secondary">
+              <Link href="/ceo/meet-monitoring"><Video className="h-4 w-4" />Meet Monitoring</Link>
+            </Button>
             <Button asChild variant="secondary">
               <Link href="/ceo/assistant"><Bot className="h-4 w-4" />AI Assistant</Link>
             </Button>

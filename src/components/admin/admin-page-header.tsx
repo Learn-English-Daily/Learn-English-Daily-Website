@@ -6,12 +6,11 @@ import {
   GraduationCap,
   MessageSquareText,
   Star,
-  Users,
-  Video
+  Users
 } from "lucide-react";
 import { getAdminAccessForUsername } from "@/lib/admin-permissions";
 
-type AdminPageKey = "dashboard" | "sessions" | "meet" | "attendance" | "students" | "teachers" | "batches" | "feedback";
+type AdminPageKey = "dashboard" | "sessions" | "attendance" | "students" | "teachers" | "batches" | "feedback";
 
 const adminNavItems: Array<{
   key: AdminPageKey;
@@ -22,7 +21,6 @@ const adminNavItems: Array<{
 }> = [
   { key: "dashboard", label: "Dashboard", href: "/admin", helper: "Daily overview", icon: Gauge },
   { key: "sessions", label: "Sessions", href: "/admin/sessions", helper: "Class schedule", icon: CalendarClock },
-  { key: "meet", label: "Meet Logs", href: "/admin/meet-monitoring", helper: "Actual class times", icon: Video },
   { key: "attendance", label: "Attendance", href: "/admin/attendance", helper: "Meeting records", icon: CalendarCheck },
   { key: "students", label: "Students", href: "/admin/students", helper: "Registrations", icon: Users },
   { key: "teachers", label: "Teachers", href: "/admin/teachers", helper: "Team overview", icon: GraduationCap },
@@ -74,7 +72,7 @@ export function AdminPageHeader({
           </form>
         </div>
 
-        <nav className={`mt-6 grid gap-3 ${access === "full" ? "sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8" : "grid-cols-5 overflow-x-auto pb-2"}`} aria-label="Admin navigation">
+        <nav className={`mt-6 grid gap-3 ${access === "full" ? "sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7" : "grid-cols-5 overflow-x-auto pb-2"}`} aria-label="Admin navigation">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;
