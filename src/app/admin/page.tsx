@@ -222,13 +222,15 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
     }));
 
   const privateRecordKeys = privateTodaySessions.map((session) => `session:${session.id}`);
-  const meetRecords = groupOnly || !privateRecordKeys.length ? [] : await db.collection<MeetActivity & { recordKey?: string }>(getMeetMonitoringCollectionName())
-    .find({ recordKey: { $in: privateRecordKeys }, recordType: "scheduled_class" })
+  const groupRecordKeys = groupTodaySessions.map((session) => `batch-session:${session.id.replace("group-", "")}`);
+  const meetRecordKeys = [...privateRecordKeys, ...groupRecordKeys];
+  const meetRecords = !meetRecordKeys.length ? [] : await db.collection<MeetActivity & { recordKey?: string }>(getMeetMonitoringCollectionName())
+    .find({ recordKey: { $in: meetRecordKeys }, recordType: "scheduled_class" })
     .project({ recordKey: 1, actualStartAt: 1, actualEndAt: 1, participantSessions: 1, recordingSegments: 1, syncedAt: 1 })
     .toArray();
-  const meetActivityBySession = new Map(meetRecords.map((record) => [record.recordKey?.replace("session:", "") || "", record]));
+  const meetActivityByKey = new Map(meetRecords.map((record) => [record.recordKey || "", record]));
 
-  const todaySessions = [...privateTodaySessions.map((session) => ({ ...session, meetActivity: meetActivityBySession.get(session.id) || null })), ...completedPrivateAttendance.map((session) => ({ ...session, meetActivity: null })), ...groupTodaySessions.map((session) => ({ ...session, meetActivity: null }))]
+  const todaySessions = [...privateTodaySessions.map((session) => ({ ...session, meetActivity: meetActivityByKey.get(`session:${session.id}`) || null })), ...completedPrivateAttendance.map((session) => ({ ...session, meetActivity: null })), ...groupTodaySessions.map((session) => ({ ...session, meetActivity: meetActivityByKey.get(`batch-session:${session.id.replace("group-", "")}`) || null }))]
     .sort((a, b) => {
       if (a.timeRecorded !== b.timeRecorded) return a.timeRecorded ? -1 : 1;
       return a.scheduledAt.localeCompare(b.scheduledAt);

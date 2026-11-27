@@ -25,6 +25,7 @@ import {
 import { getBatchClassSessionsCollectionName, getBatchType, type BatchClassSessionDocument, type BatchType } from "@/lib/batch-class-sessions";
 import { buildBatchCourseProgress, buildStudentGroupClassProgress, getCourseClassTarget, getJakartaMonthKey, type BatchMonthProgress } from "@/lib/batch-course-progress";
 import { getMongoDb } from "@/lib/mongodb";
+import { getBatchMeetLink } from "@/lib/google-meet-monitoring";
 import { getActiveStudentFilter, getStudentRegistrationCollectionName } from "@/lib/student-registration";
 import { getAvailableTeachers, type TeacherOption } from "@/lib/teachers";
 
@@ -41,6 +42,7 @@ type BatchDocument = {
   time?: string;
   maximumStudents?: number;
   status?: "active" | "archived";
+  permanentMeetLink?: string;
   createdAt?: Date;
 };
 
@@ -66,6 +68,7 @@ type Batch = {
   time: string;
   maximumStudents: number;
   status: "active" | "archived";
+  permanentMeetLink: string;
 };
 
 type Student = {
@@ -124,7 +127,8 @@ async function getBatchPageData(groupOnly: boolean) {
       days: batch.days || "",
       time: batch.time || "",
       maximumStudents: batch.maximumStudents || 12,
-      status: batch.status || "active"
+      status: batch.status || "active",
+      permanentMeetLink: getBatchMeetLink(batch.batchName || "", batch.permanentMeetLink)
     })),
     teachers: teacherDocs,
     students: studentDocs.map((student) => ({
@@ -208,6 +212,7 @@ export default async function AdminBatchesPage() {
               <Field label="Start Date" name="startDate" type="date" required />
               <Field label="Days" name="days" placeholder="Mon, Wed, Fri" required />
               <Field label="Time" name="time" placeholder="7:00 PM - 8:00 PM" required />
+              <Field label="Permanent Google Meet Link (online batches)" name="permanentMeetLink" type="url" placeholder="https://meet.google.com/xxx-xxxx-xxx" />
               <Field label="Maximum Students (Buddy is always 2)" name="maximumStudents" type="number" min={1} max={100} defaultValue={12} required />
               <div className="flex items-end">
                 <Button type="submit" className="w-full">Create Batch</Button>
@@ -277,6 +282,7 @@ export default async function AdminBatchesPage() {
                           <Field label="Start Date" name="startDate" type="date" defaultValue={batch.startDate} required />
                           <Field label="Days" name="days" defaultValue={batch.days} required />
                           <Field label="Time" name="time" defaultValue={batch.time} required />
+                          <Field label="Permanent Google Meet Link" name="permanentMeetLink" type="url" defaultValue={batch.permanentMeetLink} placeholder="https://meet.google.com/xxx-xxxx-xxx" />
                           <Field label="Maximum" name="maximumStudents" type="number" defaultValue={batch.maximumStudents} min={1} max={100} required />
                           <Button type="submit" variant="secondary" className="self-end"><Pencil className="mr-2 h-4 w-4" /> Update</Button>
                         </ActionFeedbackForm>

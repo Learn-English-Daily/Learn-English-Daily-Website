@@ -131,6 +131,23 @@ export function getMeetingCode(link: string) {
   return match?.[1]?.toLowerCase() || "";
 }
 
+const knownBatchMeetLinks: Record<string, string> = {
+  "group stars 01": "https://meet.google.com/bvr-ykrh-vff",
+  "group stars 1": "https://meet.google.com/bvr-ykrh-vff",
+  "stars 01": "https://meet.google.com/bvr-ykrh-vff",
+  "stars 1": "https://meet.google.com/bvr-ykrh-vff",
+  "group stars 02": "https://meet.google.com/uxr-ezqt-ums",
+  "group stars 2": "https://meet.google.com/uxr-ezqt-ums",
+  "stars 02": "https://meet.google.com/uxr-ezqt-ums",
+  "stars 2": "https://meet.google.com/uxr-ezqt-ums"
+};
+
+export function getBatchMeetLink(batchName: string, storedLink?: string) {
+  if (getMeetingCode(storedLink || "")) return storedLink?.trim() || "";
+  const normalized = batchName.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+  return knownBatchMeetLinks[normalized] || "";
+}
+
 export async function listConferenceRecords(meetingCode: string, since: Date) {
   const records: MeetConferenceRecord[] = [];
   let pageToken = "";

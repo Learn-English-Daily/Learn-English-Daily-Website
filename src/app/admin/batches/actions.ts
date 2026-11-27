@@ -17,6 +17,7 @@ import {
   isAssessmentProgram
 } from "@/lib/assessments";
 import { getMongoDb } from "@/lib/mongodb";
+import { getMeetingCode } from "@/lib/google-meet-monitoring";
 import { ensureGroupMonthlyInvoice } from "@/lib/group-monthly-invoices";
 import {
   getActiveStudentFilter,
@@ -111,6 +112,7 @@ function parseBatchFields(formData: FormData) {
   const days = clean(formData.get("days"));
   const time = clean(formData.get("time"));
   const batchType = getBatchType(clean(formData.get("batchType")));
+  const permanentMeetLink = clean(formData.get("permanentMeetLink"));
   const maximumStudents = batchType === "Standard/Buddy" ? 2 : numberInRange(formData.get("maximumStudents"), 1, 100, 12);
 
   if (!batchName || !isAssessmentProgram(program) || !teacherId || !startDate || !days || !time || !maximumStudents) {
@@ -120,7 +122,8 @@ function parseBatchFields(formData: FormData) {
     throw new Error("Academic English batches must use the Buddy type.");
   }
 
-  return { batchName, program, batchType, teacherId, startDate, days, time, maximumStudents };
+  if (permanentMeetLink && !getMeetingCode(permanentMeetLink)) throw new Error("Use a valid permanent Google Meet link.");
+  return { batchName, program, batchType, teacherId, startDate, days, time, maximumStudents, permanentMeetLink };
 }
 
 function assertBatchTypeAccess(admin: { username: string }, batchType: BatchType) {
