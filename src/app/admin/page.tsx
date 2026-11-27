@@ -7,6 +7,7 @@ import {
   CalendarClock,
   Inbox,
   Layers3,
+  Radio,
   Star,
   Users
 } from "lucide-react";
@@ -29,6 +30,7 @@ import {
   type BatchClassSessionDocument
 } from "@/lib/batch-class-sessions";
 import { getMongoDb } from "@/lib/mongodb";
+import { getMeetMonitoringCollectionName } from "@/lib/google-meet-monitoring";
 import { getReviewCollectionName } from "@/lib/reviews";
 import { getBatchesCollectionName } from "@/lib/assessments";
 import { getStudentAttendanceCollectionName } from "@/lib/attendance";
@@ -73,6 +75,7 @@ type DashboardData = {
     timeRecorded: boolean;
     status: string;
     teacherNames: string[];
+    meetActivity: MeetActivity | null;
   }>;
   needsAttendance: number;
   newInquiries: number;
@@ -84,6 +87,14 @@ type DashboardData = {
     name: string;
     goal: string;
   } | null;
+};
+
+type MeetActivity = {
+  actualStartAt?: string;
+  actualEndAt?: string;
+  participantSessions?: Array<{ name?: string; joinedAt?: string; leftAt?: string }>;
+  recordingSegments?: Array<{ startTime?: string; endTime?: string; state?: string }>;
+  syncedAt?: Date;
 };
 
 function getTodayJakarta() {
@@ -210,7 +221,14 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
       status: "Completed"
     }));
 
-  const todaySessions = [...privateTodaySessions, ...completedPrivateAttendance, ...groupTodaySessions]
+  const privateRecordKeys = privateTodaySessions.map((session) => `session:${session.id}`);
+  const meetRecords = groupOnly || !privateRecordKeys.length ? [] : await db.collection<MeetActivity & { recordKey?: string }>(getMeetMonitoringCollectionName())
+    .find({ recordKey: { $in: privateRecordKeys }, recordType: "scheduled_class" })
+    .project({ recordKey: 1, actualStartAt: 1, actualEndAt: 1, participantSessions: 1, recordingSegments: 1, syncedAt: 1 })
+    .toArray();
+  const meetActivityBySession = new Map(meetRecords.map((record) => [record.recordKey?.replace("session:", "") || "", record]));
+
+  const todaySessions = [...privateTodaySessions.map((session) => ({ ...session, meetActivity: meetActivityBySession.get(session.id) || null })), ...completedPrivateAttendance.map((session) => ({ ...session, meetActivity: null })), ...groupTodaySessions.map((session) => ({ ...session, meetActivity: null }))]
     .sort((a, b) => {
       if (a.timeRecorded !== b.timeRecorded) return a.timeRecorded ? -1 : 1;
       return a.scheduledAt.localeCompare(b.scheduledAt);
@@ -316,7 +334,8 @@ export default async function AdminDashboardPage() {
             </div>
             <div className="mt-5 grid gap-3">
               {data.todaySessions.map((session) => (
-                <a key={session.id} href="/admin/sessions" className="focus-ring rounded-lg border border-slate-200 bg-white p-4 transition hover:border-lead-blue hover:bg-blue-50">
+                <article key={session.id} className="rounded-lg border border-slate-200 bg-white p-4 transition hover:border-lead-blue">
+                  <a href="/admin/sessions" className="focus-ring block rounded-md hover:bg-blue-50">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-lg bg-lead-navy px-3 py-1 text-xs font-bold uppercase text-white">Meeting {session.meetingNumber}</span>
                     <span className="font-heading font-bold text-lead-navy">{session.studentName}</span>
@@ -326,7 +345,9 @@ export default async function AdminDashboardPage() {
                   <p className="mt-1 text-sm text-lead-gray">
                     <span className="font-bold text-lead-navy">Teachers:</span> {session.teacherNames.length ? session.teacherNames.join(", ") : "Not assigned"}
                   </p>
-                </a>
+                  </a>
+                  {session.meetActivity ? <MeetActivityLog activity={session.meetActivity} studentName={session.studentName} /> : null}
+                </article>
               ))}
               {!data.todaySessions.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-lead-gray">No classes scheduled for today.</p> : null}
             </div>
@@ -367,6 +388,37 @@ export default async function AdminDashboardPage() {
       </section>
     </main>
   );
+}
+
+function normalizeName(value: string) { return value.toLocaleLowerCase().replace(/[^a-z0-9]/g, " ").split(/\s+/).filter(Boolean); }
+function isStudentParticipant(participant: string, student: string) {
+  const participantWords = new Set(normalizeName(participant));
+  const studentWords = normalizeName(student);
+  return studentWords.length > 0 && studentWords.filter((word) => participantWords.has(word)).length >= Math.min(2, studentWords.length);
+}
+function formatMeetTime(value?: string) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return "Time unavailable";
+  return new Intl.DateTimeFormat("en", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }).format(new Date(value)) + " WIB";
+}
+function MeetActivityLog({ activity, studentName }: { activity: MeetActivity; studentName: string }) {
+  const events: Array<{ time: string; label: string; detail?: string; tone: string }> = [];
+  if (activity.actualStartAt) events.push({ time: activity.actualStartAt, label: "Meeting started", tone: "bg-blue-500" });
+  for (const participant of activity.participantSessions || []) {
+    if (participant.joinedAt) events.push({ time: participant.joinedAt, label: isStudentParticipant(participant.name || "", studentName) ? "Student joined" : "Participant joined", detail: participant.name, tone: "bg-emerald-500" });
+    if (participant.leftAt) events.push({ time: participant.leftAt, label: isStudentParticipant(participant.name || "", studentName) ? "Student left" : "Participant left", detail: participant.name, tone: "bg-slate-400" });
+  }
+  for (const recording of activity.recordingSegments || []) {
+    if (recording.startTime) events.push({ time: recording.startTime, label: "Recording started", tone: "bg-rose-500" });
+    if (recording.endTime) events.push({ time: recording.endTime, label: "Recording stopped", detail: recording.state === "FILE_GENERATED" ? "File ready" : "Processing", tone: "bg-amber-500" });
+  }
+  if (activity.actualEndAt) events.push({ time: activity.actualEndAt, label: "Meeting ended", tone: "bg-slate-700" });
+  events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  if (!events.length) return null;
+  return <details className="mt-3 border-t border-slate-100 pt-3">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-lead-blue"><span className="inline-flex items-center gap-2"><Radio className="h-4 w-4" />Meet activity · {events.length} event{events.length === 1 ? "" : "s"}</span><span className="text-xs font-semibold text-slate-500">Expand logs</span></summary>
+    <div className="mt-3 space-y-1.5 pl-2">{events.map((event, index) => <div key={`${event.time}-${event.label}-${index}`} className="grid grid-cols-[10px_1fr_auto] items-center gap-2 rounded-md px-2 py-1.5 text-xs"><span className={`h-2.5 w-2.5 rounded-full ${event.tone}`} /><span className="font-semibold text-lead-navy">{event.label}{event.detail ? <span className="font-normal text-slate-500"> · {event.detail}</span> : null}</span><time className="font-medium text-slate-500">{formatMeetTime(event.time)}</time></div>)}</div>
+    {activity.syncedAt ? <p className="mt-2 text-right text-[11px] text-slate-400">Last synced {formatMeetTime(String(activity.syncedAt))}</p> : null}
+  </details>;
 }
 
 function DashboardKpi({

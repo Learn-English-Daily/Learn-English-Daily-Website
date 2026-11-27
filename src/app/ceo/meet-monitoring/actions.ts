@@ -5,13 +5,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getClassSessionsCollectionName, type ClassSessionDocument } from "@/lib/class-sessions";
 import { CEO_SESSION_COOKIE, isValidCeoSession } from "@/lib/ceo-auth";
-import { getMeetingCode, getMeetMonitoringCollectionName, listConferenceParticipants, listConferenceRecordings, listConferenceRecords, type MeetConferenceRecord, type MeetRecording } from "@/lib/google-meet-monitoring";
+import { getMeetingCode, getMeetMonitoringCollectionName, listConferenceParticipants, listConferenceRecordings, listConferenceRecords, type MeetConferenceRecord, type MeetParticipant, type MeetRecording } from "@/lib/google-meet-monitoring";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
 type MeetStudent = { studentId?: string; studentName?: string; permanentMeetLink?: string };
 type StudentCode = { studentId: string; studentName: string; meetingCode: string };
-type Call = { record: MeetConferenceRecord; participantNames: string[]; recordings: MeetRecording[] };
+type Call = { record: MeetConferenceRecord; participantNames: string[]; participants: MeetParticipant[]; recordings: MeetRecording[] };
 type SessionWithId = ClassSessionDocument & { _id?: { toString(): string } };
 
 const MATCH_WINDOW_MS = 3 * 60 * 60 * 1000;
@@ -61,6 +61,24 @@ function recordingSummary(calls: Call[]) {
   };
 }
 
+function participantSummary(calls: Call[]) {
+  const entries = calls.flatMap((call) => call.participants.map((participant) => ({
+    name: participant.signedinUser?.displayName || participant.anonymousUser?.displayName || participant.phoneUser?.displayName || "Unknown participant",
+    joinedAt: participant.earliestStartTime || "",
+    leftAt: participant.latestEndTime || ""
+  })));
+  const combined = new Map<string, { name: string; joinedAt: string; leftAt: string }>();
+  for (const entry of entries) {
+    const key = entry.name.trim().toLocaleLowerCase();
+    const existing = combined.get(key);
+    if (!existing) { combined.set(key, entry); continue; }
+    const joined = [existing.joinedAt, entry.joinedAt].filter(Boolean).sort()[0] || "";
+    const left = [existing.leftAt, entry.leftAt].filter(Boolean).sort().at(-1) || "";
+    combined.set(key, { name: existing.name, joinedAt: joined, leftAt: left });
+  }
+  return [...combined.values()].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
+}
+
 function matchSession(record: MeetConferenceRecord, studentId: string, sessions: SessionWithId[]) {
   const start = new Date(record.startTime).getTime();
   return sessions.filter((session) => session.studentId === studentId && session.scheduledAt)
@@ -78,7 +96,7 @@ function classSummary(student: StudentCode, session: SessionWithId, calls: Call[
   const scheduledStart = new Date(session.scheduledAt || "").getTime();
   const scheduledEnd = new Date(session.endsAt || "").getTime();
   return {
-    recordVersion: 3, recordType: "scheduled_class", recordKey: `session:${session._id}`,
+    recordVersion: 4, recordType: "scheduled_class", recordKey: `session:${session._id}`,
     conferenceRecordNames: calls.map(({ record }) => record.name), meetingCode: student.meetingCode,
     studentId: student.studentId, studentName: student.studentName, classSessionId: String(session._id || ""),
     meetingNumber: session.meetingNumber || null, sessionDate: session.sessionDate || "",
@@ -87,7 +105,7 @@ function classSummary(student: StudentCode, session: SessionWithId, calls: Call[
     durationMinutes: active ? null : calls.reduce((sum, { record }) => sum + (durationMinutes(record) || 0), 0),
     startDifferenceMinutes: Number.isFinite(scheduledStart) ? Math.round((actualStart - scheduledStart) / 60_000) : null,
     endDifferenceMinutes: Number.isFinite(scheduledEnd) && Number.isFinite(actualEnd) ? Math.round((actualEnd - scheduledEnd) / 60_000) : null,
-    participantNames: uniqueNames(calls.flatMap((call) => call.participantNames)), status: active ? "In progress" : "Ended",
+    participantNames: uniqueNames(calls.flatMap((call) => call.participantNames)), participantSessions: participantSummary(calls), status: active ? "In progress" : "Ended",
     ...recordingSummary(calls), syncedAt: new Date()
   };
 }
@@ -106,7 +124,7 @@ export async function syncMeetMonitoring() {
 
     for (const student of codes) for (const record of await listConferenceRecords(student.meetingCode, since)) {
       const [participants, recordings] = await Promise.all([listConferenceParticipants(record.name), listConferenceRecordings(record.name)]);
-      const call: Call = { record, recordings, participantNames: uniqueNames(participants.map((participant) => participant.signedinUser?.displayName || participant.anonymousUser?.displayName || participant.phoneUser?.displayName || "")) };
+      const call: Call = { record, recordings, participants, participantNames: uniqueNames(participants.map((participant) => participant.signedinUser?.displayName || participant.anonymousUser?.displayName || participant.phoneUser?.displayName || "")) };
       const duration = durationMinutes(record);
       if (!call.participantNames.length || (duration !== null && duration < 3)) continue;
       const session = matchSession(record, student.studentId, sessions);
@@ -125,13 +143,13 @@ export async function syncMeetMonitoring() {
       synced++;
     }
     for (const { student, call } of unmatched) await collection.updateOne({ recordKey: `unmatched:${call.record.name}` }, { $set: {
-      recordVersion: 3, recordType: "unmatched_call", recordKey: `unmatched:${call.record.name}`, conferenceRecordNames: [call.record.name],
+      recordVersion: 4, recordType: "unmatched_call", recordKey: `unmatched:${call.record.name}`, conferenceRecordNames: [call.record.name],
       studentId: student.studentId, studentName: student.studentName, meetingCode: student.meetingCode,
       actualStartAt: call.record.startTime, actualEndAt: call.record.endTime || "", durationMinutes: durationMinutes(call.record),
-      participantNames: call.participantNames, status: call.record.endTime ? "Ended" : "In progress", ...recordingSummary([call]), syncedAt: new Date(),
+      participantNames: call.participantNames, participantSessions: participantSummary([call]), status: call.record.endTime ? "Ended" : "In progress", ...recordingSummary([call]), syncedAt: new Date(),
       expiresAt: new Date(new Date(call.record.startTime).getTime() + UNMATCHED_RETENTION_MS)
     } }, { upsert: true });
-    await collection.deleteMany({ recordVersion: { $ne: 3 } });
+    await collection.deleteMany({ recordVersion: { $ne: 4 } });
     revalidatePath("/ceo/meet-monitoring");
   } catch (error) {
     redirect(messageUrl("error", error instanceof Error ? error.message : "Meet monitoring sync failed."));
