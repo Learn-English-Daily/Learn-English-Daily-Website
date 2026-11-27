@@ -68,6 +68,7 @@ type AttendanceDocument = {
 type DashboardData = {
   todaySessions: Array<{
     id: string;
+    studentId: string;
     studentName: string;
     meetingNumber: number;
     scheduledAt: string;
@@ -90,6 +91,9 @@ type DashboardData = {
 };
 
 type MeetActivity = {
+  studentId?: string;
+  meetingNumber?: number;
+  sessionDate?: string;
   actualStartAt?: string;
   actualEndAt?: string;
   participantSessions?: Array<{ name?: string; joinedAt?: string; leftAt?: string }>;
@@ -177,6 +181,7 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
     .filter((doc) => doc.sessionDate === today && !doc.studentLifecycleClosed)
     .map((doc) => ({
       id: doc._id.toString(),
+      studentId: doc.studentId || "",
       studentName: doc.studentName || "Unknown",
       meetingNumber: doc.meetingNumber || 0,
       scheduledAt: doc.scheduledAt || "",
@@ -194,6 +199,7 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
     .filter((doc) => doc.sessionDate === today)
     .map((doc) => ({
       id: `group-${doc._id.toString()}`,
+      studentId: "",
       studentName: `${doc.batchName} (Group)`,
       meetingNumber: doc.meetingNumber,
       scheduledAt: `${doc.sessionDate}T${doc.startTime}:00+07:00`,
@@ -212,6 +218,7 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
     .filter((doc) => !scheduledPrivateKeys.has(`${doc.studentId || ""}:${doc.meetingNumber || 0}`))
     .map((doc) => ({
       id: `attendance-${doc._id.toString()}`,
+      studentId: doc.studentId || "",
       studentName: doc.studentName || "Unknown",
       meetingNumber: doc.meetingNumber || 0,
       scheduledAt: doc.scheduledAt || (doc.meetingDate && doc.startTime ? `${doc.meetingDate}T${doc.startTime}:00+07:00` : ""),
@@ -224,13 +231,14 @@ async function getDashboardData(groupOnly: boolean): Promise<DashboardData> {
   const privateRecordKeys = privateTodaySessions.map((session) => `session:${session.id}`);
   const groupRecordKeys = groupTodaySessions.map((session) => `batch-session:${session.id.replace("group-", "")}`);
   const meetRecordKeys = [...privateRecordKeys, ...groupRecordKeys];
-  const meetRecords = !meetRecordKeys.length ? [] : await db.collection<MeetActivity & { recordKey?: string }>(getMeetMonitoringCollectionName())
-    .find({ recordKey: { $in: meetRecordKeys }, recordType: "scheduled_class" })
-    .project({ recordKey: 1, actualStartAt: 1, actualEndAt: 1, participantSessions: 1, recordingSegments: 1, syncedAt: 1 })
+  const meetRecords = await db.collection<MeetActivity & { recordKey?: string }>(getMeetMonitoringCollectionName())
+    .find({ recordType: "scheduled_class", $or: [{ recordKey: { $in: meetRecordKeys } }, { sessionDate: today }] })
+    .project({ recordKey: 1, studentId: 1, meetingNumber: 1, sessionDate: 1, actualStartAt: 1, actualEndAt: 1, participantSessions: 1, recordingSegments: 1, syncedAt: 1 })
     .toArray();
   const meetActivityByKey = new Map(meetRecords.map((record) => [record.recordKey || "", record]));
+  const meetActivityByAttendance = new Map(meetRecords.filter((record) => record.studentId && record.meetingNumber && record.sessionDate).map((record) => [`${record.studentId}:${record.meetingNumber}:${record.sessionDate}`, record]));
 
-  const todaySessions = [...privateTodaySessions.map((session) => ({ ...session, meetActivity: meetActivityByKey.get(`session:${session.id}`) || null })), ...completedPrivateAttendance.map((session) => ({ ...session, meetActivity: null })), ...groupTodaySessions.map((session) => ({ ...session, meetActivity: meetActivityByKey.get(`batch-session:${session.id.replace("group-", "")}`) || null }))]
+  const todaySessions = [...privateTodaySessions.map((session) => ({ ...session, meetActivity: meetActivityByKey.get(`session:${session.id}`) || meetActivityByAttendance.get(`${session.studentId}:${session.meetingNumber}:${session.sessionDate}`) || null })), ...completedPrivateAttendance.map((session) => ({ ...session, meetActivity: meetActivityByAttendance.get(`${session.studentId}:${session.meetingNumber}:${session.sessionDate}`) || null })), ...groupTodaySessions.map((session) => ({ ...session, meetActivity: meetActivityByKey.get(`batch-session:${session.id.replace("group-", "")}`) || null }))]
     .sort((a, b) => {
       if (a.timeRecorded !== b.timeRecorded) return a.timeRecorded ? -1 : 1;
       return a.scheduledAt.localeCompare(b.scheduledAt);
