@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "schedules": {
     "sync-meet-monitoring": {
-      "schedule": "*/10 * * * *",
+      "schedule": "*/30 * * * *",
       "function": "api/sync-meet-monitoring.ts",
       "timezone": "UTC"
     }
