@@ -3,12 +3,12 @@
   "schedules": {
     "sync-meet-monitoring": {
       "schedule": "*/30 * * * *",
-      "function": "api/sync-meet-monitoring.ts",
+      "function": "src/app/api/scheduled/meet-monitoring/route.ts",
       "timezone": "UTC"
     }
   },
   "functions": {
-    "api/sync-meet-monitoring.ts": {
+    "src/app/api/scheduled/meet-monitoring/route.ts": {
       "maxDuration": 60,
       "experimentalTriggers": [
         {
