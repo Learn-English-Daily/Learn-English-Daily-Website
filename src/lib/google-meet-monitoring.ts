@@ -24,6 +24,14 @@ export type MeetParticipant = {
   phoneUser?: { displayName?: string };
 };
 
+export type MeetRecording = {
+  name: string;
+  state?: "STATE_UNSPECIFIED" | "STARTED" | "ENDED" | "FILE_GENERATED";
+  startTime?: string;
+  endTime?: string;
+  driveDestination?: { file?: string; exportUri?: string };
+};
+
 type CachedToken = { token: string; expiresAt: number };
 const globalForGoogle = globalThis as typeof globalThis & { _leadGoogleMeetToken?: CachedToken };
 
@@ -150,6 +158,20 @@ export async function listConferenceParticipants(conferenceRecordName: string) {
     pageToken = response.nextPageToken || "";
   } while (pageToken);
   return participants;
+}
+
+export async function listConferenceRecordings(conferenceRecordName: string) {
+  const recordings: MeetRecording[] = [];
+  let pageToken = "";
+  do {
+    const response = await meetGet<{ recordings?: MeetRecording[]; nextPageToken?: string }>(`${conferenceRecordName}/recordings`, {
+      pageSize: "100",
+      ...(pageToken ? { pageToken } : {})
+    });
+    recordings.push(...(response.recordings || []));
+    pageToken = response.nextPageToken || "";
+  } while (pageToken);
+  return recordings;
 }
 
 export function getMeetMonitoringCollectionName() {

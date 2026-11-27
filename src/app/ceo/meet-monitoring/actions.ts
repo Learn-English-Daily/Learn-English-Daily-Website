@@ -5,13 +5,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getClassSessionsCollectionName, type ClassSessionDocument } from "@/lib/class-sessions";
 import { CEO_SESSION_COOKIE, isValidCeoSession } from "@/lib/ceo-auth";
-import { getMeetingCode, getMeetMonitoringCollectionName, listConferenceParticipants, listConferenceRecords, type MeetConferenceRecord } from "@/lib/google-meet-monitoring";
+import { getMeetingCode, getMeetMonitoringCollectionName, listConferenceParticipants, listConferenceRecordings, listConferenceRecords, type MeetConferenceRecord, type MeetRecording } from "@/lib/google-meet-monitoring";
 import { getMongoDb } from "@/lib/mongodb";
 import { getStudentRegistrationCollectionName } from "@/lib/student-registration";
 
 type MeetStudent = { studentId?: string; studentName?: string; permanentMeetLink?: string };
 type StudentCode = { studentId: string; studentName: string; meetingCode: string };
-type Call = { record: MeetConferenceRecord; participantNames: string[] };
+type Call = { record: MeetConferenceRecord; participantNames: string[]; recordings: MeetRecording[] };
 type SessionWithId = ClassSessionDocument & { _id?: { toString(): string } };
 
 const MATCH_WINDOW_MS = 3 * 60 * 60 * 1000;
@@ -28,6 +28,37 @@ function uniqueNames(names: string[]) {
 function durationMinutes(record: MeetConferenceRecord) {
   if (!record.endTime) return null;
   return Math.max(0, Math.round((new Date(record.endTime).getTime() - new Date(record.startTime).getTime()) / 60_000));
+}
+
+function recordingDurationMinutes(recording: MeetRecording) {
+  if (!recording.startTime || !recording.endTime) return null;
+  return Math.max(0, Math.round((new Date(recording.endTime).getTime() - new Date(recording.startTime).getTime()) / 60_000));
+}
+
+function recordingSummary(calls: Call[]) {
+  const recordings = calls.flatMap((call) => call.recordings).sort((a, b) => new Date(a.startTime || 0).getTime() - new Date(b.startTime || 0).getTime());
+  const active = recordings.some((recording) => recording.state === "STARTED" || !recording.endTime);
+  const segments = recordings.map((recording) => ({
+    recordingName: recording.name,
+    startTime: recording.startTime || "",
+    endTime: recording.endTime || "",
+    state: recording.state || "STATE_UNSPECIFIED",
+    durationMinutes: recordingDurationMinutes(recording),
+    exportUri: recording.driveDestination?.exportUri || ""
+  }));
+  const completedEnds = recordings.flatMap((recording) => recording.endTime ? [new Date(recording.endTime).getTime()] : []);
+  const allReady = recordings.length > 0 && recordings.every((recording) => recording.state === "FILE_GENERATED");
+  const processing = recordings.some((recording) => recording.state === "ENDED");
+  return {
+    recordingCount: recordings.length,
+    recordingStartedAt: recordings[0]?.startTime || "",
+    recordingEndedAt: active || !completedEnds.length ? "" : new Date(Math.max(...completedEnds)).toISOString(),
+    recordingDurationMinutes: recordings.reduce((sum, recording) => sum + (recordingDurationMinutes(recording) || 0), 0),
+    recordingStatus: !recordings.length ? "Not recorded" : active ? "Recording" : allReady ? "Ready" : processing ? "Processing" : "Stopped",
+    recordingWasInterrupted: recordings.length > 1,
+    recordingRestartCount: Math.max(0, recordings.length - 1),
+    recordingSegments: segments
+  };
 }
 
 function matchSession(record: MeetConferenceRecord, studentId: string, sessions: SessionWithId[]) {
@@ -47,7 +78,7 @@ function classSummary(student: StudentCode, session: SessionWithId, calls: Call[
   const scheduledStart = new Date(session.scheduledAt || "").getTime();
   const scheduledEnd = new Date(session.endsAt || "").getTime();
   return {
-    recordVersion: 2, recordType: "scheduled_class", recordKey: `session:${session._id}`,
+    recordVersion: 3, recordType: "scheduled_class", recordKey: `session:${session._id}`,
     conferenceRecordNames: calls.map(({ record }) => record.name), meetingCode: student.meetingCode,
     studentId: student.studentId, studentName: student.studentName, classSessionId: String(session._id || ""),
     meetingNumber: session.meetingNumber || null, sessionDate: session.sessionDate || "",
@@ -56,7 +87,8 @@ function classSummary(student: StudentCode, session: SessionWithId, calls: Call[
     durationMinutes: active ? null : calls.reduce((sum, { record }) => sum + (durationMinutes(record) || 0), 0),
     startDifferenceMinutes: Number.isFinite(scheduledStart) ? Math.round((actualStart - scheduledStart) / 60_000) : null,
     endDifferenceMinutes: Number.isFinite(scheduledEnd) && Number.isFinite(actualEnd) ? Math.round((actualEnd - scheduledEnd) / 60_000) : null,
-    participantNames: uniqueNames(calls.flatMap((call) => call.participantNames)), status: active ? "In progress" : "Ended", syncedAt: new Date()
+    participantNames: uniqueNames(calls.flatMap((call) => call.participantNames)), status: active ? "In progress" : "Ended",
+    ...recordingSummary(calls), syncedAt: new Date()
   };
 }
 
@@ -73,8 +105,8 @@ export async function syncMeetMonitoring() {
     const unmatched: { student: StudentCode; call: Call }[] = [];
 
     for (const student of codes) for (const record of await listConferenceRecords(student.meetingCode, since)) {
-      const participants = await listConferenceParticipants(record.name);
-      const call: Call = { record, participantNames: uniqueNames(participants.map((participant) => participant.signedinUser?.displayName || participant.anonymousUser?.displayName || participant.phoneUser?.displayName || "")) };
+      const [participants, recordings] = await Promise.all([listConferenceParticipants(record.name), listConferenceRecordings(record.name)]);
+      const call: Call = { record, recordings, participantNames: uniqueNames(participants.map((participant) => participant.signedinUser?.displayName || participant.anonymousUser?.displayName || participant.phoneUser?.displayName || "")) };
       const duration = durationMinutes(record);
       if (!call.participantNames.length || (duration !== null && duration < 3)) continue;
       const session = matchSession(record, student.studentId, sessions);
@@ -93,13 +125,13 @@ export async function syncMeetMonitoring() {
       synced++;
     }
     for (const { student, call } of unmatched) await collection.updateOne({ recordKey: `unmatched:${call.record.name}` }, { $set: {
-      recordVersion: 2, recordType: "unmatched_call", recordKey: `unmatched:${call.record.name}`, conferenceRecordNames: [call.record.name],
+      recordVersion: 3, recordType: "unmatched_call", recordKey: `unmatched:${call.record.name}`, conferenceRecordNames: [call.record.name],
       studentId: student.studentId, studentName: student.studentName, meetingCode: student.meetingCode,
       actualStartAt: call.record.startTime, actualEndAt: call.record.endTime || "", durationMinutes: durationMinutes(call.record),
-      participantNames: call.participantNames, status: call.record.endTime ? "Ended" : "In progress", syncedAt: new Date(),
+      participantNames: call.participantNames, status: call.record.endTime ? "Ended" : "In progress", ...recordingSummary([call]), syncedAt: new Date(),
       expiresAt: new Date(new Date(call.record.startTime).getTime() + UNMATCHED_RETENTION_MS)
     } }, { upsert: true });
-    await collection.deleteMany({ recordVersion: { $ne: 2 } });
+    await collection.deleteMany({ recordVersion: { $ne: 3 } });
     revalidatePath("/ceo/meet-monitoring");
   } catch (error) {
     redirect(messageUrl("error", error instanceof Error ? error.message : "Meet monitoring sync failed."));
