@@ -1,0 +1,25 @@
+name: Sync Meet monitoring
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-meet-monitoring
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger secured production sync
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --max-time 240 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://www.learn-english-daily.com/api/cron/meet-monitoring
