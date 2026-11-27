@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getClassSessionsCollectionName, type ClassSessionDocument } from "@/lib/class-sessions";
@@ -148,16 +149,13 @@ function groupClassSummary(batch: BatchCode, session: BatchSessionWithId, calls:
   };
 }
 
-export async function syncMeetMonitoring() {
-  if (!isValidCeoSession((await cookies()).get(CEO_SESSION_COOKIE)?.value)) throw new Error("Unauthorized");
+async function runMeetMonitoringSync(since: Date) {
   let synced = 0;
-  try {
-    const db = await getMongoDb();
+  const db = await getMongoDb();
     const students = await db.collection<MeetStudent>(getStudentRegistrationCollectionName()).find({ classType: "Premium 1-to-1", permanentMeetLink: { $type: "string", $ne: "" } }).project({ studentId: 1, studentName: 1, permanentMeetLink: 1 }).toArray();
     const batches = await db.collection<MeetBatch>(getBatchesCollectionName()).find({}).project({ batchName: 1, permanentMeetLink: 1 }).toArray();
     const codes: StudentCode[] = students.map((student) => ({ studentId: student.studentId || "", studentName: student.studentName || "Unknown student", meetingCode: getMeetingCode(student.permanentMeetLink || "") })).filter((student) => student.studentId && student.meetingCode);
     const batchCodes: BatchCode[] = batches.map((batch) => ({ batchId: String(batch._id || ""), batchName: batch.batchName || "Unknown batch", meetingCode: getMeetingCode(getBatchMeetLink(batch.batchName || "", batch.permanentMeetLink)) })).filter((batch) => batch.batchId && batch.meetingCode);
-    const since = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
     const sessions = await db.collection<SessionWithId>(getClassSessionsCollectionName()).find({ studentId: { $in: codes.map(({ studentId }) => studentId) }, classMode: "Online", scheduledAt: { $gte: new Date(since.getTime() - 86_400_000).toISOString() } }).toArray();
     const batchSessions = await db.collection<BatchSessionWithId>(getBatchClassSessionsCollectionName()).find({ batchId: { $in: batchCodes.map(({ batchId }) => batchId) }, classMode: "Online", sessionDate: { $gte: since.toISOString().slice(0, 10) } }).toArray();
     const matched = new Map<string, { student: StudentCode; session: SessionWithId; calls: Call[] }>();
@@ -218,8 +216,25 @@ export async function syncMeetMonitoring() {
     } }, { upsert: true });
     await collection.deleteMany({ recordVersion: { $ne: 4 } });
     revalidatePath("/ceo/meet-monitoring");
+    revalidatePath("/admin");
+    return synced;
+}
+
+export async function syncMeetMonitoring() {
+  if (!isValidCeoSession((await cookies()).get(CEO_SESSION_COOKIE)?.value)) throw new Error("Unauthorized");
+  let synced = 0;
+  try {
+    synced = await runMeetMonitoringSync(new Date(Date.now() - 31 * 24 * 60 * 60 * 1000));
   } catch (error) {
     redirect(messageUrl("error", error instanceof Error ? error.message : "Meet monitoring sync failed."));
   }
   redirect(messageUrl("success", `Synced ${synced} scheduled class summar${synced === 1 ? "y" : "ies"}.`));
+}
+
+export async function syncMeetMonitoringAutomatically() {
+  const secret = process.env.CRON_SECRET?.trim();
+  const authorization = (await headers()).get("authorization");
+  if (!secret || authorization !== `Bearer ${secret}`) throw new Error("Unauthorized cron request");
+  const synced = await runMeetMonitoringSync(new Date(Date.now() - 8 * 60 * 60 * 1000));
+  return { synced, syncedAt: new Date().toISOString() };
 }
